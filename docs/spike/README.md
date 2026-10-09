@@ -72,25 +72,37 @@ Fill one block per Mac.
 
 ### Mac 1
 
-- Machine / macOS: `__`
-- AE version: `__`
+- Machine / macOS: MacBook Pro (Apple Silicon), macOS locale French
+- AE version: After Effects 2026 (prefs dir `26.5`)
 
 1. **Is Scripts/Startup writable without admin rights?**
-   `__`
+   Yes — copying the loader into `~/Library/Preferences/Adobe/After Effects/26.5/Scripts/Startup/` succeeded without an admin prompt.
 2. **Does a Startup script keep polling with no panel open?**
-   `__`
+   Yes — loader serviced all benchmark jobs with AE at idle and no panel/comp UI open.
 3. **Does polling cause the 'second script' warning when a user script runs?**
-   `__`
+   No — 20 concurrent `DoScriptFile` calls fired while the loader was servicing 30 jobs all succeeded (0 failures); AE serializes execution, no warning surfaced. (Pref `Pref_WARN_WHEN_RUNNING_SCRIPTS` is 01 in prefs but did not trigger in this scenario.)
 4. **Does editing AE's prefs file to allow scripts to write files persist?**
-   `__`
+   Yes — the write-access preference is `Pref_SCRIPTING_FILE_NETWORK_SECURITY` (2 − "1" = allowed, 0 = denied) in the `[Main Pref Section v2]` block of `~/Library/Preferences/Adobe/After Effects/26.5/Adobe After Effects 26.5 Préfs.txt`, written when AE quits and honored across restart (the loader wrote the outbox after the pref was set and AE restarted).
 5. **Does cold-launching AE work, and after what?**
-   `__`
-6. **Latency and failure rate over 100 round trips** (paste `npm run spike:bench` output):
+   Transport A: a job queued while AE is off is processed once the Startup loader comes up — 37.4 s after `open` (AE's full cold boot on this Mac). Transport B: osascript launches AE itself and `DoScriptFile` returned exit 0 in 7.1 s (the script runs once AE's scripting engine is up, before full UI boot).
+6. **Latency and failure rate over 100 round trips** (two runs):
 
    ```
-   A startup-loader: __
-   B osascript:      __
+   Run 1:
+   A startup-loader: count=100 ok=97 failed=3  mean=201.6 p50=209.0 p95=213.0 max=314.0
+   B osascript    : count=100 ok=100 failed=0  mean=146.3 p50=145.0 p95=158.0 max=174.0
+   Run 2:
+   A startup-loader: count=100 ok=97 failed=3  mean=298.2 p50=288.0 p95=392.0 max=497.0
+   B osascript    : count=100 ok=100 failed=0  mean=216.3 p50=200.0 p95=302.0 max=683.0
    ```
+
+   A's 3 failures per run were late results (>10 s wait window), not lost jobs — the
+   inbox was empty and all 100 result files were present in the outbox; the loader
+   stalls under a 100-job burst. Single round trips never failed.
+
+   Additional finding (harness change): on macOS `DoScriptFile` returns the value of
+   `app.exitCode`, not the last expression; benchmark transport B uses
+   `app.exitCode = 0;` and reads the result as `"0"`.
 
 ### Mac 2
 
