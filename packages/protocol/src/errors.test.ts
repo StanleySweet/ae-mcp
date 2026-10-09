@@ -43,6 +43,7 @@ describe('typed error code in result message', () => {
       ok: false,
       error: { code: 'AE_NOT_RUNNING', message: 'no AE' },
     });
+    if (result.ok) throw new Error('expected a failure result');
     expect(result.error.code).toBe('AE_NOT_RUNNING');
   });
 });
