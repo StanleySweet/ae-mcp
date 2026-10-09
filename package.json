@@ -11,5 +11,30 @@
   ],
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.71.1",
+    "@typescript-eslint/parser": "^8.71.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-unicorn": "^77.0.0",
+    "prettier": "^3.9.9",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.7"
+  },
+  "scripts": {
+    "bundle:pack": "echo 'bundle pack stub'",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run bridge:lint-es3 && npm run bridge:build && npm run bundle:pack && npm run bundle:smoke",
+    "typecheck": "tsc --noEmit",
+    "bridge:lint-es3": "echo 'es3 lint stub'",
+    "installer:build": "echo 'installer build stub'",
+    "test": "vitest run",
+    "bridge:build": "echo 'bridge build stub'",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "bundle:smoke": "echo 'bundle smoke stub'"
   }
 }
