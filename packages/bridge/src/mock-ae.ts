@@ -34,6 +34,15 @@ export class MockFile {
     return this.ae.fs.has(this.path);
   }
 
+  get fsName(): string {
+    return this.path;
+  }
+
+  get name(): string {
+    const i = this.path.lastIndexOf('/');
+    return i >= 0 ? this.path.slice(i + 1) : this.path;
+  }
+
   open(mode: 'r' | 'w'): boolean {
     if (mode === 'r' && !this.ae.fs.has(this.path)) {
       return false;
@@ -80,6 +89,23 @@ export class MockFolder {
     this.ae.dirs.add(this.path);
     return true;
   }
+
+  getFiles(mask: string): MockFile[] {
+    const out: MockFile[] = [];
+    for (const path of this.ae.fs.keys()) {
+      const rest = path.slice(this.path.length + 1);
+      if (path.startsWith(`${this.path}/`) && !rest.includes('/') && globMatch(rest, mask)) {
+        out.push(new MockFile(this.ae, path));
+      }
+    }
+    return out;
+  }
+}
+
+function globMatch(name: string, mask: string): boolean {
+  const escaped = mask.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`^${escaped.replace(/\*/g, '.*').replace(/\?/g, '.')}$`);
+  return re.test(name);
 }
 
 export class MockAE {
