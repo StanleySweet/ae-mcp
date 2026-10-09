@@ -39,7 +39,7 @@
     "bridge:lint-es3": "echo 'es3 lint stub'",
     "installer:build": "echo 'installer build stub'",
     "test": "vitest run",
-    "bridge:build": "echo 'bridge build stub'",
+    "bridge:build": "tsx packages/bridge/src/build.ts",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
     "bundle:smoke": "echo 'bundle smoke stub'"
   }
