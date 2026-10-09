@@ -8,3 +8,11 @@ export {
 export type { JobMessage, HeartbeatMessage, ResultMessage } from './messages.js';
 export { errorCodes, errorCodeSchema, errorHints, makeError } from './errors.js';
 export type { ErrorCode } from './errors.js';
+export {
+  queueRoot,
+  bridgeDir,
+  inboxDir,
+  outboxDir,
+  ensureQueue,
+  writeAtomic,
+} from './queue.js';
