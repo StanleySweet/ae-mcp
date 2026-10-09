@@ -25,6 +25,10 @@ const defaultRunner: Runner = (command, args, options) =>
  * Transport B: run one ExtendScript file in After Effects per call via
  * osascript `DoScriptFile`.
  *   https://ae-scripting.docsforadobe.dev/introduction/overview/#how-to-include-after-effects-scripting-in-an-applescript-mac-os
+ *
+ * On macOS the DoScript result is the value of `app.exitCode` (default 0), not
+ * the JS last expression — a script must set it explicitly to return a value.
+ *   https://ae-scripting.docsforadobe.dev/general/application/#appexitcode
  */
 export function createOsaScriptDispatcher(
   runner: Runner = defaultRunner,

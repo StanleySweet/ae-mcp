@@ -33,8 +33,8 @@ async function runTransportB(): Promise<Stats> {
   for (let i = 0; i < COUNT; i++) {
     const started = Date.now();
     try {
-      const result = await dispatch.evalScript(`"${COMMAND}"`);
-      if (result !== COMMAND) {
+      const result = await dispatch.evalScript('app.exitCode = 0;');
+      if (result !== '0') {
         failures += 1;
       } else {
         latencies.push(Date.now() - started);

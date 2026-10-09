@@ -14,8 +14,11 @@ questions and become the ADR's evidence. Spike tooling lives in `packages/spike`
   (`send` / `waitForResult` / `readResult`).
 - **Transport B — osascript** (`packages/spike/src/osascript.ts`).
   One `osascript -e 'tell application "<AE app name>" to DoScriptFile "<job.jsx>"'`
-  invocation per call. AE executes the script file and returns its result.
+  invocation per call. AE executes the script file and returns its result —
+  measured on macOS as the value of `app.exitCode` (default 0), so scripts set
+  it to return a value.
   AE AppleScript integration: https://ae-scripting.docsforadobe.dev/introduction/overview/
+  `app.exitCode`: https://ae-scripting.docsforadobe.dev/general/application/#appexitcode
 
 ## Prerequisites
 
