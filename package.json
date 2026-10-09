@@ -36,7 +36,7 @@
     "check": "npm run lint && npm run typecheck && npm run test && npm run bridge:lint-es3 && npm run bridge:build && npm run bundle:pack && npm run bundle:smoke",
     "spike:bench": "tsx packages/spike/src/benchmark.ts",
     "typecheck": "tsc -b --emitDeclarationOnly",
-    "bridge:lint-es3": "echo 'es3 lint stub'",
+    "bridge:lint-es3": "eslint --config packages/bridge/es3-lint.config.js \"packages/bridge/src/*.js\"",
     "installer:build": "echo 'installer build stub'",
     "test": "vitest run",
     "bridge:build": "tsx packages/bridge/src/build.ts",
