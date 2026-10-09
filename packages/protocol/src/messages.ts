@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { errorCodeSchema } from './errors.js';
 
 export const PROTOCOL_VERSION = 1 as const;
 
@@ -21,7 +22,7 @@ export const heartbeatSchema = z.object({
 });
 
 export const errorSchema = z.object({
-  code: z.string(),
+  code: errorCodeSchema,
   message: z.string(),
   hint: z.string().optional(),
 });
