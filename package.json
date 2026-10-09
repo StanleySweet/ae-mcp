@@ -27,7 +27,8 @@
     "prettier": "^3.9.9",
     "tsx": "^4.23.15",
     "typescript": "^5.9.2",
-    "vitest": "^3.2.7"
+    "vite": "^8.3.4",
+    "vitest": "^5.0.3"
   },
   "scripts": {
     "bundle:pack": "echo 'bundle pack stub'",
