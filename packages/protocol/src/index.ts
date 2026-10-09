@@ -1,1 +1,8 @@
-export const PROTOCOL_VERSION = 1 as const;
+export {
+  PROTOCOL_VERSION,
+  jobSchema,
+  heartbeatSchema,
+  resultSchema,
+  errorSchema,
+} from './messages.js';
+export type { JobMessage, HeartbeatMessage, ResultMessage } from './messages.js';
