@@ -16,3 +16,5 @@ export {
   ensureQueue,
   writeAtomic,
 } from './queue.js';
+export { contractCases } from './contract-suite.js';
+export type { BridgeDriver, ContractCase } from './contract-suite.js';
