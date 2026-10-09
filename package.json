@@ -15,6 +15,7 @@
   "devDependencies": {
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
+    "@types/node": "^24.19.2",
     "@typescript-eslint/eslint-plugin": "^8.71.1",
     "@typescript-eslint/parser": "^8.71.1",
     "@vitest/coverage-v8": "^5.0.3",
@@ -33,7 +34,7 @@
   "scripts": {
     "bundle:pack": "echo 'bundle pack stub'",
     "check": "npm run lint && npm run typecheck && npm run test && npm run bridge:lint-es3 && npm run bridge:build && npm run bundle:pack && npm run bundle:smoke",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b --emitDeclarationOnly",
     "bridge:lint-es3": "echo 'es3 lint stub'",
     "installer:build": "echo 'installer build stub'",
     "test": "vitest run",
