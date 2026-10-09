@@ -7,7 +7,7 @@ import unicorn from 'eslint-plugin-unicorn';
 
 export default [
   {
-    ignores: ['**/dist', 'coverage', 'out', '**/transport-a/*.jsx'],
+    ignores: ['**/dist', 'coverage', 'out', '**/transport-a/*.jsx', 'packages/bridge/src/*.js'],
   },
   js.configs.recommended,
   {

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const SRC_DIR = join(dirname(fileURLToPath(import.meta.url)));
 
 const PAYLOAD_SOURCES = ['es3-polyfills.js', 'es3-json2.js'];
-const LOADER_SOURCES: string[] = [];
+const LOADER_SOURCES = ['es3-polyfills.js', 'es3-json2.js', 'loader.js'];
 
 async function bridgeVersion(): Promise<string> {
   const pkg = JSON.parse(await readFile(join(SRC_DIR, '..', 'package.json'), 'utf8'));

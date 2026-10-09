@@ -14,9 +14,81 @@ export interface MockUndoGroup {
   end: number;
 }
 
+function homeOf(ae: MockAE): string {
+  return ae.env.HOME ?? '';
+}
+
+export class MockFile {
+  private opened: 'r' | 'w' | null = null;
+  private buffer = '';
+  readonly path: string;
+
+  constructor(
+    private readonly ae: MockAE,
+    path: string,
+  ) {
+    this.path = path.replace(/^~/, homeOf(ae));
+  }
+
+  get exists(): boolean {
+    return this.ae.fs.has(this.path);
+  }
+
+  open(mode: 'r' | 'w'): boolean {
+    if (mode === 'r' && !this.ae.fs.has(this.path)) {
+      return false;
+    }
+    this.opened = mode;
+    return true;
+  }
+
+  read(): string {
+    return this.ae.fs.get(this.path) ?? '';
+  }
+
+  write(text: string): void {
+    this.buffer += text;
+  }
+
+  close(): void {
+    if (this.opened === 'w') {
+      this.ae.fs.set(this.path, this.buffer);
+    }
+    this.opened = null;
+  }
+
+  remove(): void {
+    this.ae.fs.delete(this.path);
+  }
+}
+
+export class MockFolder {
+  readonly path: string;
+
+  constructor(
+    private readonly ae: MockAE,
+    path: string,
+  ) {
+    this.path = path.replace(/^~/, homeOf(ae));
+  }
+
+  get exists(): boolean {
+    return this.ae.dirs.has(this.path);
+  }
+
+  create(): boolean {
+    this.ae.dirs.add(this.path);
+    return true;
+  }
+}
+
 export class MockAE {
   readonly undoGroups: MockUndoGroup[] = [];
   readonly alerts: string[] = [];
+  readonly fs = new Map<string, string>();
+  readonly dirs = new Set<string>();
+  readonly env: Record<string, string> = {};
+  evalFileCalls = 0;
   private clock = 0;
   private undoDepth = 0;
   private nextTaskId = 1;
@@ -24,6 +96,7 @@ export class MockAE {
 
   app = {
     exitCode: 0,
+    version: 'MockAE-25',
     beginUndoGroup: (name?: string): void => {
       this.undoDepth += 1;
       this.undoGroups.push({ name, start: this.clock, end: -1 });
@@ -53,9 +126,15 @@ export class MockAE {
     },
   };
 
-  $ = {
-    hiresTimer: (): number => this.clock,
-    os: 'MockAE',
+  $: {
+    hiresTimer: () => number;
+    os: string;
+    getenv: (name: string) => string | undefined;
+    evalFile?: (path: string) => unknown;
+  } = {
+    hiresTimer: () => this.clock,
+    os: 'MockAE-OS',
+    getenv: (name: string) => this.env[name],
   };
 
   now(): number {
@@ -90,8 +169,22 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     app: ae.app,
     $: ae.$,
     JSON: undefined,
+    File: function (path: string): MockFile {
+      return new MockFile(ae, path);
+    },
+    Folder: function (path: string): MockFolder {
+      return new MockFolder(ae, path);
+    },
   };
   const context = vm.createContext(sandbox);
+  ae.$.evalFile = (path: string): unknown => {
+    ae.evalFileCalls += 1;
+    const content = ae.fs.get(path);
+    if (content === undefined) {
+      throw new Error(`file not found: ${path}`);
+    }
+    return vm.runInContext(content, context);
+  };
   vm.runInContext(code, context);
   return context;
 }
