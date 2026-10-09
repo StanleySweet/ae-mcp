@@ -40,8 +40,8 @@ On AE startup the loader:
    job through the payload's job runner.
 
 The job runner (`AEMCP` in the payload) exposes `processJob(path)`,
-`invoke(tool, args, deadline)`, and `poll(root)` for transport B to drive with
-`DoScriptFile`. Each job:
+`invoke(tool, args, deadline)`, `poll(root)`, `register(tool, fn)` and
+`capabilities()` for transport B to drive with `DoScriptFile`. Each job:
 
 - runs inside one undo group named `ae-mcp <tool>`;
 - always writes a result to `bridge/outbox/<id>.json` — `ok: true` with the
@@ -50,5 +50,6 @@ The job runner (`AEMCP` in the payload) exposes `processJob(path)`,
   throw) and the canonical hint;
 - consumes the job file.
 
-`capabilities` is populated by the handler registry (E3-7); `busy` and chunked
-execution come from E3-8.
+`capabilities` in the heartbeat is the alphabetically sorted list of tools
+registered via `AEMCP.register` (op scripts self-register when the payload
+loads); `busy` and chunked execution come from E3-8.

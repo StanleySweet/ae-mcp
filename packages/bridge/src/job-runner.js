@@ -92,6 +92,25 @@ function aemcpPollInbox(root) {
     }
 }
 
+function aemcpRegister(tool, fn) {
+    if (typeof tool !== 'string' || tool.length === 0) {
+        throw new Error('AEMCP.register: tool must be a non-empty string');
+    }
+    if (typeof fn !== 'function') {
+        throw new Error('AEMCP.register: handler for ' + tool + ' must be a function');
+    }
+    if (AEMCP.HANDLERS[tool]) {
+        throw new Error('AEMCP.register: tool already registered: ' + tool);
+    }
+    AEMCP.HANDLERS[tool] = fn;
+}
+
+function aemcpCapabilities() {
+    var names = Object.keys(AEMCP.HANDLERS);
+    names.sort();
+    return names;
+}
+
 var AEMCP = {};
 AEMCP.HANDLERS = {};
 AEMCP.processJob = function (jobPath) {
@@ -102,4 +121,10 @@ AEMCP.invoke = function (tool, args, deadline) {
 };
 AEMCP.poll = function (root) {
     aemcpPollInbox(root);
+};
+AEMCP.register = function (tool, fn) {
+    return aemcpRegister(tool, fn);
+};
+AEMCP.capabilities = function () {
+    return aemcpCapabilities();
 };

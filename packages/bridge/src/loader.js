@@ -29,12 +29,16 @@ function aemcpLoadPayload(root) {
 }
 
 function aemcpSendHeartbeat(root, version) {
+    var caps = [];
+    if (typeof AEMCP !== 'undefined') {
+        caps = AEMCP.capabilities();
+    }
     var beat = {
         protocolVersion: 1,
         bridgeVersion: version,
         aeVersion: app.version,
         os: $.os,
-        capabilities: [],
+        capabilities: caps,
         busy: false,
         transport: 'startup-loader'
     };
