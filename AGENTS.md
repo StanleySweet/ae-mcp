@@ -18,6 +18,8 @@ Five canonical labels (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-f
 
 Single-context: `CONTEXT.md` at the root (created lazily), ADRs in `docs/decisions/`. See `docs/agents/domain.md`.
 
+Code map: `docs/agents/code-map.md` — file:line map of tool registration, bridge dispatch, registries and test harnesses. Read before exploring; update when code changes.
+
 ## Task execution loop (what every executing agent must do)
 
 Backlog rule 1: never start a task whose dependencies are not merged. Merge = the task issue is **closed**.
