@@ -1,7 +1,6 @@
-import { readFile, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { stat } from 'node:fs/promises';
 import { discoverAEVersions } from '@ae-mcp/core';
-import { heartbeatSchema, outboxDir } from '@ae-mcp/protocol';
+import { readHeartbeat } from './heartbeat.js';
 
 export type CheckStatus = 'ok' | 'fail';
 
@@ -35,26 +34,20 @@ async function heartbeatCheck(
   maxAgeMs: number,
   now: () => number,
 ): Promise<SetupCheck> {
-  const file = join(outboxDir(root), 'heartbeat.json');
-  let raw: string;
-  try {
-    raw = await readFile(file, 'utf8');
-  } catch {
-    return fail(
-      'bridge_heartbeat',
-      'Open After Effects. If it persists, reinstall the bridge with Setup.',
-    );
+  const state = await readHeartbeat(root, maxAgeMs, now);
+  switch (state.status) {
+    case 'ok':
+      return { check: 'bridge_heartbeat', status: 'ok' };
+    case 'missing':
+      return fail(
+        'bridge_heartbeat',
+        'Open After Effects. If it persists, reinstall the bridge with Setup.',
+      );
+    case 'unreadable':
+      return fail('bridge_heartbeat', 'The heartbeat is unreadable; restart After Effects.');
+    case 'stale':
+      return fail('bridge_heartbeat', 'The bridge stopped reporting; restart After Effects.');
   }
-  try {
-    heartbeatSchema.parse(JSON.parse(raw));
-  } catch {
-    return fail('bridge_heartbeat', 'The heartbeat is unreadable; restart After Effects.');
-  }
-  const age = now() - (await stat(file)).mtimeMs;
-  if (age > maxAgeMs) {
-    return fail('bridge_heartbeat', 'The bridge stopped reporting; restart After Effects.');
-  }
-  return { check: 'bridge_heartbeat', status: 'ok' };
 }
 
 async function queueDirCheck(root: string): Promise<SetupCheck> {

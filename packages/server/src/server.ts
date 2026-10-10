@@ -1,5 +1,6 @@
 import { queueRoot } from '@ae-mcp/protocol';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { buildAeContext } from './context.js';
 import { runSetupChecks } from './setup-checks.js';
 
 export const SERVER_NAME = 'ae-mcp';
@@ -27,6 +28,19 @@ export function createServer(options: ServerOptions = {}): McpServer {
         applicationsDir: options.applicationsDir,
       });
       return { content: [{ type: 'text', text: JSON.stringify(checks) }] };
+    },
+  );
+
+  server.registerTool(
+    'ae_context',
+    {
+      description:
+        'Report the live connection context: active transport, AE and bridge versions, capabilities and busy state.',
+      inputSchema: {},
+    },
+    async () => {
+      const context = await buildAeContext(root);
+      return { content: [{ type: 'text', text: JSON.stringify(context) }] };
     },
   );
 
