@@ -188,4 +188,36 @@ describe('bridge serializers', () => {
       text: { text: 'Hello', fontSize: 72, font: 'ArialMT', fillColor: [1, 1, 1] },
     });
   });
+
+  it('resolves ae_layer_info by comp name, all layers or an index subset', async () => {
+    const { ctx, ae } = await payloadContext();
+    seed(ae);
+    const comp = ae.project.item(1) as MockCompItem;
+    const first = new MockAVLayer('Layer 1', 'Layer');
+    first.id = 7;
+    const second = new MockAVLayer('Layer 2', 'Layer');
+    second.id = 8;
+    comp.addLayer(first);
+    comp.addLayer(second);
+
+    const all = vm.runInContext("AEMCP.invoke('ae_layer_info', { comp: 'Main' }, null).value", ctx);
+    expect(all.comp).toBe('Main');
+    expect(all.layers.map((layer: { name: string }) => layer.name)).toEqual([
+      'Layer 1',
+      'Layer 2',
+    ]);
+
+    const subset = vm.runInContext(
+      "AEMCP.invoke('ae_layer_info', { comp: 'Main', layers: [2, 9] }, null).value",
+      ctx,
+    );
+    expect(subset.layers.map((layer: { name: string }) => layer.name)).toEqual(['Layer 2']);
+    expect(subset.missing).toEqual([9]);
+
+    const unknown = vm.runInContext(
+      "AEMCP.invoke('ae_layer_info', { comp: 'Nope' }, null).value",
+      ctx,
+    );
+    expect(unknown.comp).toBeNull();
+  });
 });

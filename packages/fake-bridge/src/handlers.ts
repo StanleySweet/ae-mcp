@@ -28,6 +28,35 @@ function requestedComps(args: unknown): (string | number)[] {
   return Array.isArray(comps) ? (comps as (string | number)[]) : [];
 }
 
+function findComp(project: FakeProject, key: unknown): Comp | undefined {
+  if (key === undefined || key === null || key === '') {
+    return project.comps[0];
+  }
+  return project.comps.find((comp) =>
+    typeof key === 'number' ? comp.id === key : comp.name === key,
+  );
+}
+
+function layerInfo(comp: Comp, index: number): Record<string, unknown> {
+  const layer = comp.layers[index - 1]!;
+  return {
+    index,
+    id: layer.id,
+    name: layer.name,
+    type: 'AVLayer',
+    enabled: true,
+    solo: false,
+    shy: false,
+    locked: false,
+    inPoint: 0,
+    outPoint: 0,
+    startTime: 0,
+    stretch: 1,
+    parentIndex: null,
+    label: 0,
+  };
+}
+
 /** Read-only observe handlers backed by the in-memory fake project. */
 export function observeHandlers(project: FakeProject): HandlerMap {
   return {
@@ -64,6 +93,27 @@ export function observeHandlers(project: FakeProject): HandlerMap {
         }
       }
       return { comps, missing };
+    },
+    ae_layer_info: (args) => {
+      const parsed = (args ?? {}) as { comp?: unknown; layers?: unknown };
+      const comp = findComp(project, parsed.comp);
+      if (!comp) {
+        return { comp: null, layers: [], missing: [] };
+      }
+      if (!Array.isArray(parsed.layers)) {
+        const layers = comp.layers.map((_, i) => layerInfo(comp, i + 1));
+        return { comp: comp.name, layers, missing: [] };
+      }
+      const layers: Record<string, unknown>[] = [];
+      const missing: number[] = [];
+      for (const index of parsed.layers as number[]) {
+        if (index >= 1 && index <= comp.layers.length) {
+          layers.push(layerInfo(comp, index));
+        } else {
+          missing.push(index);
+        }
+      }
+      return { comp: comp.name, layers, missing };
     },
   };
 }

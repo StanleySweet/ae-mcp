@@ -28,4 +28,10 @@ export class FakeProject {
     this.comps.push(comp);
     return comp;
   }
+
+  addLayer(comp: Comp, name: string): CompLayer {
+    const layer: CompLayer = { id: this.nextId++, name };
+    comp.layers.push(layer);
+    return layer;
+  }
 }

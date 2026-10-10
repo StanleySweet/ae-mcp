@@ -116,8 +116,17 @@ export const compInfoResultSchema = z.object({
   truncated: z.boolean(),
 });
 
-export type Keyframe = z.infer<typeof keyframeSchema>;export type PropertyNode = z.infer<typeof propertySchema>;
+export const layerInfoResultSchema = z.object({
+  comp: z.string().nullable(),
+  layers: z.array(layerSchema),
+  missing: z.array(z.number()),
+  truncated: z.boolean(),
+});
+
+export type Keyframe = z.infer<typeof keyframeSchema>;
+export type PropertyNode = z.infer<typeof propertySchema>;
 export type EffectNode = z.infer<typeof effectSchema>;
 export type TextNode = z.infer<typeof textSchema>;
 export type LayerNode = z.infer<typeof layerSchema>;
 export type CompInfoResult = z.infer<typeof compInfoResultSchema>;
+export type LayerInfoResult = z.infer<typeof layerInfoResultSchema>;

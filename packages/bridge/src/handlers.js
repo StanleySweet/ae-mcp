@@ -43,3 +43,39 @@ AEMCP.register('ae_comp_info', function (args) {
     }
     return { comps: comps, missing: missing };
 });
+
+function aemcpResolveComp(key) {
+    var active;
+    if (key === undefined || key === null || key === '') {
+        active = app.project.activeItem;
+        return active instanceof CompItem ? active : null;
+    }
+    return aemcpFindComp(key);
+}
+
+AEMCP.register('ae_layer_info', function (args) {
+    var comp = aemcpResolveComp(args ? args.comp : null);
+    var layers = [];
+    var missing = [];
+    var requested, i, index;
+    if (!comp) {
+        return { comp: null, layers: layers, missing: missing };
+    }
+    requested = args && args.layers ? args.layers : null;
+    if (!requested) {
+        for (i = 1; i <= comp.numLayers; i++) {
+            layers.push(AEMCP.serialize.layer(comp.layer(i)));
+        }
+    } else {
+        for (i = 0; i < requested.length; i++) {
+            index = requested[i];
+            if (index >= 1 && index <= comp.numLayers) {
+                layers.push(AEMCP.serialize.layer(comp.layer(index)));
+            } else {
+                missing.push(index);
+            }
+        }
+    }
+    return { comp: comp.name, layers: layers, missing: missing };
+});
+

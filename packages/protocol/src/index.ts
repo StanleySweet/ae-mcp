@@ -30,6 +30,7 @@ export {
   textSchema,
   layerSchema,
   compInfoResultSchema,
+  layerInfoResultSchema,
 } from './serialize.js';
 export type {
   ItemType,
@@ -43,4 +44,5 @@ export type {
   TextNode,
   LayerNode,
   CompInfoResult,
+  LayerInfoResult,
 } from './serialize.js';
