@@ -17,7 +17,7 @@ class VmBridgeDriver implements BridgeDriver {
   constructor(
     private readonly ctx: vm.Context,
     private readonly ae: MockAE,
-    private readonly root: string,
+    readonly root: string,
   ) {}
 
   async sendJob(job: JobMessage): Promise<void> {
@@ -82,7 +82,7 @@ describe('bridge job runner', () => {
     const result = await driver.waitForResult('u-1');
     expect(ae.app.inUndoGroup()).toBe(false);
     expect(ae.undoGroups).toHaveLength(1);
-    expect(ae.undoGroups[0].name).toBe('ae-mcp boom');
+    expect(ae.undoGroups[0].name).toBe('Claude: boom');
     expect(ae.undoGroups[0].end).toBeGreaterThanOrEqual(ae.undoGroups[0].start);
     expect(result).toMatchObject({
       ok: false,
@@ -95,7 +95,7 @@ describe('bridge job runner', () => {
 
   it('consumes the job file after writing the result', async () => {
     const { driver, ae, ctx } = await setup();
-    const root = driver['root'] as string;
+    const root = driver.root;
     await driver.sendJob({
       protocolVersion: 1,
       id: 'consume-1',
@@ -112,5 +112,33 @@ describe('bridge job runner', () => {
       ae.fs.has(join(root, 'bridge', 'outbox', 'consume-1.json')),
     ).toBe(true);
     expect(vm.runInContext('typeof AEMCP.processJob', ctx)).toBe('function');
+  });
+
+  it('processes at most one job per poll tick and stays busy while jobs remain', async () => {
+    const { driver, ae, ctx } = await setup();
+    const root = driver.root;
+    await driver.sendJob({
+      protocolVersion: 1,
+      id: 'chunk-1',
+      tool: 'echo',
+      args: { n: 1 },
+      deadline: Date.now() + 5000,
+    });
+    await driver.sendJob({
+      protocolVersion: 1,
+      id: 'chunk-2',
+      tool: 'echo',
+      args: { n: 2 },
+      deadline: Date.now() + 5000,
+    });
+    expect(vm.runInContext('AEMCP.busy()', ctx)).toBe(false);
+    vm.runInContext(`AEMCP.poll("${root}")`, ctx);
+    expect(ae.fs.has(join(root, 'bridge', 'outbox', 'chunk-1.json'))).toBe(true);
+    expect(ae.fs.has(join(root, 'bridge', 'outbox', 'chunk-2.json'))).toBe(false);
+    expect(vm.runInContext('AEMCP.busy()', ctx)).toBe(true);
+
+    vm.runInContext(`AEMCP.poll("${root}")`, ctx);
+    expect(ae.fs.has(join(root, 'bridge', 'outbox', 'chunk-2.json'))).toBe(true);
+    expect(vm.runInContext('AEMCP.busy()', ctx)).toBe(false);
   });
 });

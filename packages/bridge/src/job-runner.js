@@ -21,6 +21,12 @@ function aemcpFileName(path) {
     return name;
 }
 
+var AEMCP_BUSY = false;
+
+function aemcpBusy() {
+    return AEMCP_BUSY;
+}
+
 function aemcpInvoke(tool, args, deadline) {
     if (typeof deadline === 'number' && new Date().getTime() >= deadline) {
         return { ok: false, issue: aemcpErrorIssue('TIMEOUT', 'job deadline exceeded') };
@@ -29,15 +35,17 @@ function aemcpInvoke(tool, args, deadline) {
     if (!handler) {
         return { ok: false, issue: aemcpErrorIssue('UNKNOWN_TOOL', 'no handler for tool ' + tool) };
     }
-    app.beginUndoGroup('ae-mcp ' + tool);
+    app.beginUndoGroup('Claude: ' + tool);
     var value;
     var caught = null;
+    AEMCP_BUSY = true;
     try {
         value = handler(args);
     } catch (err) {
         caught = err;
     } finally {
         app.endUndoGroup();
+        AEMCP_BUSY = false;
     }
     if (caught !== null) {
         return { ok: false, issue: aemcpErrorIssue('SCRIPT_ERROR', String(caught)) };
@@ -85,10 +93,18 @@ function aemcpProcessJob(jobPath) {
 }
 
 function aemcpPollInbox(root) {
-    var folder = new Folder(root + '/bridge/inbox');
-    var files = folder.getFiles('*.json');
-    for (var i = 0; i < files.length; i++) {
-        aemcpProcessJob(files[i].fsName);
+    var listing = new Folder(root + '/bridge/inbox').getFiles('*.json');
+    if (listing.length === 0) {
+        AEMCP_BUSY = false;
+        return;
+    }
+    AEMCP_BUSY = true;
+    aemcpProcessJob(listing[0].fsName);
+    var rest = new Folder(root + '/bridge/inbox').getFiles('*.json');
+    if (rest.length === 0) {
+        AEMCP_BUSY = false;
+    } else {
+        AEMCP_BUSY = true;
     }
 }
 
@@ -127,4 +143,7 @@ AEMCP.register = function (tool, fn) {
 };
 AEMCP.capabilities = function () {
     return aemcpCapabilities();
+};
+AEMCP.busy = function () {
+    return aemcpBusy();
 };

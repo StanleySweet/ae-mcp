@@ -169,21 +169,19 @@ export class MockAE {
 
   advance(ms: number): void {
     const target = this.clock + ms;
-    for (let guard = 0; guard < 1000; guard += 1) {
-      const due = [...this.tasks.values()]
-        .filter((t) => t.dueAt <= target)
-        .sort((a, b) => a.dueAt - b.dueAt);
-      if (due.length === 0) break;
-      this.clock = due[0].dueAt;
-      for (const task of due) {
-        this.tasks.delete(task.id);
-        task.fn();
-        if (task.repeat) {
-          this.tasks.set(task.id, {
-            ...task,
-            dueAt: task.dueAt + task.delay,
-          });
+    for (let guard = 0; guard < 100000; guard += 1) {
+      let next: MockTask | undefined;
+      for (const task of this.tasks.values()) {
+        if (task.dueAt <= target && (next === undefined || task.dueAt < next.dueAt)) {
+          next = task;
         }
+      }
+      if (next === undefined) break;
+      this.clock = next.dueAt;
+      this.tasks.delete(next.id);
+      next.fn();
+      if (next.repeat) {
+        this.tasks.set(next.id, { ...next, dueAt: next.dueAt + next.delay });
       }
     }
     this.clock = target;

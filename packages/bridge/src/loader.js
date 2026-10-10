@@ -30,8 +30,10 @@ function aemcpLoadPayload(root) {
 
 function aemcpSendHeartbeat(root, version) {
     var caps = [];
+    var busy = false;
     if (typeof AEMCP !== 'undefined') {
         caps = AEMCP.capabilities();
+        busy = AEMCP.busy();
     }
     var beat = {
         protocolVersion: 1,
@@ -39,7 +41,7 @@ function aemcpSendHeartbeat(root, version) {
         aeVersion: app.version,
         os: $.os,
         capabilities: caps,
-        busy: false,
+        busy: busy,
         transport: 'startup-loader'
     };
     aemcpWriteFile(root + '/bridge/outbox/heartbeat.json', JSON.stringify(beat));

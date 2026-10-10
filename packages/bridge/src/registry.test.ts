@@ -75,6 +75,32 @@ describe('handler registry', () => {
     const second = JSON.parse(ae.fs.get(beatPath) as string);
     expect(heartbeatSchema.parse(second)).toMatchObject({
       capabilities: ['comp.add'],
+      busy: false,
     });
+  });
+
+  it('reports busy while jobs are still draining', async () => {
+    const { ctx, ae, home } = await loaderWithPayload();
+    const beatPath = join(home, '.ae-mcp', 'bridge', 'outbox', 'heartbeat.json');
+    for (let i = 0; i < 160; i += 1) {
+      ae.fs.set(
+        join(home, '.ae-mcp', 'bridge', 'inbox', `busy-${i}.json`),
+        JSON.stringify({
+          protocolVersion: 1,
+          id: `busy-${i}`,
+          tool: 'echo',
+          args: {},
+          deadline: Date.now() + 60_000,
+        }),
+      );
+    }
+    vm.runInContext('AEMCP.register("echo", function () { return 1; });', ctx);
+    ae.advance(30_000);
+    const midDrain = JSON.parse(ae.fs.get(beatPath) as string);
+    expect(heartbeatSchema.parse(midDrain)).toMatchObject({ busy: true });
+
+    ae.advance(40_000);
+    const drained = JSON.parse(ae.fs.get(beatPath) as string);
+    expect(heartbeatSchema.parse(drained)).toMatchObject({ busy: false });
   });
 });
