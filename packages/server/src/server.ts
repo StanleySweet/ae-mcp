@@ -3,6 +3,10 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
 import { buildAeContext } from './context.js';
+import {
+  defaultOperationRegistry,
+  type OperationRegistry,
+} from './operations.js';
 import { selectTransport, type Runner } from './osascript-transport.js';
 import { runSetupChecks } from './setup-checks.js';
 
@@ -17,6 +21,7 @@ export interface ServerOptions {
   runner?: Runner;
   client?: AEClient;
   maxResultBytes?: number;
+  operations?: OperationRegistry;
 }
 
 type ToolResult = {
@@ -52,6 +57,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
   const root = options.root ?? queueRoot();
   const maxResultBytes = options.maxResultBytes ?? MAX_RESULT_BYTES;
+  const operations = options.operations ?? defaultOperationRegistry();
 
   let clientPromise: Promise<AEClient> | undefined;
   const getClient = (): Promise<AEClient> => {
@@ -213,6 +219,18 @@ export function createServer(options: ServerOptions = {}): McpServer {
         truncated: layers.truncated || properties.truncated,
       });
     },
+  );
+
+  server.registerTool(
+    'ae_catalog',
+    {
+      description:
+        'List the operations available through ae_do, optionally filtered to one category.',
+      inputSchema: {
+        category: z.string().optional(),
+      },
+    },
+    async (args) => text({ operations: operations.list(args.category) }),
   );
 
   return server;
