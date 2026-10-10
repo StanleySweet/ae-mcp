@@ -1120,6 +1120,283 @@ AEMCP.register('marker.list', function (args) {
     return { markers: list };
 });
 
+// Mask, shape and text operation handlers (mutating/reading, run via ae_do).
+// Ref: https://ae-scripting.docsforadobe.dev/other/shape.html
+// Ref: https://ae-scripting.docsforadobe.dev/other/textDocument.html
+
+AEMCP.register('mask.add', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var masks = layer.property('Masks');
+    if (!masks) return { success: false, error: 'Masks property not found' };
+    var newMask = masks.addProperty('Mask');
+    if (args && args.vertices) {
+        var shape = new Shape();
+        shape.vertices = args.vertices;
+        if (args.inTangents) shape.inTangents = args.inTangents;
+        if (args.outTangents) shape.outTangents = args.outTangents;
+        if (typeof args.closed === 'boolean') shape.closed = args.closed;
+        newMask.property('maskShape').setValue(shape);
+    }
+    return { success: true, maskIndex: newMask.propertyIndex };
+});
+
+AEMCP.register('mask.set', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var maskIndex = args && typeof args.maskIndex === 'number' ? args.maskIndex : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var mask = layer.property('Masks') ? layer.property('Masks').property(maskIndex) : null;
+    if (!mask) return { success: false, error: 'Mask not found' };
+    var maskShapeProp = mask.property('maskShape');
+    var shape = maskShapeProp.value;
+    if (args.vertices) shape.vertices = args.vertices;
+    if (args.inTangents) shape.inTangents = args.inTangents;
+    if (args.outTangents) shape.outTangents = args.outTangents;
+    if (typeof args.closed === 'boolean') shape.closed = args.closed;
+    maskShapeProp.setValue(shape);
+    return { success: true };
+});
+
+AEMCP.register('mask.read', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var maskIndex = args && typeof args.maskIndex === 'number' ? args.maskIndex : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var mask = layer.property('Masks') ? layer.property('Masks').property(maskIndex) : null;
+    if (!mask) return { success: false, error: 'Mask not found' };
+    var shape = mask.property('maskShape').value;
+    return {
+        vertices: shape.vertices,
+        inTangents: shape.inTangents,
+        outTangents: shape.outTangents,
+        closed: shape.closed
+    };
+});
+
+AEMCP.register('shape.add', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
+    var shapeType = args && args.type ? args.type : 'path'; // 'path', 'rect', 'ellipse'
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer;
+    if (layerIndex !== null) {
+        layer = comp.layer(layerIndex);
+    } else {
+        layer = comp.layers.addShape();
+        if (args && args.name) layer.name = args.name;
+    }
+    if (!layer) return { success: false, error: 'Shape layer not found or could not be created' };
+
+    var contents = layer.property('Contents');
+    var shapeGroup = contents.addProperty('ADBE Vector Group');
+    var groupContents = shapeGroup.property('Contents');
+
+    if (shapeType === 'rect') {
+        var rect = groupContents.addProperty('ADBE Vector Shape - Rect');
+        if (args.size) rect.property('ADBE Vector Rect Size').setValue(args.size);
+    } else if (shapeType === 'ellipse') {
+        var ellipse = groupContents.addProperty('ADBE Vector Shape - Ellipse');
+        if (args.size) ellipse.property('ADBE Vector Ellipse Size').setValue(args.size);
+    } else {
+        var pathProp = groupContents.addProperty('ADBE Vector Shape - Path');
+        if (args.vertices) {
+            var myShape = new Shape();
+            myShape.vertices = args.vertices;
+            if (args.inTangents) myShape.inTangents = args.inTangents;
+            if (args.outTangents) myShape.outTangents = args.outTangents;
+            if (typeof args.closed === 'boolean') myShape.closed = args.closed;
+            pathProp.property('ADBE Vector Shape').setValue(myShape);
+        }
+    }
+
+    if (args && args.fillColor) {
+        var fill = groupContents.addProperty('ADBE Vector Graphic - Fill');
+        fill.property('ADBE Vector Fill Color').setValue(args.fillColor);
+    }
+    if (args && args.strokeColor) {
+        var stroke = groupContents.addProperty('ADBE Vector Graphic - Stroke');
+        stroke.property('ADBE Vector Stroke Color').setValue(args.strokeColor);
+        if (typeof args.strokeWidth === 'number') {
+            stroke.property('ADBE Vector Stroke Width').setValue(args.strokeWidth);
+        }
+    }
+    return { success: true, layerIndex: layer.index };
+});
+
+AEMCP.register('shape.set', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var contents = layer.property('Contents');
+    if (!contents) return { success: false, error: 'Layer contents not found' };
+
+    // Traverse and update matching property
+    if (args.vertices) {
+        var myShape = new Shape();
+        myShape.vertices = args.vertices;
+        if (args.inTangents) myShape.inTangents = args.inTangents;
+        if (args.outTangents) myShape.outTangents = args.outTangents;
+        if (typeof args.closed === 'boolean') myShape.closed = args.closed;
+        // set on first vector path found
+        var group = contents.property(1);
+        if (group && group.property('Contents')) {
+            var p = group.property('Contents').property('ADBE Vector Shape - Path');
+            if (p) p.property('ADBE Vector Shape').setValue(myShape);
+        }
+    }
+    return { success: true };
+});
+
+AEMCP.register('shape.read', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var contents = layer.property('Contents');
+    var details = { numGroups: contents ? contents.numProperties : 0 };
+    return { shape: details };
+});
+
+AEMCP.register('text.add', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var textString = args && args.text ? args.text : 'Text';
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var textLayer = comp.layers.addText(textString);
+    if (args && args.fontSize) {
+        var textProp = textLayer.property('Source Text');
+        var textDoc = textProp.value;
+        textDoc.fontSize = args.fontSize;
+        if (args.fillColor) textDoc.fillColor = args.fillColor;
+        textProp.setValue(textDoc);
+    }
+    return { success: true, layerIndex: textLayer.index };
+});
+
+AEMCP.register('text.set', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var textProp = layer.property('Source Text');
+    if (!textProp) return { success: false, error: 'Source Text not found' };
+    var textDoc = textProp.value;
+    if (args.text) textDoc.text = args.text;
+    if (args.fontSize) textDoc.fontSize = args.fontSize;
+    if (args.fillColor) textDoc.fillColor = args.fillColor;
+    textProp.setValue(textDoc);
+    return { success: true };
+});
+
+AEMCP.register('text.read', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var textProp = layer.property('Source Text');
+    if (!textProp) return { success: false, error: 'Source Text not found' };
+    var textDoc = textProp.value;
+    return {
+        text: textDoc.text,
+        fontSize: textDoc.fontSize,
+        font: textDoc.font
+    };
+});
+
+
 
 
 
