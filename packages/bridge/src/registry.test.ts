@@ -50,6 +50,8 @@ describe('handler registry', () => {
       'batch.run',
       'find',
       'get_selection',
+      'project.info',
+      'project.undo',
       'z.one',
     ]);
     expect(vm.runInContext('typeof AEMCP.invoke("a.two", null, 9999999999999)', ctx)).toBe(
@@ -82,6 +84,8 @@ describe('handler registry', () => {
         'batch.run',
         'find',
         'get_selection',
+        'project.info',
+        'project.undo',
       ],
     });
 
@@ -101,6 +105,8 @@ describe('handler registry', () => {
         'comp.add',
         'find',
         'get_selection',
+        'project.info',
+        'project.undo',
       ],
       busy: false,
     });

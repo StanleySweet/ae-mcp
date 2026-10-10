@@ -4,6 +4,17 @@ AEMCP.register('ae_project_info', function () {
     return AEMCP.serialize.project();
 });
 
+// Project operation handlers (mutating, run via ae_do).
+AEMCP.register('project.info', function () {
+    var project = app.project;
+    return AEMCP.serialize.project();
+});
+
+AEMCP.register('project.undo', function () {
+    app.project.undo();
+    return { success: true };
+});
+
 function aemcpFindComp(key) {
     var project = app.project;
     var i, item;

@@ -50,6 +50,8 @@ describe('bridge loader', () => {
         'batch.run',
         'find',
         'get_selection',
+        'project.info',
+        'project.undo',
       ],
       busy: false,
       transport: 'startup-loader',
