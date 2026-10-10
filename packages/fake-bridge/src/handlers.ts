@@ -59,7 +59,7 @@ function layerInfo(comp: Comp, index: number): Record<string, unknown> {
 
 /** Read-only observe handlers backed by the in-memory fake project. */
 export function observeHandlers(project: FakeProject): HandlerMap {
-  return {
+  const handlers: HandlerMap = {
     ae_project_info: () => ({
       file: null,
       numItems: project.comps.length,
@@ -116,4 +116,10 @@ export function observeHandlers(project: FakeProject): HandlerMap {
       return { comp: comp.name, layers, missing };
     },
   };
+  handlers.ae_version_info = () => ({
+    aeVersion: '24.6.0',
+    bridgeVersion: '0.0.0',
+    capabilities: Object.keys(handlers).sort(),
+  });
+  return handlers;
 }

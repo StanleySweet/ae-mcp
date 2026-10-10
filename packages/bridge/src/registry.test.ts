@@ -46,6 +46,7 @@ describe('handler registry', () => {
       'ae_comp_info',
       'ae_layer_info',
       'ae_project_info',
+      'ae_version_info',
       'z.one',
     ]);
     expect(vm.runInContext('typeof AEMCP.invoke("a.two", null, 9999999999999)', ctx)).toBe(
@@ -70,7 +71,7 @@ describe('handler registry', () => {
     const first = JSON.parse(ae.fs.get(beatPath) as string);
     expect(heartbeatSchema.parse(first)).toMatchObject({
       transport: 'startup-loader',
-      capabilities: ['ae_comp_info', 'ae_layer_info', 'ae_project_info'],
+      capabilities: ['ae_comp_info', 'ae_layer_info', 'ae_project_info', 'ae_version_info'],
     });
 
     vm.runInContext(
@@ -80,7 +81,13 @@ describe('handler registry', () => {
     ae.advance(30000);
     const second = JSON.parse(ae.fs.get(beatPath) as string);
     expect(heartbeatSchema.parse(second)).toMatchObject({
-      capabilities: ['ae_comp_info', 'ae_layer_info', 'ae_project_info', 'comp.add'],
+      capabilities: [
+        'ae_comp_info',
+        'ae_layer_info',
+        'ae_project_info',
+        'ae_version_info',
+        'comp.add',
+      ],
       busy: false,
     });
   });

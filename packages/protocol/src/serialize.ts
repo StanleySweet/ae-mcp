@@ -123,6 +123,12 @@ export const layerInfoResultSchema = z.object({
   truncated: z.boolean(),
 });
 
+export const versionInfoSchema = z.object({
+  aeVersion: z.string(),
+  bridgeVersion: z.string(),
+  capabilities: z.array(z.string()),
+});
+
 export type Keyframe = z.infer<typeof keyframeSchema>;
 export type PropertyNode = z.infer<typeof propertySchema>;
 export type EffectNode = z.infer<typeof effectSchema>;
@@ -130,3 +136,4 @@ export type TextNode = z.infer<typeof textSchema>;
 export type LayerNode = z.infer<typeof layerSchema>;
 export type CompInfoResult = z.infer<typeof compInfoResultSchema>;
 export type LayerInfoResult = z.infer<typeof layerInfoResultSchema>;
+export type VersionInfo = z.infer<typeof versionInfoSchema>;

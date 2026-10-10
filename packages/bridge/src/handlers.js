@@ -79,3 +79,14 @@ AEMCP.register('ae_layer_info', function (args) {
     return { comp: comp.name, layers: layers, missing: missing };
 });
 
+// Live capability probe: executes inside AE, so a successful reply proves the
+// bridge is loaded and responsive, not merely that a heartbeat file exists.
+AEMCP.register('ae_version_info', function () {
+    return {
+        aeVersion: app.version,
+        bridgeVersion: AEMCP_BRIDGE_VERSION,
+        capabilities: AEMCP.capabilities()
+    };
+});
+
+

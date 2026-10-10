@@ -164,5 +164,15 @@ export function createServer(options: ServerOptions = {}): McpServer {
     },
   );
 
+  server.registerTool(
+    'ae_version_info',
+    {
+      description:
+        'Probe the running bridge for the live AE version, bridge version and registered capabilities.',
+      inputSchema: {},
+    },
+    async () => toResult(await callRaw('ae_version_info')),
+  );
+
   return server;
 }
