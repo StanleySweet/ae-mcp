@@ -47,6 +47,7 @@ describe('bridge loader', () => {
         'ae_layer_info',
         'ae_project_info',
         'ae_version_info',
+        'batch.run',
         'find',
         'get_selection',
       ],
