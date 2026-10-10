@@ -15,6 +15,103 @@ AEMCP.register('project.undo', function () {
     return { success: true };
 });
 
+// Comp operation handlers (mutating, run via ae_do).
+AEMCP.register('comp.create', function (args) {
+    var name = args && args.name ? args.name : 'New Comp';
+    var comp = app.project.items.addComp(name, 1920, 1080, 30, 10);
+    return { name: comp.name, id: comp.id };
+});
+
+AEMCP.register('comp.duplicate', function (args) {
+    var compName = args && args.name ? args.name : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var newComp = comp.duplicate ? comp.duplicate() : app.project.items.addComp(comp.name + ' Copy', comp.width, comp.height, comp.frameRate, 10);
+    app.project.add(newComp);
+    return { name: newComp.name, id: newComp.id };
+});
+
+AEMCP.register('comp.set_settings', function (args) {
+    var compName = args && args.name ? args.name : null;
+    var width = args && args.width ? args.width : null;
+    var height = args && args.height ? args.height : null;
+    var frameRate = args && args.frameRate ? args.frameRate : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    if (width !== null) comp.width = width;
+    if (height !== null) comp.height = height;
+    if (frameRate !== null) comp.frameRate = frameRate;
+    return { success: true };
+});
+
+AEMCP.register('comp.precompose', function (args) {
+    var compName = args && args.name ? args.name : null;
+    var newCompName = args && args.newName ? args.newName : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var newComp = app.project.items.addComp(newCompName || comp.name + ' Precomped', comp.width, comp.height, comp.frameRate, 10);
+    for (var i = 1; i <= comp.numLayers; i++) {
+        var layer = comp.layer(i);
+        app.project.addLayer(newComp, layer);
+    }
+    app.project.add(newComp);
+    return { name: newComp.name, id: newComp.id };
+});
+
+AEMCP.register('comp.layer_clip_frames', function (args) {
+    var compName = args && args.name ? args.name : null;
+    var from = args && args.from ? args.from : 0;
+    var to = args && args.to ? args.to : 0;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    for (var i = 1; i <= comp.numLayers; i++) {
+        var layer = comp.layer(i);
+        if (layer.setInPoint) layer.setInPoint(from);
+        if (layer.setOutPoint) layer.setOutPoint(to);
+    }
+    return { success: true };
+});
+
 function aemcpFindComp(key) {
     var project = app.project;
     var i, item;
@@ -198,6 +295,277 @@ AEMCP.register('find', function (args) {
         }
     }
     return result;
+});
+
+// Layer operation handlers (mutating, run via ae_do).
+AEMCP.register('layer.add_text', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var text = args && args.text ? args.text : 'Text';
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layers.add ? comp.layers.add() : null;
+    if (!layer) return { success: false, error: 'Cannot add layer' };
+    layer.name = 'Text';
+    if (layer.property) {
+        var textProp = layer.property('ADBE Text Properties');
+        if (textProp) {
+            textProp.setValue(text);
+        }
+    }
+    return { name: layer.name, id: layer.id };
+});
+
+AEMCP.register('layer.add_shape', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layers.add ? comp.layers.add() : null;
+    if (!layer) return { success: false, error: 'Cannot add layer' };
+    layer.name = 'Shape';
+    if (layer.property) {
+        var fill = layer.property('ADBE Fill');
+        if (fill) {
+            fill.setValue([1, 1, 1]);
+        }
+    }
+    return { name: layer.name, id: layer.id };
+});
+
+AEMCP.register('layer.add_solid', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var color = args && args.color ? args.color : [1, 1, 1];
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layers.add ? comp.layers.add() : null;
+    if (!layer) return { success: false, error: 'Cannot add layer' };
+    layer.name = 'Solid';
+    if (layer.property) {
+        var solid = layer.property('ADBE Solid');
+        if (solid) {
+            solid.setValue(color);
+        }
+    }
+    return { name: layer.name, id: layer.id };
+});
+
+AEMCP.register('layer.add_adjustment', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layers.add ? comp.layers.add() : null;
+    if (!layer) return { success: false, error: 'Cannot add layer' };
+    layer.name = 'Adjustment';
+    layer.adjustment = true;
+    return { name: layer.name, id: layer.id };
+});
+
+AEMCP.register('layer.add_null', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layers.add ? comp.layers.add() : null;
+    if (!layer) return { success: false, error: 'Cannot add layer' };
+    layer.name = 'Null';
+    if (layer.property) {
+        var adbeTransform = layer.property('ADBE Transform Group');
+        if (adbeTransform) {
+            var position = adbeTransform.property('ADBE Position');
+            if (position) position.setValue([comp.width / 2, comp.height / 2]);
+        }
+    }
+    return { name: layer.name, id: layer.id };
+});
+
+AEMCP.register('layer.add_footage', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var footageName = args && args.name ? args.name : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layers.add ? comp.layers.add() : null;
+    if (!layer) return { success: false, error: 'Cannot add layer' };
+    layer.name = footageName || 'Footage';
+    return { name: layer.name, id: layer.id };
+});
+
+AEMCP.register('layer.center', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var sel = comp.selectedLayers;
+    if (!sel) return { success: false, error: 'No layers selected' };
+    for (var i = 1; i <= sel.length; i++) {
+        var layer = sel[i];
+        if (layer.property) {
+            var transform = layer.property('ADBE Transform Group');
+            if (transform) {
+                var position = transform.property('ADBE Position');
+                if (position) position.setValue([comp.width / 2, comp.height / 2]);
+            }
+        }
+    }
+    return { success: true };
+});
+
+AEMCP.register('layer.set_transform', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var position = args && args.position ? args.position : [comp.width / 2, comp.height / 2];
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    if (layer.property) {
+        var transform = layer.property('ADBE Transform Group');
+        if (transform) {
+            var pos = transform.property('ADBE Position');
+            if (pos) pos.setValue(position);
+        }
+    }
+    return { success: true };
+});
+
+AEMCP.register('layer.set_parent', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var parentIndex = args && args.parent ? args.parent : 0;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    layer.parentIndex = parentIndex;
+    return { success: true };
+});
+
+AEMCP.register('layer.delete', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    comp.removeLayer(layer);
+    return { success: true };
+});
+
+AEMCP.register('layer.bounds', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var bounds = layer.bounds ? layer.bounds() : { left: 0, top: 0, right: comp.width, bottom: comp.height };
+    return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
 });
 
 
