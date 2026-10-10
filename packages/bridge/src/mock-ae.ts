@@ -137,6 +137,7 @@ export class MockCompItem extends MockItem {
   workAreaStart = 0;
   workAreaDuration = 0;
   private readonly layerList: MockLayer[] = [];
+  selectedLayers: MockLayer[] = [];
 
   constructor(
     id: number,
@@ -280,6 +281,7 @@ export class MockProject {
   file: MockFile | null = null;
   bitsPerChannel = 8;
   activeItem: MockItem | null = null;
+  selection: MockItem[] = [];
   readonly rootFolder = new MockFolderItem(0, 'Root');
   private readonly all: MockItem[] = [];
 

@@ -89,4 +89,27 @@ AEMCP.register('ae_version_info', function () {
     };
 });
 
+AEMCP.register('get_selection', function () {
+    var active = app.project.activeItem;
+    var layers = [];
+    var items = [];
+    var sel, i;
+    if (active instanceof CompItem) {
+        sel = active.selectedLayers;
+        if (sel) {
+            for (i = 0; i < sel.length; i++) {
+                layers.push(AEMCP.serialize.layer(sel[i]));
+            }
+        }
+        return { comp: active.name, layers: layers, items: items };
+    }
+    sel = app.project.selection;
+    if (sel) {
+        for (i = 0; i < sel.length; i++) {
+            items.push(AEMCP.serialize.item(sel[i]));
+        }
+    }
+    return { comp: null, layers: layers, items: items };
+});
+
 

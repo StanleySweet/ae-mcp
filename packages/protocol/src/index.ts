@@ -32,6 +32,7 @@ export {
   compInfoResultSchema,
   layerInfoResultSchema,
   versionInfoSchema,
+  selectionSchema,
 } from './serialize.js';
 export type {
   ItemType,
@@ -47,4 +48,5 @@ export type {
   CompInfoResult,
   LayerInfoResult,
   VersionInfo,
+  Selection,
 } from './serialize.js';

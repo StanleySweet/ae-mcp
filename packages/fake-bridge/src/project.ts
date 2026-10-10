@@ -15,6 +15,7 @@ export interface Comp {
 export class FakeProject {
   private nextId = 1;
   comps: Comp[] = [];
+  selection: CompLayer[] = [];
 
   addComp(name: string, width: number, height: number, frameRate = 30): Comp {
     const comp: Comp = {

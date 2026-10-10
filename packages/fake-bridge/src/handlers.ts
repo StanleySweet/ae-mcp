@@ -1,5 +1,5 @@
 import type { HandlerMap } from './consumer.js';
-import type { Comp, FakeProject } from './project.js';
+import type { Comp, CompLayer, FakeProject } from './project.js';
 
 function compInfo(comp: Comp): Record<string, unknown> {
   return {
@@ -37,8 +37,7 @@ function findComp(project: FakeProject, key: unknown): Comp | undefined {
   );
 }
 
-function layerInfo(comp: Comp, index: number): Record<string, unknown> {
-  const layer = comp.layers[index - 1]!;
+function layerInfo(layer: CompLayer, index: number): Record<string, unknown> {
   return {
     index,
     id: layer.id,
@@ -101,14 +100,14 @@ export function observeHandlers(project: FakeProject): HandlerMap {
         return { comp: null, layers: [], missing: [] };
       }
       if (!Array.isArray(parsed.layers)) {
-        const layers = comp.layers.map((_, i) => layerInfo(comp, i + 1));
+        const layers = comp.layers.map((layer, i) => layerInfo(layer, i + 1));
         return { comp: comp.name, layers, missing: [] };
       }
       const layers: Record<string, unknown>[] = [];
       const missing: number[] = [];
       for (const index of parsed.layers as number[]) {
         if (index >= 1 && index <= comp.layers.length) {
-          layers.push(layerInfo(comp, index));
+          layers.push(layerInfo(comp.layers[index - 1]!, index));
         } else {
           missing.push(index);
         }
@@ -120,6 +119,11 @@ export function observeHandlers(project: FakeProject): HandlerMap {
     aeVersion: '24.6.0',
     bridgeVersion: '0.0.0',
     capabilities: Object.keys(handlers).sort(),
+  });
+  handlers.get_selection = () => ({
+    comp: project.comps[0]?.name ?? null,
+    layers: project.selection.map((layer, i) => layerInfo(layer, i + 1)),
+    items: [],
   });
   return handlers;
 }

@@ -231,4 +231,26 @@ describe('bridge serializers', () => {
     expect(probe.capabilities).toContain('ae_version_info');
     expect(probe.capabilities).toContain('ae_project_info');
   });
+
+  it('reports selected layers of the active comp, or selected project items', async () => {
+    const { ctx, ae } = await payloadContext();
+    seed(ae);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer 1', 'Layer');
+    layer.id = 7;
+    comp.addLayer(layer);
+    comp.selectedLayers = [layer];
+
+    const active = vm.runInContext("AEMCP.invoke('get_selection', null, null).value", ctx);
+    expect(active.comp).toBe('Main');
+    expect(active.layers.map((item: { name: string }) => item.name)).toEqual(['Layer 1']);
+    expect(active.items).toEqual([]);
+
+    ae.project.activeItem = null;
+    ae.project.selection = [ae.project.item(2) as MockFolderItem];
+    const panel = vm.runInContext("AEMCP.invoke('get_selection', null, null).value", ctx);
+    expect(panel.comp).toBeNull();
+    expect(panel.layers).toEqual([]);
+    expect(panel.items.map((item: { name: string }) => item.name)).toEqual(['Assets']);
+  });
 });

@@ -129,6 +129,12 @@ export const versionInfoSchema = z.object({
   capabilities: z.array(z.string()),
 });
 
+export const selectionSchema = z.object({
+  comp: z.string().nullable(),
+  layers: z.array(layerSchema),
+  items: z.array(itemSummarySchema),
+});
+
 export type Keyframe = z.infer<typeof keyframeSchema>;
 export type PropertyNode = z.infer<typeof propertySchema>;
 export type EffectNode = z.infer<typeof effectSchema>;
@@ -137,3 +143,4 @@ export type LayerNode = z.infer<typeof layerSchema>;
 export type CompInfoResult = z.infer<typeof compInfoResultSchema>;
 export type LayerInfoResult = z.infer<typeof layerInfoResultSchema>;
 export type VersionInfo = z.infer<typeof versionInfoSchema>;
+export type Selection = z.infer<typeof selectionSchema>;

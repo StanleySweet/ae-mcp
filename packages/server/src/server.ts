@@ -174,5 +174,15 @@ export function createServer(options: ServerOptions = {}): McpServer {
     async () => toResult(await callRaw('ae_version_info')),
   );
 
+  server.registerTool(
+    'get_selection',
+    {
+      description:
+        'Report the current selection: the active composition and its selected layers, or the selected items in the project panel.',
+      inputSchema: {},
+    },
+    async () => toResult(await callRaw('get_selection')),
+  );
+
   return server;
 }
