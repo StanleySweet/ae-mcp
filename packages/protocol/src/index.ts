@@ -19,6 +19,12 @@ export {
 export { contractCases } from './contract-suite.js';
 export type { BridgeDriver, ContractCase } from './contract-suite.js';
 export {
+  operationCategories,
+  operationCategorySchema,
+  operationDefinitionSchema,
+} from './operations.js';
+export type { OperationCategory, OperationDefinition } from './operations.js';
+export {
   itemTypeSchema,
   itemSummarySchema,
   compItemSchema,
