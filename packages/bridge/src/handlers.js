@@ -1477,6 +1477,67 @@ AEMCP.register('audio.peaks_to_markers', function (args) {
     return { success: true, count: peaks.length };
 });
 
+// Font and command operation handlers (run via ae_do).
+// Ref: https://ae-scripting.docsforadobe.dev/other/app.html#app-fonts
+// Ref: https://ae-scripting.docsforadobe.dev/other/app.html#app-executemenucommand
+AEMCP.register('font.list', function (args) {
+    var fonts = [];
+    if (app.fonts && app.fonts.allFonts) {
+        var all = app.fonts.allFonts;
+        for (var i = 0; i < all.length; i++) {
+            fonts.push({
+                postScriptName: all[i].postScriptName,
+                family: all[i].family,
+                style: all[i].style
+            });
+        }
+    }
+    return { fonts: fonts };
+});
+
+AEMCP.register('command.find', function (args) {
+    var name = args && args.name ? args.name : '';
+    if (!name || !app.findMenuCommandId) {
+        return { commandId: 0 };
+    }
+    var id = app.findMenuCommandId(name);
+    return { commandId: id };
+});
+
+AEMCP.register('command.list', function (args) {
+    // Return standard well-known After Effects menu command IDs
+    var knownCommands = [
+        { id: 2, name: 'Open Project...' },
+        { id: 3, name: 'Close' },
+        { id: 4, name: 'Save' },
+        { id: 5, name: 'Save As...' },
+        { id: 16, name: 'Undo' },
+        { id: 17, name: 'Redo' },
+        { id: 18, name: 'Cut' },
+        { id: 19, name: 'Copy' },
+        { id: 20, name: 'Paste' },
+        { id: 21, name: 'Clear' },
+        { id: 2000, name: 'New Composition...' },
+        { id: 2004, name: 'Composition Settings...' },
+        { id: 2154, name: 'Add to Render Queue' }
+    ];
+    return { commands: knownCommands };
+});
+
+AEMCP.register('command.execute', function (args) {
+    var id = args && typeof args.id === 'number' ? args.id : 0;
+    var name = args && args.name ? args.name : null;
+    if (!id && name && app.findMenuCommandId) {
+        id = app.findMenuCommandId(name);
+    }
+    if (!id) {
+        return { success: false, error: 'Valid command ID or name required' };
+    }
+    app.executeCommand(id);
+    return { success: true, commandId: id };
+});
+
+
 
 
 
