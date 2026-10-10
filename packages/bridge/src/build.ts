@@ -6,7 +6,7 @@ const SRC_DIR = join(dirname(fileURLToPath(import.meta.url)));
 
 const SHARED_SOURCES = ['es3-polyfills.js', 'es3-json2.js', 'bridge-fs.js'];
 
-const PAYLOAD_SOURCES = [...SHARED_SOURCES, 'job-runner.js'];
+const PAYLOAD_SOURCES = [...SHARED_SOURCES, 'job-runner.js', 'serializers.js'];
 const LOADER_SOURCES = [...SHARED_SOURCES, 'loader.js'];
 
 async function bridgeVersion(): Promise<string> {

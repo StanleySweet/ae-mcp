@@ -18,3 +18,10 @@ export {
 } from './queue.js';
 export { contractCases } from './contract-suite.js';
 export type { BridgeDriver, ContractCase } from './contract-suite.js';
+export {
+  itemTypeSchema,
+  itemSummarySchema,
+  compItemSchema,
+  projectInfoSchema,
+} from './serialize.js';
+export type { ItemType, ItemSummary, CompItemInfo, ProjectInfo } from './serialize.js';

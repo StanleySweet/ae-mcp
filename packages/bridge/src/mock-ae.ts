@@ -108,12 +108,97 @@ function globMatch(name: string, mask: string): boolean {
   return re.test(name);
 }
 
+export class MockItem {
+  label = 0;
+  comment = '';
+  selected = false;
+  parentFolder!: MockFolderItem;
+
+  constructor(
+    readonly id: number,
+    public name: string,
+  ) {}
+}
+
+export class MockFolderItem extends MockItem {
+  readonly items: MockItem[] = [];
+
+  add(item: MockItem): MockItem {
+    item.parentFolder = this;
+    this.items.push(item);
+    return item;
+  }
+}
+
+export class MockCompItem extends MockItem {
+  pixelAspect = 1;
+  bgColor: [number, number, number] = [0, 0, 0];
+  motionBlur = false;
+  workAreaStart = 0;
+  workAreaDuration = 0;
+
+  constructor(
+    id: number,
+    name: string,
+    public width: number,
+    public height: number,
+    public frameRate: number,
+    public duration: number,
+  ) {
+    super(id, name);
+  }
+
+  get numLayers(): number {
+    return 0;
+  }
+}
+
+export class MockFootageItem extends MockItem {
+  pixelAspect = 1;
+  frameRate = 0;
+  duration = 0;
+  footageMissing = false;
+  file: MockFile | null = null;
+
+  constructor(
+    id: number,
+    name: string,
+    public width: number,
+    public height: number,
+  ) {
+    super(id, name);
+  }
+}
+
+export class MockProject {
+  file: MockFile | null = null;
+  bitsPerChannel = 8;
+  activeItem: MockItem | null = null;
+  readonly rootFolder = new MockFolderItem(0, 'Root');
+  private readonly all: MockItem[] = [];
+
+  get numItems(): number {
+    return this.all.length;
+  }
+
+  item(index: number): MockItem | undefined {
+    return this.all[index - 1];
+  }
+
+  add(item: MockItem, parent: MockFolderItem = this.rootFolder): MockItem {
+    parent.add(item);
+    this.all.push(item);
+    return item;
+  }
+}
+
 export class MockAE {
   readonly undoGroups: MockUndoGroup[] = [];
   readonly alerts: string[] = [];
   readonly fs = new Map<string, string>();
   readonly dirs = new Set<string>();
   readonly env: Record<string, string> = {};
+  readonly project = new MockProject();
   evalFileCalls = 0;
   private clock = 0;
   private undoDepth = 0;
@@ -123,6 +208,7 @@ export class MockAE {
   app = {
     exitCode: 0,
     version: 'MockAE-25',
+    project: this.project,
     beginUndoGroup: (name?: string): void => {
       this.undoDepth += 1;
       this.undoGroups.push({ name, start: this.clock, end: -1 });
@@ -193,6 +279,9 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     app: ae.app,
     $: ae.$,
     JSON: undefined,
+    CompItem: MockCompItem,
+    FolderItem: MockFolderItem,
+    FootageItem: MockFootageItem,
     File: function (path: string): MockFile {
       return new MockFile(ae, path);
     },
