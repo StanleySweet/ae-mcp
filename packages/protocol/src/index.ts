@@ -29,6 +29,7 @@ export {
   effectSchema,
   textSchema,
   layerSchema,
+  compInfoResultSchema,
 } from './serialize.js';
 export type {
   ItemType,
@@ -41,4 +42,5 @@ export type {
   EffectNode,
   TextNode,
   LayerNode,
+  CompInfoResult,
 } from './serialize.js';

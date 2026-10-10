@@ -1,0 +1,97 @@
+import { chmod, mkdir, mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createQueueConsumer, FakeProject, observeHandlers } from '@ae-mcp/fake-bridge';
+import { compInfoResultSchema } from '@ae-mcp/protocol';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { afterEach, describe, it, expect } from 'vitest';
+import { createAEClient } from './ae-client.js';
+import { FileQueueTransport } from './file-queue-transport.js';
+import { createServer } from './server.js';
+
+async function connectServer(
+  project: FakeProject,
+  options: Parameters<typeof createServer>[0] = {},
+): Promise<{ client: Client; close: () => Promise<void> }> {
+  const home = await mkdtemp(join(tmpdir(), 'ae-mcp-comp-info-'));
+  const root = join(home, '.ae-mcp');
+  await mkdir(root, { recursive: true, mode: 0o700 });
+  await chmod(root, 0o700);
+
+  const consumer = createQueueConsumer(root, observeHandlers(project));
+  await consumer.start();
+
+  const aeClient = createAEClient({ transport: new FileQueueTransport(root, 10), root });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createServer({ root, client: aeClient, ...options });
+  await server.connect(serverTransport);
+  const client = new Client({ name: 'test-client', version: '0.0.0' });
+  await client.connect(clientTransport);
+
+  return {
+    client,
+    close: async () => {
+      await client.close();
+      await server.close();
+      await consumer.stop();
+    },
+  };
+}
+
+async function call(
+  client: Client,
+  args: Record<string, unknown>,
+): Promise<{ comps: { name: string }[]; missing: unknown[]; truncated: boolean }> {
+  const result = await client.callTool({ name: 'ae_comp_info', arguments: args });
+  const [first] = result.content as Array<{ type: string; text: string }>;
+  return compInfoResultSchema.parse(JSON.parse(first!.text));
+}
+
+describe('ae_comp_info', () => {
+  const closes: (() => Promise<void>)[] = [];
+
+  afterEach(async () => {
+    for (const close of closes.splice(0)) {
+      await close();
+    }
+  });
+
+  it('returns the requested comps by name and reports missing ones', async () => {
+    const project = new FakeProject();
+    project.addComp('Main', 1920, 1080);
+    project.addComp('Lower Third', 1280, 720);
+    const { client, close } = await connectServer(project);
+    closes.push(close);
+
+    const info = await call(client, { comps: ['Main', 'Nope'] });
+    expect(info.comps.map((comp) => comp.name)).toEqual(['Main']);
+    expect(info.missing).toEqual(['Nope']);
+    expect(info.truncated).toBe(false);
+  });
+
+  it('returns every comp when no names are given', async () => {
+    const project = new FakeProject();
+    project.addComp('Main', 1920, 1080);
+    project.addComp('Lower Third', 1280, 720);
+    const { client, close } = await connectServer(project);
+    closes.push(close);
+
+    const info = await call(client, {});
+    expect(info.comps.map((comp) => comp.name)).toEqual(['Main', 'Lower Third']);
+  });
+
+  it('flags truncation when the output exceeds the size cap', async () => {
+    const project = new FakeProject();
+    for (let i = 0; i < 20; i += 1) {
+      project.addComp(`Comp ${i}`, 1920, 1080);
+    }
+    const { client, close } = await connectServer(project, { maxResultBytes: 400 });
+    closes.push(close);
+
+    const info = await call(client, {});
+    expect(info.truncated).toBe(true);
+    expect(info.comps.length).toBeGreaterThan(0);
+    expect(info.comps.length).toBeLessThan(20);
+  });
+});
