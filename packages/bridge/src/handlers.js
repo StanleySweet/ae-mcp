@@ -568,4 +568,158 @@ AEMCP.register('layer.bounds', function (args) {
     return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
 });
 
+// Property operation handlers (mutating, run via ae_do).
+AEMCP.register('property.get', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var propertyName = args && args.name ? args.name : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    return { name: prop.name, value: prop.value };
+});
+
+AEMCP.register('property.list', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var project = app.project;
+    var comp;
+    var properties = [];
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    for (var i = 1; i <= comp.numLayers; i++) {
+        var layer = comp.layer(i);
+        if (layer.property) {
+            var keys = layer.property.keys;
+            if (keys) {
+                for (var j = 1; j <= keys.length; j++) {
+                    properties.push({ name: keys[j].name, id: keys[j].id });
+                }
+            }
+        }
+    }
+    return { properties: properties };
+});
+
+AEMCP.register('property.set', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var propertyName = args && args.name ? args.name : null;
+    var value = args && args.value ? args.value : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    prop.setValue(value);
+    return { success: true };
+});
+
+// Keyframe operation handlers (mutating, run via ae_do).
+AEMCP.register('keyframe.add', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var time = args && args.time ? args.time : 0;
+    var value = args && args.value ? args.value : [0, 0];
+    var propertyName = args && args.property ? args.property : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    prop.setValueAtTime(time, value);
+    return { success: true };
+});
+
+AEMCP.register('keyframe.remove', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var time = args && args.time ? args.time : 0;
+    var propertyName = args && args.property ? args.property : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    prop.setValueAtTime(time, undefined);
+    return { success: true };
+});
+
+AEMCP.register('keyframe.set_easing', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var time = args && args.time ? args.time : 0;
+    var easing = args && args.easing ? args.easing : 'linear';
+    var propertyName = args && args.property ? args.property : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    prop.setEasingAtTime(time, easing);
+    return { success: true };
+});
+
 
