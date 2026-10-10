@@ -33,14 +33,24 @@ describe('mock AE', () => {
     expect(() => ae.app.endUndoGroup()).toThrow(/beginUndoGroup/);
   });
 
-  it('runs scheduled tasks when virtual time passes, rescheduling repeats', () => {
+  it('runs scheduled code strings when virtual time passes, rescheduling repeats', () => {
     const ae = new MockAE();
-    const hits: number[] = [];
-    ae.app.scheduleTask(() => hits.push(ae.now()), 100, true);
+    const sandbox = runInMockAE(
+      'var hits = []; app.scheduleTask("hits.push($.hiresTimer())", 100, true);',
+      ae,
+    );
     ae.advance(120);
     ae.advance(90);
-    expect(hits).toEqual([100, 200]);
+    expect(vm.runInContext('hits', sandbox)).toEqual([100, 200]);
     expect(ae.now()).toBe(210);
+  });
+
+  it('rejects non-string scheduleTask arguments like real After Effects', () => {
+    const ae = new MockAE();
+    runInMockAE('', ae);
+    expect(() =>
+      ae.app.scheduleTask((() => undefined) as unknown as string, 100, true),
+    ).toThrow(/string/);
   });
 
   it('reports virtual time through $.hiresTimer', () => {

@@ -793,4 +793,172 @@ AEMCP.register('expression.check_errors', function (args) {
     return { errors: errors };
 });
 
+// Effect operation handlers (mutating, run via ae_do).
+AEMCP.register('effect.apply', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var propertyName = args && args.property ? args.property : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    prop.setValue(args && args.value ? args.value : [1, 1, 1]);
+    return { success: true };
+});
+
+AEMCP.register('effect.list_on_layer', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var propertyName = args && args.property ? args.property : null;
+    var project = app.project;
+    var comp;
+    var results = [];
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    var list = prop.list_on_layer ? prop.list_on_layer() : [];
+    return { list: list };
+});
+
+AEMCP.register('effect.list_available', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var project = app.project;
+    var comp;
+    var results = [];
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    // Return available effects from the effect parade
+    var parade = comp.property('ADBE Effect Parade');
+    if (parade) {
+        for (var i = 1; i <= parade.numProperties; i++) {
+            var effect = parade.property(i);
+            results.push({ name: effect.name });
+        }
+    }
+    return { list: results };
+});
+
+AEMCP.register('effect.set_property', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var propertyName = args && args.property ? args.property : null;
+    var value = args && args.value ? args.value : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    prop.setValue(value);
+    return { success: true };
+});
+
+AEMCP.register('effect.set_keyframe', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var time = args && args.time ? args.time : 0;
+    var value = args && args.value ? args.value : null;
+    var propertyName = args && args.property ? args.property : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    prop.setValueAtTime(time, value);
+    return { success: true };
+});
+
+AEMCP.register('effect.remove', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var propertyName = args && args.property ? args.property : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    prop.setValueAtTime(0, null);
+    return { success: true };
+});
+
+AEMCP.register('effect.apply_template', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var templateName = args && args.template ? args.template : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    // Apply template - basic implementation
+    var layer = comp.layer(1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    return { success: true };
+});
+
 

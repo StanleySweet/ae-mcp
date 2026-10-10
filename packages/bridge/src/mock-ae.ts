@@ -308,6 +308,7 @@ export class MockAE {
   readonly env: Record<string, string> = {};
   readonly project = new MockProject();
   evalFileCalls = 0;
+  context: vm.Context | null = null;
   private clock = 0;
   private undoDepth = 0;
   private nextTaskId = 1;
@@ -332,9 +333,20 @@ export class MockAE {
       }
     },
     inUndoGroup: (): boolean => this.undoDepth > 0,
-    scheduleTask: (fn: () => void, delay: number, repeat: boolean): number => {
+    // Real AE only accepts a string of code, evaluated later in the global scope.
+    scheduleTask: (code: string, delay: number, repeat: boolean): number => {
+      if (typeof code !== 'string') {
+        throw new TypeError('app.scheduleTask: stringToExecute must be a string');
+      }
+      const context = this.context;
+      if (context === null) {
+        throw new Error('app.scheduleTask: no script context');
+      }
       const id = this.nextTaskId;
       this.nextTaskId += 1;
+      const fn = (): void => {
+        vm.runInContext(code, context);
+      };
       this.tasks.set(id, { id, fn, dueAt: this.clock + delay, delay, repeat });
       return id;
     },
@@ -403,6 +415,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     },
   };
   const context = vm.createContext(sandbox);
+  ae.context = context;
   ae.$.evalFile = (path: string): unknown => {
     ae.evalFileCalls += 1;
     const content = ae.fs.get(path);

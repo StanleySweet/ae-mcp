@@ -8,6 +8,18 @@ import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
 import { MockAE, runInMockAE } from './mock-ae.js';
 
+const CORE_TOOLS = [
+  'ae_comp_info',
+  'ae_layer_info',
+  'ae_project_info',
+  'ae_version_info',
+  'batch.run',
+  'find',
+  'get_selection',
+  'project.info',
+  'project.undo',
+];
+
 async function makeAE(): Promise<{ ae: MockAE; home: string; source: string }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-home-'));
   const ae = new MockAE();
@@ -42,17 +54,7 @@ describe('bridge loader', () => {
       bridgeVersion: '0.0.0',
       aeVersion: 'MockAE-25',
       os: 'MockAE-OS',
-      capabilities: [
-        'ae_comp_info',
-        'ae_layer_info',
-        'ae_project_info',
-        'ae_version_info',
-        'batch.run',
-        'find',
-        'get_selection',
-        'project.info',
-        'project.undo',
-      ],
+      capabilities: expect.arrayContaining(CORE_TOOLS),
       busy: false,
       transport: 'startup-loader',
     });
@@ -78,13 +80,41 @@ describe('bridge loader', () => {
 
     ae.fs.set(
       join(aeHome, 'current.jsx'),
-      'var AEMCP_BRIDGE_VERSION = "9.9.9"; var PAYLOAD_RELOADED = 1;',
+      'var AEMCP_BRIDGE_VERSION = "9.9.9"; var PAYLOAD_RELOADED = 1;' +
+        'var AEMCP = { capabilities: function () { return []; },' +
+        ' busy: function () { return false; }, poll: function () {} };',
     );
     runInMockAE(source, ae);
     expect(ae.evalFileCalls).toBe(2);
     expect(ae.fs.get(join(aeHome, '.payload-version'))).toBe('9.9.9');
 
-    runInMockAE(source, ae);
+    // Same session, next beat: nothing changed, so no reload.
+    ae.advance(30000);
     expect(ae.evalFileCalls).toBe(2);
+  });
+
+  it('loads the payload in a fresh session even when the version marker exists', async () => {
+    const { ae, home, source } = await makeAE();
+    runInMockAE(source, ae);
+    expect(ae.evalFileCalls).toBe(1);
+
+    // Relaunching After Effects: new runtime, same files on disk.
+    const ctx = runInMockAE(source, ae);
+    expect(ae.evalFileCalls).toBe(2);
+    expect(vm.runInContext('typeof AEMCP', ctx)).toBe('object');
+    expect(heartbeatSchema.parse(heartbeat(ae, home))).toMatchObject({
+      capabilities: expect.arrayContaining(CORE_TOOLS),
+    });
+  });
+
+  it('refreshes the heartbeat on the 30 second schedule', async () => {
+    const { ae, home, source } = await makeAE();
+    runInMockAE(source, ae);
+    const beatPath = join(home, '.ae-mcp', 'bridge', 'outbox', 'heartbeat.json');
+    ae.fs.delete(beatPath);
+    ae.advance(29000);
+    expect(ae.fs.has(beatPath)).toBe(false);
+    ae.advance(1000);
+    expect(ae.fs.has(beatPath)).toBe(true);
   });
 });

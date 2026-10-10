@@ -8,6 +8,18 @@ import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
 import { MockAE, runInMockAE } from './mock-ae.js';
 
+const CORE_TOOLS = [
+  'ae_comp_info',
+  'ae_layer_info',
+  'ae_project_info',
+  'ae_version_info',
+  'batch.run',
+  'find',
+  'get_selection',
+  'project.info',
+  'project.undo',
+];
+
 async function payloadContext(): Promise<{ ctx: vm.Context; ae: MockAE }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-registry-'));
   const ae = new MockAE();
@@ -36,24 +48,16 @@ async function loaderWithPayload(): Promise<{ ctx: vm.Context; ae: MockAE; home:
 describe('handler registry', () => {
   it('lists registered tools alphabetically', async () => {
     const { ctx } = await payloadContext();
+    const builtIn = vm.runInContext('AEMCP.capabilities()', ctx) as string[];
+    expect(builtIn).toEqual(expect.arrayContaining(CORE_TOOLS));
     vm.runInContext(
       'AEMCP.register("z.one", function () { return 1; });' +
         'AEMCP.register("a.two", function () { return 2; });',
       ctx,
     );
-    expect(vm.runInContext('AEMCP.capabilities()', ctx)).toEqual([
-      'a.two',
-      'ae_comp_info',
-      'ae_layer_info',
-      'ae_project_info',
-      'ae_version_info',
-      'batch.run',
-      'find',
-      'get_selection',
-      'project.info',
-      'project.undo',
-      'z.one',
-    ]);
+    expect(vm.runInContext('AEMCP.capabilities()', ctx)).toEqual(
+      [...builtIn, 'a.two', 'z.one'].sort(),
+    );
     expect(vm.runInContext('typeof AEMCP.invoke("a.two", null, 9999999999999)', ctx)).toBe(
       'object',
     );
@@ -76,18 +80,9 @@ describe('handler registry', () => {
     const first = JSON.parse(ae.fs.get(beatPath) as string);
     expect(heartbeatSchema.parse(first)).toMatchObject({
       transport: 'startup-loader',
-      capabilities: [
-        'ae_comp_info',
-        'ae_layer_info',
-        'ae_project_info',
-        'ae_version_info',
-        'batch.run',
-        'find',
-        'get_selection',
-        'project.info',
-        'project.undo',
-      ],
+      capabilities: expect.arrayContaining(CORE_TOOLS),
     });
+    expect(first.capabilities).toEqual([...first.capabilities].sort());
 
     vm.runInContext(
       'AEMCP.register("comp.add", function () { return true; });',
@@ -96,18 +91,7 @@ describe('handler registry', () => {
     ae.advance(30000);
     const second = JSON.parse(ae.fs.get(beatPath) as string);
     expect(heartbeatSchema.parse(second)).toMatchObject({
-      capabilities: [
-        'ae_comp_info',
-        'ae_layer_info',
-        'ae_project_info',
-        'ae_version_info',
-        'batch.run',
-        'comp.add',
-        'find',
-        'get_selection',
-        'project.info',
-        'project.undo',
-      ],
+      capabilities: [...first.capabilities, 'comp.add'].sort(),
       busy: false,
     });
   });

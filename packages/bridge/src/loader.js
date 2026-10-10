@@ -21,7 +21,8 @@ function aemcpLoadPayload(root) {
     var version = aemcpPayloadVersion(source);
     var markerFile = root + '/bridge/.payload-version';
     var loaded = aemcpReadFile(markerFile);
-    if (loaded !== version) {
+    // The marker file survives restarts but AEMCP does not: always load in a fresh session.
+    if (loaded !== version || typeof AEMCP === 'undefined') {
         $.evalFile(path);
         aemcpWriteFile(markerFile, version);
     }
@@ -56,14 +57,31 @@ function aemcpBeat(root) {
     return version;
 }
 
+// app.scheduleTask only accepts a string of code run in the global scope, so the
+// scheduled work lives in global functions. They never throw: an error in a
+// scheduled task would raise a modal dialog in After Effects.
+function aemcpBeatTick() {
+    try {
+        aemcpBeat(aemcpQueueRoot());
+    } catch (error) {
+        // try again on the next beat
+    }
+}
+
+function aemcpPollTick() {
+    try {
+        if (typeof AEMCP !== 'undefined') {
+            AEMCP.poll(aemcpQueueRoot());
+        }
+    } catch (error) {
+        // the job stays in the inbox for the next poll
+    }
+}
+
 (function () {
     var root = aemcpQueueRoot();
     aemcpEnsureDirs(root);
     aemcpBeat(root);
-    app.scheduleTask(function () {
-        aemcpBeat(root);
-    }, 30000, true);
-    app.scheduleTask(function () {
-        AEMCP.poll(root);
-    }, 200, true);
+    app.scheduleTask('aemcpBeatTick()', 30000, true);
+    app.scheduleTask('aemcpPollTick()', 200, true);
 })();
