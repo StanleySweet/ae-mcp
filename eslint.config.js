@@ -42,6 +42,9 @@ export default [
       ...tsPlugin.configs.recommended.rules,
       ...importPlugin.configs.recommended.rules,
       'import/order': ['error', { alphabetize: { order: 'asc' } }],
+      // The SDK uses wildcard subpath exports that eslint-import-resolver-typescript
+      // cannot map; tsc resolves and typechecks these imports instead.
+      'import/no-unresolved': ['error', { ignore: ['^@modelcontextprotocol/sdk/'] }],
       'unicorn/prevent-abbreviations': 'off',
     },
   },
