@@ -9,6 +9,7 @@ import {
   type JobMessage,
   type ResultMessage,
 } from '@ae-mcp/protocol';
+import { detectStall } from './stall.js';
 import type { Transport } from './transport.js';
 
 export interface AEClientOptions {
@@ -16,6 +17,7 @@ export interface AEClientOptions {
   root: string;
   timeoutMs?: number;
   staleMs?: number;
+  heartbeatMaxAgeMs?: number;
   now?: () => number;
   newId?: () => string;
 }
@@ -77,7 +79,27 @@ export function createAEClient(options: AEClientOptions): AEClient {
         deadline: now() + timeoutMs,
       };
       try {
-        return await options.transport.call(job);
+        const result = await options.transport.call(job);
+        if (result.ok || (result.error.code !== 'TIMEOUT' && result.error.code !== 'BRIDGE_NOT_LOADED')) {
+          return result;
+        }
+        const stall = await detectStall(options.root, {
+          now,
+          maxAgeMs: options.heartbeatMaxAgeMs,
+        });
+        if (!stall.stalled) {
+          return result;
+        }
+        return {
+          protocolVersion: PROTOCOL_VERSION,
+          ok: false,
+          error: {
+            code: 'TIMEOUT',
+            message:
+              'After Effects is blocked by a modal dialog: the bridge went busy and stopped reporting.',
+            hint: 'Close the dialog open in After Effects, then retry; the job did not run.',
+          },
+        };
       } catch (error) {
         return {
           protocolVersion: PROTOCOL_VERSION,

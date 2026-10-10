@@ -6,6 +6,7 @@ import {
   PROTOCOL_VERSION,
   errorHints,
   inboxDir,
+  makeError,
   outboxDir,
   type JobMessage,
   type ResultMessage,
@@ -125,5 +126,41 @@ describe('ae client', () => {
     await expect(stat(freshInbox)).resolves.toBeDefined();
     await expect(stat(oldInbox)).rejects.toThrow();
     await expect(stat(oldOutbox)).rejects.toThrow();
+  });
+
+  it('reports a modal-dialog stall instead of a bare timeout', async () => {
+    const root = await queueRoot();
+    await mkdir(outboxDir(root), { recursive: true });
+    const heartbeat = join(outboxDir(root), 'heartbeat.json');
+    await writeFile(
+      heartbeat,
+      JSON.stringify({
+        protocolVersion: 1,
+        bridgeVersion: '0.0.0',
+        aeVersion: '26.5',
+        os: 'Macintosh',
+        capabilities: [],
+        busy: true,
+        transport: 'startup-loader',
+      }),
+    );
+    const old = new Date(Date.now() - 5 * 60_000);
+    await utimes(heartbeat, old, old);
+
+    const transport: Transport = {
+      name: 'timeout',
+      call: async () => ({
+        protocolVersion: PROTOCOL_VERSION,
+        ok: false,
+        error: makeError('TIMEOUT', 'job exceeded its deadline'),
+      }),
+    };
+    const client = createAEClient({ transport, root });
+    const result = await client.call('echo');
+    if (result.ok) {
+      throw new Error(`expected a failure, got ${JSON.stringify(result)}`);
+    }
+    expect(result.error.message).toMatch(/modal dialog/);
+    expect(result.error.hint).toMatch(/Close the dialog/);
   });
 });
