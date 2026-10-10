@@ -16,9 +16,15 @@ AEMCP.register('project.undo', function () {
 });
 
 // Comp operation handlers (mutating, run via ae_do).
+// Ref: https://ae-scripting.docsforadobe.dev/itemCollection/itemCollection.html#itemcollection-addcomp
 AEMCP.register('comp.create', function (args) {
     var name = args && args.name ? args.name : 'New Comp';
-    var comp = app.project.items.addComp(name, 1920, 1080, 30, 10);
+    var width = args && typeof args.width === 'number' ? args.width : 1920;
+    var height = args && typeof args.height === 'number' ? args.height : 1080;
+    var pixelAspect = args && typeof args.pixelAspect === 'number' ? args.pixelAspect : 1.0;
+    var duration = args && typeof args.duration === 'number' ? args.duration : 10;
+    var frameRate = args && typeof args.fps === 'number' ? args.fps : (args && typeof args.frameRate === 'number' ? args.frameRate : 30);
+    var comp = app.project.items.addComp(name, width, height, pixelAspect, duration, frameRate);
     return { name: comp.name, id: comp.id };
 });
 
@@ -1395,6 +1401,82 @@ AEMCP.register('text.read', function (args) {
         font: textDoc.font
     };
 });
+
+// Audio operation handlers (mutating/reading, run via ae_do).
+// Ref: https://ae-scripting.docsforadobe.dev/layers/avLayer.html
+AEMCP.register('audio.set_levels', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var levels = args && args.levels ? args.levels : [0, 0];
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var audioLevels = layer.property('Audio Levels');
+    if (!audioLevels) return { success: false, error: 'Audio Levels property not found' };
+    audioLevels.setValue(levels);
+    return { success: true };
+});
+
+AEMCP.register('audio.info', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var hasAudio = layer.hasAudio;
+    var audioActive = layer.audioActive;
+    var audioLevels = layer.property('Audio Levels');
+    return {
+        hasAudio: hasAudio,
+        audioActive: audioActive,
+        levels: audioLevels ? audioLevels.value : [0, 0]
+    };
+});
+
+AEMCP.register('audio.peaks_to_markers', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var peaks = args && args.peaks ? args.peaks : [];
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var markerProp = layer.property('Marker');
+    if (!markerProp) return { success: false, error: 'Marker property not found' };
+    for (var j = 0; j < peaks.length; j++) {
+        var p = peaks[j];
+        var mv = new MarkerValue(p.comment || 'Peak');
+        markerProp.setValueAtTime(p.time || 0, mv);
+    }
+    return { success: true, count: peaks.length };
+});
+
 
 
 
