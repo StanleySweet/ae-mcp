@@ -722,4 +722,75 @@ AEMCP.register('keyframe.set_easing', function (args) {
     return { success: true };
 });
 
+// Expression operation handlers (mutating, run via ae_do).
+AEMCP.register('expression.set', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var propertyName = args && args.property ? args.property : null;
+    var value = args && args.value ? args.value : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    prop.setValue(value);
+    return { success: true };
+});
+
+AEMCP.register('expression.clear', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var propertyName = args && args.property ? args.property : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    prop.setValue(null);
+    return { success: true };
+});
+
+AEMCP.register('expression.check_errors', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var propertyName = args && args.property ? args.property : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = layer.property(propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    var errors = prop.check_errors ? prop.check_errors() : [];
+    return { errors: errors };
+});
+
 
