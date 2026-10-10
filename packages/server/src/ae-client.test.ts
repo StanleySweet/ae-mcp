@@ -144,7 +144,7 @@ describe('ae client', () => {
         transport: 'startup-loader',
       }),
     );
-    const old = new Date(Date.now() - 5 * 60_000);
+    const old = new Date(Date.now() - 120_000);
     await utimes(heartbeat, old, old);
 
     const transport: Transport = {
