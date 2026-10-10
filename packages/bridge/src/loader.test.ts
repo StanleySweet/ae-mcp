@@ -42,7 +42,7 @@ describe('bridge loader', () => {
       bridgeVersion: '0.0.0',
       aeVersion: 'MockAE-25',
       os: 'MockAE-OS',
-      capabilities: [],
+      capabilities: ['ae_project_info'],
       busy: false,
       transport: 'startup-loader',
     });

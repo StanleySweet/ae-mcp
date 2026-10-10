@@ -41,7 +41,11 @@ describe('handler registry', () => {
         'AEMCP.register("a.two", function () { return 2; });',
       ctx,
     );
-    expect(vm.runInContext('AEMCP.capabilities()', ctx)).toEqual(['a.two', 'z.one']);
+    expect(vm.runInContext('AEMCP.capabilities()', ctx)).toEqual([
+      'a.two',
+      'ae_project_info',
+      'z.one',
+    ]);
     expect(vm.runInContext('typeof AEMCP.invoke("a.two", null, 9999999999999)', ctx)).toBe(
       'object',
     );
@@ -64,7 +68,7 @@ describe('handler registry', () => {
     const first = JSON.parse(ae.fs.get(beatPath) as string);
     expect(heartbeatSchema.parse(first)).toMatchObject({
       transport: 'startup-loader',
-      capabilities: [],
+      capabilities: ['ae_project_info'],
     });
 
     vm.runInContext(
@@ -74,7 +78,7 @@ describe('handler registry', () => {
     ae.advance(30000);
     const second = JSON.parse(ae.fs.get(beatPath) as string);
     expect(heartbeatSchema.parse(second)).toMatchObject({
-      capabilities: ['comp.add'],
+      capabilities: ['ae_project_info', 'comp.add'],
       busy: false,
     });
   });
