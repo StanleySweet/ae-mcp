@@ -27,6 +27,36 @@ function aemcpBusy() {
     return AEMCP_BUSY;
 }
 
+function aemcpCallHandler(handler, args) {
+    var value;
+    try {
+        value = handler(args);
+    } catch (err) {
+        if (err && err.aemcpIssue) {
+            return { ok: false, issue: err.aemcpIssue };
+        }
+        return { ok: false, issue: aemcpErrorIssue('SCRIPT_ERROR', String(err)) };
+    }
+    if (value === undefined) {
+        value = null;
+    }
+    return { ok: true, value: value };
+}
+
+function aemcpAbort(issue) {
+    var err = new Error(issue.message);
+    err.aemcpIssue = issue;
+    throw err;
+}
+
+function aemcpRunHandler(tool, args) {
+    var handler = AEMCP.HANDLERS[tool];
+    if (!handler) {
+        return { ok: false, issue: aemcpErrorIssue('UNKNOWN_TOOL', 'no handler for tool ' + tool) };
+    }
+    return aemcpCallHandler(handler, args);
+}
+
 function aemcpInvoke(tool, args, deadline) {
     if (typeof deadline === 'number' && new Date().getTime() >= deadline) {
         return { ok: false, issue: aemcpErrorIssue('TIMEOUT', 'job deadline exceeded') };
@@ -36,24 +66,15 @@ function aemcpInvoke(tool, args, deadline) {
         return { ok: false, issue: aemcpErrorIssue('UNKNOWN_TOOL', 'no handler for tool ' + tool) };
     }
     app.beginUndoGroup('Claude: ' + tool);
-    var value;
-    var caught = null;
     AEMCP_BUSY = true;
+    var outcome;
     try {
-        value = handler(args);
-    } catch (err) {
-        caught = err;
+        outcome = aemcpCallHandler(handler, args);
     } finally {
         app.endUndoGroup();
         AEMCP_BUSY = false;
     }
-    if (caught !== null) {
-        return { ok: false, issue: aemcpErrorIssue('SCRIPT_ERROR', String(caught)) };
-    }
-    if (value === undefined) {
-        value = null;
-    }
-    return { ok: true, value: value };
+    return outcome;
 }
 
 function aemcpProcessJob(jobPath) {
@@ -147,3 +168,23 @@ AEMCP.capabilities = function () {
 AEMCP.busy = function () {
     return aemcpBusy();
 };
+
+// batch.run: one undo group for many sub-ops. aemcpInvoke already opened the
+// group for 'batch.run'; each sub-op runs via aemcpRunHandler (no nested group).
+AEMCP.register('batch.run', function (args) {
+    var ops = args && args.ops ? args.ops : [];
+    var results = [];
+    var i, sub, outcome;
+    for (i = 0; i < ops.length; i++) {
+        sub = ops[i];
+        if (!sub || typeof sub.op !== 'string' || sub.op.length === 0) {
+            aemcpAbort(aemcpErrorIssue('INVALID_ARGS', 'ops[' + i + '].op must be a non-empty string'));
+        }
+        outcome = aemcpRunHandler(sub.op, sub.args);
+        if (!outcome.ok) {
+            aemcpAbort(outcome.issue);
+        }
+        results.push(outcome.value);
+    }
+    return { results: results };
+});

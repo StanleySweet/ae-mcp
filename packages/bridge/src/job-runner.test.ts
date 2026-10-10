@@ -142,3 +142,81 @@ describe('bridge job runner', () => {
     expect(vm.runInContext('AEMCP.busy()', ctx)).toBe(false);
   });
 });
+
+describe('bridge batch.run', () => {
+  it('runs every sub-op inside a single batch.run undo group', async () => {
+    const { driver, ae, ctx } = await setup();
+    vm.runInContext(
+      'AEMCP.HANDLERS["a.one"] = function (args) { return args.n; };' +
+        'AEMCP.HANDLERS["a.two"] = function (args) { return args.n * 2; };',
+      ctx,
+    );
+    await driver.sendJob({
+      protocolVersion: 1,
+      id: 'batch-ok',
+      tool: 'batch.run',
+      args: { ops: [{ op: 'a.one', args: { n: 1 } }, { op: 'a.two', args: { n: 2 } }] },
+      deadline: Date.now() + 5000,
+    });
+    const result = await driver.waitForResult('batch-ok');
+    expect(result).toEqual({
+      protocolVersion: 1,
+      ok: true,
+      result: { results: [1, 4] },
+    });
+    expect(ae.undoGroups).toHaveLength(1);
+    expect(ae.undoGroups[0]!.name).toBe('Claude: batch.run');
+    expect(ae.app.inUndoGroup()).toBe(false);
+  });
+
+  it('stops at the first failing sub-op and keeps the single undo group', async () => {
+    const { driver, ae, ctx } = await setup();
+    vm.runInContext(
+      'var ran = [];' +
+        'AEMCP.HANDLERS["a.ok"] = function () { ran.push("ok"); return 1; };' +
+        'AEMCP.HANDLERS["a.boom"] = function () { throw new Error("kaboom"); };' +
+        'AEMCP.HANDLERS["a.after"] = function () { ran.push("after"); return 9; };',
+      ctx,
+    );
+    await driver.sendJob({
+      protocolVersion: 1,
+      id: 'batch-boom',
+      tool: 'batch.run',
+      args: { ops: [{ op: 'a.ok' }, { op: 'a.boom' }, { op: 'a.after' }] },
+      deadline: Date.now() + 5000,
+    });
+    const result = await driver.waitForResult('batch-boom');
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'SCRIPT_ERROR', message: 'Error: kaboom' },
+    });
+    expect(vm.runInContext('ran.join(",")', ctx)).toBe('ok');
+    expect(ae.undoGroups).toHaveLength(1);
+  });
+
+  it('reports an unknown sub-op with UNKNOWN_TOOL', async () => {
+    const { driver } = await setup();
+    await driver.sendJob({
+      protocolVersion: 1,
+      id: 'batch-unknown',
+      tool: 'batch.run',
+      args: { ops: [{ op: 'nope.nope' }] },
+      deadline: Date.now() + 5000,
+    });
+    const result = await driver.waitForResult('batch-unknown');
+    expect(result).toMatchObject({ ok: false, error: { code: 'UNKNOWN_TOOL' } });
+  });
+
+  it('rejects a sub-op without a name with INVALID_ARGS', async () => {
+    const { driver } = await setup();
+    await driver.sendJob({
+      protocolVersion: 1,
+      id: 'batch-invalid',
+      tool: 'batch.run',
+      args: { ops: [{ args: {} }] },
+      deadline: Date.now() + 5000,
+    });
+    const result = await driver.waitForResult('batch-invalid');
+    expect(result).toMatchObject({ ok: false, error: { code: 'INVALID_ARGS' } });
+  });
+});
