@@ -1017,5 +1017,109 @@ AEMCP.register('preset.search', function (args) {
     return { matches: matches };
 });
 
+// Marker operation handlers (mutating, run via ae_do).
+// Ref: https://ae-scripting.docsforadobe.dev/other/markerValue.html
+AEMCP.register('marker.add', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
+    var time = args && typeof args.time === 'number' ? args.time : 0;
+    var comment = args && args.comment ? args.comment : '';
+    var duration = args && typeof args.duration === 'number' ? args.duration : 0;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var target = comp;
+    if (layerIndex !== null) {
+        target = comp.layer(layerIndex);
+        if (!target) return { success: false, error: 'Layer not found' };
+    }
+    var markerProp = target.property('Marker');
+    if (!markerProp) return { success: false, error: 'Marker property not found' };
+    var mv = new MarkerValue(comment);
+    if (duration > 0) {
+        mv.duration = duration;
+    }
+    markerProp.setValueAtTime(time, mv);
+    return { success: true };
+});
+
+AEMCP.register('marker.add_bulk', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
+    var markers = args && args.markers ? args.markers : [];
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var target = comp;
+    if (layerIndex !== null) {
+        target = comp.layer(layerIndex);
+        if (!target) return { success: false, error: 'Layer not found' };
+    }
+    var markerProp = target.property('Marker');
+    if (!markerProp) return { success: false, error: 'Marker property not found' };
+    for (var j = 0; j < markers.length; j++) {
+        var m = markers[j];
+        var mv = new MarkerValue(m.comment || '');
+        if (m.duration) mv.duration = m.duration;
+        markerProp.setValueAtTime(m.time || 0, mv);
+    }
+    return { success: true, count: markers.length };
+});
+
+AEMCP.register('marker.list', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var target = comp;
+    if (layerIndex !== null) {
+        target = comp.layer(layerIndex);
+        if (!target) return { success: false, error: 'Layer not found' };
+    }
+    var markerProp = target.property('Marker');
+    var list = [];
+    if (markerProp) {
+        for (var k = 1; k <= markerProp.numKeys; k++) {
+            var val = markerProp.keyValue(k);
+            list.push({
+                index: k,
+                time: markerProp.keyTime(k),
+                comment: val ? val.comment : '',
+                duration: val ? val.duration : 0
+            });
+        }
+    }
+    return { markers: list };
+});
+
+
 
 
