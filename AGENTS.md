@@ -36,7 +36,8 @@ For each task, in order:
    ```
    One task = one commit. Do not batch tasks into one commit.
 6. **Push** (`git push origin main`) so the `Closes #N` footer closes the task issue and unblocks its dependents.
-7. **Check CI** after pushing: `gh run list --branch main --limit 3` (or `gh run watch`). Fix red CI with a new follow-up commit, never by force-pushing.
+7. **Close the parent epic when its last task closes.** After pushing, re-list the epic's task issues: `gh issue list --state all --label "epic:<ID>" --json number,title,state`. If every task (`<ID>-n …`) is `CLOSED` and the epic issue itself is still `OPEN`, close it: `gh issue close <epic> --comment "All <ID> tasks are closed."`.
+8. **Check CI** after pushing: `gh run list --branch main --limit 3` (or `gh run watch`). Fix red CI with a new follow-up commit, never by force-pushing.
 
 Other rules:
 
