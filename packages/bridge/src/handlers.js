@@ -961,4 +961,61 @@ AEMCP.register('effect.apply_template', function (args) {
     return { success: true };
 });
 
+// Preset operation handlers (mutating, run via ae_do).
+AEMCP.register('preset.apply_ffx', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var presetPath = args && args.path ? args.path : null;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    if (!presetPath) return { success: false, error: 'Preset path required' };
+    var ffxFile = new File(presetPath);
+    if (!ffxFile.exists) {
+        return { success: false, error: 'Preset file not found: ' + presetPath };
+    }
+    layer.applyPreset(ffxFile);
+    return { success: true };
+});
+
+AEMCP.register('preset.list', function (args) {
+    var category = args && args.category ? args.category : null;
+    var presetFolder = new Folder(Folder.appPackage.fsName + '/Presets');
+    var files = [];
+    if (presetFolder.exists) {
+        var list = presetFolder.getFiles('*.ffx');
+        for (var i = 0; i < list.length; i++) {
+            files.push({ name: list[i].name, path: list[i].fsName });
+        }
+    }
+    return { presets: files };
+});
+
+AEMCP.register('preset.search', function (args) {
+    var query = args && args.query ? args.query.toLowerCase() : '';
+    var presetFolder = new Folder(Folder.appPackage.fsName + '/Presets');
+    var matches = [];
+    if (presetFolder.exists && query.length > 0) {
+        var list = presetFolder.getFiles('*.ffx');
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].name.toLowerCase().indexOf(query) !== -1) {
+                matches.push({ name: list[i].name, path: list[i].fsName });
+            }
+        }
+    }
+    return { matches: matches };
+});
+
+
 
