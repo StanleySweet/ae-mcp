@@ -1,10 +1,12 @@
-import { queueRoot, type ResultMessage } from '@ae-mcp/protocol';
+import { makeError, queueRoot, type ResultMessage } from '@ae-mcp/protocol';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
 import { buildAeContext } from './context.js';
 import {
+  closestNames,
   defaultOperationRegistry,
+  validateOperationArgs,
   type OperationRegistry,
 } from './operations.js';
 import { selectTransport, type Runner } from './osascript-transport.js';
@@ -231,6 +233,42 @@ export function createServer(options: ServerOptions = {}): McpServer {
       },
     },
     async (args) => text({ operations: operations.list(args.category) }),
+  );
+
+  server.registerTool(
+    'ae_do',
+    {
+      description:
+        'Run a named operation from ae_catalog. Arguments are validated against the operation schema before reaching After Effects, and the response carries the ambient context (active comp and selection).',
+      inputSchema: {
+        op: z.string(),
+        args: z.record(z.string(), z.unknown()).optional(),
+      },
+    },
+    async (toolArgs) => {
+      const definition = operations.get(toolArgs.op);
+      if (definition === undefined) {
+        const suggestions = closestNames(operations.names(), toolArgs.op);
+        const suffix = suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : '';
+        return text(
+          makeError('UNKNOWN_TOOL', `unknown operation '${toolArgs.op}'.${suffix}`),
+          true,
+        );
+      }
+      const validation = validateOperationArgs(definition.schema, toolArgs.args);
+      if (!validation.ok) {
+        return text(makeError('INVALID_ARGS', validation.message), true);
+      }
+      const result = await callRaw(definition.name, validation.args);
+      if (!result.ok) {
+        return toResult(result);
+      }
+      const selection = await callRaw('get_selection');
+      return text({
+        result: result.result,
+        context: selection.ok ? selection.result : null,
+      });
+    },
   );
 
   return server;
