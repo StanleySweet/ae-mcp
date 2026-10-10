@@ -6,16 +6,22 @@ import vm from 'node:vm';
 import {
   compItemSchema,
   itemSummarySchema,
+  layerSchema,
   projectInfoSchema,
 } from '@ae-mcp/protocol';
 import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
 import {
   MockAE,
+  MockAVLayer,
   MockCompItem,
+  MockEffect,
   MockFolderItem,
   MockFootageItem,
   MockFile,
+  MockProperty,
+  MockPropertyGroup,
+  MockTextLayer,
   runInMockAE,
 } from './mock-ae.js';
 
@@ -89,5 +95,97 @@ describe('bridge serializers', () => {
       vm.runInContext('AEMCP.serialize.item(app.project.item(2))', ctx),
     );
     expect(folder).toMatchObject({ id: 2, name: 'Assets', type: 'Folder' });
+  });
+
+  it('serializes a layer with transform, keyframes, effects, masks and text', async () => {
+    const { ctx, ae } = await payloadContext();
+    seed(ae);
+    const comp = ae.project.item(1) as MockCompItem;
+
+    const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+    transform.add(new MockProperty('Position', 'ADBE Position', [100, 200]));
+    const opacity = new MockProperty('Opacity', 'ADBE Opacity', 100);
+    opacity.key(0, 100);
+    opacity.key(12, 0);
+    transform.add(opacity);
+
+    const layer = new MockAVLayer('Layer 1', 'Layer');
+    layer.id = 7;
+    layer.source = comp;
+    layer.width = 1920;
+    layer.height = 1080;
+    layer.add(transform);
+
+    const effects = new MockPropertyGroup('Effects', 'ADBE Effect Parade');
+    const blur = new MockEffect('Fast Box Blur', 'ADBE Box Blur2');
+    blur.add(new MockProperty('Blur Radius', 'ADBE Box Blur2-0001', 10));
+    effects.add(blur);
+    layer.add(effects);
+
+    const masks = new MockPropertyGroup('Masks', 'ADBE Mask Parade');
+    masks.add(new MockProperty('Mask 1', 'ADBE Mask Atom'));
+    layer.add(masks);
+
+    const text = new MockTextLayer('Title', 'Layer');
+    text.id = 8;
+    const textProperties = new MockPropertyGroup('Text', 'ADBE Text Properties');
+    textProperties.add(
+      new MockProperty('Source Text', 'ADBE Text Document', {
+        text: 'Hello',
+        fontSize: 72,
+        font: 'ArialMT',
+        fillColor: [1, 1, 1],
+      }),
+    );
+    text.add(textProperties);
+
+    comp.addLayer(layer);
+    comp.addLayer(text);
+
+    const avLayer = layerSchema.parse(
+      vm.runInContext('AEMCP.serialize.layer(app.project.item(1).layer(1))', ctx),
+    );
+    expect(avLayer).toMatchObject({
+      index: 1,
+      id: 7,
+      name: 'Layer 1',
+      type: 'AVLayer',
+      width: 1920,
+      height: 1080,
+      sourceId: 1,
+      sourceName: 'Main',
+      parentIndex: null,
+    });
+    expect(avLayer.transform?.properties).toContainEqual({
+      name: 'Position',
+      matchName: 'ADBE Position',
+      value: [100, 200],
+    });
+    expect(avLayer.transform?.properties).toContainEqual({
+      name: 'Opacity',
+      matchName: 'ADBE Opacity',
+      keyframes: [
+        { time: 0, value: 100 },
+        { time: 12, value: 0 },
+      ],
+    });
+    expect(avLayer.effects).toEqual([
+      {
+        name: 'Fast Box Blur',
+        matchName: 'ADBE Box Blur2',
+        enabled: true,
+        properties: [{ name: 'Blur Radius', matchName: 'ADBE Box Blur2-0001', value: 10 }],
+      },
+    ]);
+    expect(avLayer.masks).toHaveLength(1);
+
+    const textLayer = layerSchema.parse(
+      vm.runInContext('AEMCP.serialize.layer(app.project.item(1).layer(2))', ctx),
+    );
+    expect(textLayer).toMatchObject({
+      name: 'Title',
+      type: 'TextLayer',
+      text: { text: 'Hello', fontSize: 72, font: 'ArialMT', fillColor: [1, 1, 1] },
+    });
   });
 });

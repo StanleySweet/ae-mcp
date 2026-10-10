@@ -136,6 +136,7 @@ export class MockCompItem extends MockItem {
   motionBlur = false;
   workAreaStart = 0;
   workAreaDuration = 0;
+  private readonly layerList: MockLayer[] = [];
 
   constructor(
     id: number,
@@ -149,9 +150,114 @@ export class MockCompItem extends MockItem {
   }
 
   get numLayers(): number {
-    return 0;
+    return this.layerList.length;
+  }
+
+  layer(index: number): MockLayer | null {
+    return this.layerList[index - 1] ?? null;
+  }
+
+  addLayer(layer: MockLayer): MockLayer {
+    layer.index = this.layerList.length + 1;
+    this.layerList.push(layer);
+    return layer;
   }
 }
+
+export class MockProperty {
+  expressionEnabled = false;
+  expression = '';
+  readonly keys: { time: number; value: unknown }[] = [];
+
+  constructor(
+    readonly name: string,
+    readonly matchName: string,
+    public value: unknown = null,
+  ) {}
+
+  get numKeys(): number {
+    return this.keys.length;
+  }
+
+  keyTime(index: number): number {
+    return this.keys[index - 1].time;
+  }
+
+  keyValue(index: number): unknown {
+    return this.keys[index - 1].value;
+  }
+
+  key(time: number, value: unknown): this {
+    this.keys.push({ time, value });
+    return this;
+  }
+}
+
+export class MockPropertyGroup {
+  protected readonly children: (MockProperty | MockPropertyGroup)[] = [];
+
+  constructor(
+    readonly name: string,
+    readonly matchName: string,
+  ) {}
+
+  get numProperties(): number {
+    return this.children.length;
+  }
+
+  property(indexOrName: number | string): MockProperty | MockPropertyGroup | null {
+    if (typeof indexOrName === 'number') {
+      return this.children[indexOrName - 1] ?? null;
+    }
+    for (const child of this.children) {
+      if (child.matchName === indexOrName) {
+        return child;
+      }
+    }
+    return null;
+  }
+
+  add<T extends MockProperty | MockPropertyGroup>(child: T): T {
+    this.children.push(child);
+    return child;
+  }
+}
+
+export class MockEffect extends MockPropertyGroup {
+  enabled = new MockProperty('enabled', 'ADBE Effect Enabled', true);
+}
+
+export class MockLayer extends MockPropertyGroup {
+  index = 1;
+  id: number | null = null;
+  enabled = true;
+  solo = false;
+  shy = false;
+  locked = false;
+  inPoint = 0;
+  outPoint = 0;
+  startTime = 0;
+  stretch = 1;
+  label = 0;
+  parent: MockLayer | null = null;
+}
+
+export class MockAVLayer extends MockLayer {
+  width = 0;
+  height = 0;
+  hasVideo = true;
+  hasAudio = false;
+  threeDLayer = false;
+  source: MockItem | null = null;
+}
+
+export class MockTextLayer extends MockAVLayer {}
+
+export class MockShapeLayer extends MockAVLayer {}
+
+export class MockCameraLayer extends MockLayer {}
+
+export class MockLightLayer extends MockLayer {}
 
 export class MockFootageItem extends MockItem {
   pixelAspect = 1;
@@ -282,6 +388,11 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     CompItem: MockCompItem,
     FolderItem: MockFolderItem,
     FootageItem: MockFootageItem,
+    AVLayer: MockAVLayer,
+    TextLayer: MockTextLayer,
+    ShapeLayer: MockShapeLayer,
+    CameraLayer: MockCameraLayer,
+    LightLayer: MockLightLayer,
     File: function (path: string): MockFile {
       return new MockFile(ae, path);
     },

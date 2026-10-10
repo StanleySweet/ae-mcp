@@ -23,5 +23,22 @@ export {
   itemSummarySchema,
   compItemSchema,
   projectInfoSchema,
+  keyframeSchema,
+  propertySchema,
+  propertyGroupSchema,
+  effectSchema,
+  textSchema,
+  layerSchema,
 } from './serialize.js';
-export type { ItemType, ItemSummary, CompItemInfo, ProjectInfo } from './serialize.js';
+export type {
+  ItemType,
+  ItemSummary,
+  CompItemInfo,
+  ProjectInfo,
+  Keyframe,
+  PropertyNode,
+  PropertyGroupNode,
+  EffectNode,
+  TextNode,
+  LayerNode,
+} from './serialize.js';
