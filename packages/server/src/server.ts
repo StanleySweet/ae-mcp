@@ -184,5 +184,36 @@ export function createServer(options: ServerOptions = {}): McpServer {
     async () => toResult(await callRaw('get_selection')),
   );
 
+  server.registerTool(
+    'find',
+    {
+      description:
+        'Find comps, layers and properties whose name or match name contains a query. Restrict with kinds.',
+      inputSchema: {
+        query: z.string(),
+        kinds: z.array(z.enum(['comp', 'layer', 'property'])).optional(),
+      },
+    },
+    async (args) => {
+      const result = await callRaw('find', { query: args.query, kinds: args.kinds });
+      if (!result.ok) {
+        return toResult(result);
+      }
+      const value = result.result as {
+        comps?: unknown[];
+        layers?: unknown[];
+        properties?: unknown[];
+      };
+      const layers = capArray(value.layers ?? [], maxResultBytes);
+      const properties = capArray(value.properties ?? [], maxResultBytes);
+      return text({
+        comps: value.comps ?? [],
+        layers: layers.items,
+        properties: properties.items,
+        truncated: layers.truncated || properties.truncated,
+      });
+    },
+  );
+
   return server;
 }

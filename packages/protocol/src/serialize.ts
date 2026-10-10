@@ -135,6 +135,27 @@ export const selectionSchema = z.object({
   items: z.array(itemSummarySchema),
 });
 
+export const findLayerSchema = z.object({
+  comp: z.string(),
+  index: z.number(),
+  name: z.string(),
+  type: z.string(),
+});
+
+export const findPropertySchema = z.object({
+  comp: z.string(),
+  layer: z.string(),
+  name: z.string(),
+  matchName: z.string(),
+});
+
+export const findResultSchema = z.object({
+  comps: z.array(itemSummarySchema),
+  layers: z.array(findLayerSchema),
+  properties: z.array(findPropertySchema),
+  truncated: z.boolean(),
+});
+
 export type Keyframe = z.infer<typeof keyframeSchema>;
 export type PropertyNode = z.infer<typeof propertySchema>;
 export type EffectNode = z.infer<typeof effectSchema>;
@@ -144,3 +165,6 @@ export type CompInfoResult = z.infer<typeof compInfoResultSchema>;
 export type LayerInfoResult = z.infer<typeof layerInfoResultSchema>;
 export type VersionInfo = z.infer<typeof versionInfoSchema>;
 export type Selection = z.infer<typeof selectionSchema>;
+export type FindLayer = z.infer<typeof findLayerSchema>;
+export type FindProperty = z.infer<typeof findPropertySchema>;
+export type FindResult = z.infer<typeof findResultSchema>;

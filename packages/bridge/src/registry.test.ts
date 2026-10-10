@@ -47,6 +47,7 @@ describe('handler registry', () => {
       'ae_layer_info',
       'ae_project_info',
       'ae_version_info',
+      'find',
       'get_selection',
       'z.one',
     ]);
@@ -77,6 +78,7 @@ describe('handler registry', () => {
         'ae_layer_info',
         'ae_project_info',
         'ae_version_info',
+        'find',
         'get_selection',
       ],
     });
@@ -94,6 +96,7 @@ describe('handler registry', () => {
         'ae_project_info',
         'ae_version_info',
         'comp.add',
+        'find',
         'get_selection',
       ],
       busy: false,

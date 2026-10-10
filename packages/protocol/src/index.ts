@@ -33,6 +33,9 @@ export {
   layerInfoResultSchema,
   versionInfoSchema,
   selectionSchema,
+  findLayerSchema,
+  findPropertySchema,
+  findResultSchema,
 } from './serialize.js';
 export type {
   ItemType,
@@ -49,4 +52,7 @@ export type {
   LayerInfoResult,
   VersionInfo,
   Selection,
+  FindLayer,
+  FindProperty,
+  FindResult,
 } from './serialize.js';

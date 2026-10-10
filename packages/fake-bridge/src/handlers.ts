@@ -125,5 +125,42 @@ export function observeHandlers(project: FakeProject): HandlerMap {
     layers: project.selection.map((layer, i) => layerInfo(layer, i + 1)),
     items: [],
   });
+  handlers.find = (args) => {
+    const parsed = (args ?? {}) as { query?: unknown; kinds?: unknown };
+    const query = typeof parsed.query === 'string' ? parsed.query.toLowerCase() : '';
+    const kinds = Array.isArray(parsed.kinds)
+      ? (parsed.kinds as string[])
+      : ['comp', 'layer', 'property'];
+    const comps: Record<string, unknown>[] = [];
+    const layers: Record<string, unknown>[] = [];
+    const properties: Record<string, unknown>[] = [];
+    if (query !== '') {
+      if (kinds.includes('comp')) {
+        for (const comp of project.comps) {
+          if (comp.name.toLowerCase().includes(query)) {
+            comps.push({
+              id: comp.id,
+              name: comp.name,
+              type: 'Composition',
+              parentFolderId: 0,
+              parentFolderName: 'Root',
+              label: 0,
+              comment: '',
+            });
+          }
+        }
+      }
+      if (kinds.includes('layer')) {
+        for (const comp of project.comps) {
+          comp.layers.forEach((layer, i) => {
+            if (layer.name.toLowerCase().includes(query)) {
+              layers.push({ comp: comp.name, index: i + 1, name: layer.name, type: 'AVLayer' });
+            }
+          });
+        }
+      }
+    }
+    return { comps, layers, properties };
+  };
   return handlers;
 }

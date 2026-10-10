@@ -112,4 +112,81 @@ AEMCP.register('get_selection', function () {
     return { comp: null, layers: layers, items: items };
 });
 
+var AEMCP_FIND_LIMIT = 200;
+
+function aemcpFindWants(kinds, kind) {
+    var i;
+    for (i = 0; i < kinds.length; i++) {
+        if (kinds[i] === kind) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function aemcpFindMatches(name, query) {
+    return typeof name === 'string' && name.toLowerCase().indexOf(query) >= 0;
+}
+
+function aemcpFindProperties(group, compName, layerName, query, out) {
+    var i, child;
+    for (i = 1; i <= group.numProperties; i++) {
+        if (out.length >= AEMCP_FIND_LIMIT) {
+            return;
+        }
+        child = group.property(i);
+        if (aemcpIsGroup(child)) {
+            aemcpFindProperties(child, compName, layerName, query, out);
+        } else if (aemcpFindMatches(child.name, query) || aemcpFindMatches(child.matchName, query)) {
+            out.push({
+                comp: compName,
+                layer: layerName,
+                name: child.name,
+                matchName: child.matchName
+            });
+        }
+    }
+}
+
+AEMCP.register('find', function (args) {
+    var query = args && typeof args.query === 'string' ? args.query.toLowerCase() : '';
+    var kinds = args && args.kinds && args.kinds.length ? args.kinds : ['comp', 'layer', 'property'];
+    var wantComp = aemcpFindWants(kinds, 'comp');
+    var wantLayer = aemcpFindWants(kinds, 'layer');
+    var wantProp = aemcpFindWants(kinds, 'property');
+    var result = { comps: [], layers: [], properties: [] };
+    var project = app.project;
+    var i, j, item, layer;
+    if (query === '') {
+        return result;
+    }
+    for (i = 1; i <= project.numItems; i++) {
+        item = project.item(i);
+        if (!(item instanceof CompItem)) {
+            continue;
+        }
+        if (wantComp && aemcpFindMatches(item.name, query)) {
+            result.comps.push(AEMCP.serialize.item(item));
+        }
+        if (!wantLayer && !wantProp) {
+            continue;
+        }
+        for (j = 1; j <= item.numLayers; j++) {
+            layer = item.layer(j);
+            if (wantLayer && result.layers.length < AEMCP_FIND_LIMIT && aemcpFindMatches(layer.name, query)) {
+                result.layers.push({
+                    comp: item.name,
+                    index: j,
+                    name: layer.name,
+                    type: aemcpLayerType(layer)
+                });
+            }
+            if (wantProp && result.properties.length < AEMCP_FIND_LIMIT) {
+                aemcpFindProperties(layer, item.name, layer.name, query, result.properties);
+            }
+        }
+    }
+    return result;
+});
+
 

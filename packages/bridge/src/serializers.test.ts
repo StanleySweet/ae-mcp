@@ -253,4 +253,37 @@ describe('bridge serializers', () => {
     expect(panel.layers).toEqual([]);
     expect(panel.items.map((item: { name: string }) => item.name)).toEqual(['Assets']);
   });
+
+  it('finds comps, layers and properties by name or match name', async () => {
+    const { ctx, ae } = await payloadContext();
+    seed(ae);
+    const comp = ae.project.item(1) as MockCompItem;
+    const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+    transform.add(new MockProperty('Position', 'ADBE Position', [100, 200]));
+    const layer = new MockAVLayer('Logo', 'Layer');
+    layer.id = 7;
+    layer.add(transform);
+    comp.addLayer(layer);
+
+    const props = vm.runInContext(
+      "AEMCP.invoke('find', { query: 'position' }, null).value",
+      ctx,
+    );
+    expect(props.properties).toContainEqual({
+      comp: 'Main',
+      layer: 'Logo',
+      name: 'Position',
+      matchName: 'ADBE Position',
+    });
+
+    const layers = vm.runInContext(
+      "AEMCP.invoke('find', { query: 'log', kinds: ['layer'] }, null).value",
+      ctx,
+    );
+    expect(layers.layers).toEqual([{ comp: 'Main', index: 1, name: 'Logo', type: 'AVLayer' }]);
+    expect(layers.properties).toEqual([]);
+
+    const none = vm.runInContext("AEMCP.invoke('find', { query: '' }, null).value", ctx);
+    expect(none).toEqual({ comps: [], layers: [], properties: [] });
+  });
 });
