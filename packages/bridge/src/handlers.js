@@ -92,8 +92,9 @@ AEMCP.register('comp.set_settings', function (args) {
 });
 
 AEMCP.register('comp.precompose', function (args) {
-    var compName = args && args.name ? args.name : null;
-    var newCompName = args && args.newName ? args.newName : null;
+    var compName = args && args.comp ? args.comp : null;
+    var newCompName = args && args.name ? args.name : (args && args.newName ? args.newName : null);
+    var layers = args && args.layers ? args.layers : null;
     var project = app.project;
     var comp;
     for (var i = 1; i <= project.numItems; i++) {
@@ -106,15 +107,24 @@ AEMCP.register('comp.precompose', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var indices = [];
-    for (var j = 1; j <= comp.numLayers; j++) {
-        indices.push(j);
+    var indices: number[] = [];
+    if (layers) {
+        for (var j = 0; j < layers.length; j += 1) {
+            var li = layers[j];
+            if (typeof li === 'number' && li >= 1 && li <= comp.numLayers) {
+                indices.push(li);
+            }
+        }
+    } else {
+        for (var j = 1; j <= comp.numLayers; j++) {
+            indices.push(j);
+        }
     }
     if (indices.length === 0) {
         return { success: false, error: 'Composition has no layers to precompose' };
     }
     var newComp = comp.layers.precompose(indices, newCompName || comp.name + ' Precomped', true);
-    return { name: newComp.name, id: newComp.id };
+    return { numLayers: indices.length, precomp: { name: newComp.name } };
 });
 
 AEMCP.register('comp.layer_clip_frames', function (args) {

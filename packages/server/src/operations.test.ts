@@ -13,6 +13,7 @@ const BRIDGE_OPS = [
   'comp.set_settings',
   'comp.precompose',
   'comp.layer_clip_frames',
+  'comp.info',
   'layer.add_text',
   'layer.add_shape',
   'layer.add_solid',

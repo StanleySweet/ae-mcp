@@ -82,12 +82,15 @@ export function defaultOperationRegistry(): OperationRegistry {
     }),
   );
   register(operation('comp.precompose', 'comp', 'Precompose a composition into a new comp.', {
-    schema: { name: comp, newName: comp },
+    schema: { name: comp, comp: comp, newName: comp, layers: { type: "array" } },
   }));
   register(
     operation('comp.layer_clip_frames', 'comp', 'Set every layer in-point and out-point.', {
       schema: { name: comp, from: { type: 'number' }, to: { type: 'number' } },
     }),
+  );
+  register(
+    operation("comp.info", "comp", "Report composition information.", { readOnly: true, schema: { comp: comp } }),
   );
 
   // Layer.
