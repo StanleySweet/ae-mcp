@@ -207,7 +207,7 @@ Tasks E6-5 to E6-15 are one commit per category, each with the message `feat(ops
 - **E7-1** feat(server): settings loader
 - **E7-2** feat(server): policy engine for read-only and category allowlist
 - **E7-3** feat(server): gate eval.run behind a setting
-- **E7-4** feat(server): require an incremental save before save-over and file overwrite (guard defined in E13)
+- **E7-4** ✅ closed as covered by E13-3: the destructive guard increments before any operation flagged `destructive:true`. Save-over and file-overwrite operations (e.g. `project.save_as` onto an existing path, renders onto an existing file) are marked `destructive:true` in the registry when they are registered.
 
 **Story 7.2.** As the owner, I can snapshot and restore a project. AC: export then import with clearFirst reproduces the structure in a fixture comparison; dryRun reports counts and changes nothing.
 
