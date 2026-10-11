@@ -13,6 +13,7 @@ function registryWith(...names: [string, string][]): OperationRegistry {
       category: category as never,
       description: `Runs ${name}.`,
       readOnly: true,
+      destructive: false,
       schema: {},
     });
   }

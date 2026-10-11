@@ -6,6 +6,7 @@ const valid = {
   category: 'layer',
   description: 'Add a text layer.',
   readOnly: false,
+  destructive: false,
   schema: { text: { type: 'string' }, size: { type: 'number' } },
 };
 
@@ -15,6 +16,7 @@ describe('operation definition', () => {
     expect(parsed.name).toBe('layer.add_text');
     expect(parsed.category).toBe('layer');
     expect(parsed.readOnly).toBe(false);
+    expect(parsed.destructive).toBe(false);
     expect(parsed.schema).toEqual({ text: { type: 'string' }, size: { type: 'number' } });
   });
 
@@ -24,7 +26,10 @@ describe('operation definition', () => {
     ).toThrow();
   });
 
-  it('requires name, category, description and readOnly', () => {
+  it('requires name, category, description, readOnly and destructive', () => {
     expect(() => operationDefinitionSchema.parse({ name: 'x' })).toThrow();
+    expect(() =>
+      operationDefinitionSchema.parse({ ...valid, destructive: undefined }),
+    ).toThrow();
   });
 });

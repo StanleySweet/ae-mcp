@@ -28,6 +28,7 @@ export const operationDefinitionSchema = z.object({
   category: operationCategorySchema,
   description: z.string(),
   readOnly: z.boolean(),
+  destructive: z.boolean(),
   schema: z.record(z.string(), z.unknown()),
 });
 

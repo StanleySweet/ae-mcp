@@ -18,6 +18,7 @@ function registry(): OperationRegistry {
     category: 'layer',
     description: 'Rename a layer.',
     readOnly: false,
+    destructive: false,
     schema: { index: { type: 'number' }, name: { type: 'string' } },
   });
   registry.register({
@@ -25,6 +26,7 @@ function registry(): OperationRegistry {
     category: 'comp',
     description: 'Create a comp.',
     readOnly: false,
+    destructive: false,
     schema: { name: { type: 'string' } },
   });
   return registry;

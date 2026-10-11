@@ -19,6 +19,7 @@ function registry(): OperationRegistry {
     category: 'project',
     description: 'Report project info.',
     readOnly: true,
+    destructive: false,
     schema: {},
   });
   registry.register({
@@ -26,6 +27,7 @@ function registry(): OperationRegistry {
     category: 'layer',
     description: 'Rename a layer.',
     readOnly: false,
+    destructive: false,
     schema: { index: { type: 'number' }, name: { type: 'string' } },
   });
   registry.register({
@@ -33,6 +35,7 @@ function registry(): OperationRegistry {
     category: 'comp',
     description: 'Create a comp.',
     readOnly: false,
+    destructive: false,
     schema: { name: { type: 'string' } },
   });
   registry.register({
@@ -40,6 +43,7 @@ function registry(): OperationRegistry {
     category: 'batch',
     description: 'Run many operations as one undo step.',
     readOnly: false,
+    destructive: false,
     schema: {
       ops: { type: 'array', items: { type: 'object' } },
     },
@@ -49,6 +53,7 @@ function registry(): OperationRegistry {
     category: 'eval',
     description: 'Run arbitrary ExtendScript.',
     readOnly: false,
+    destructive: true,
     schema: { code: { type: 'string' } },
   });
   return registry;

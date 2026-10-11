@@ -15,7 +15,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 
 ## Operations registry
 
-- Type: `packages/protocol/src/operations.ts` — `operationCategories` :3, `operationDefinitionSchema` :26 `{name, category, description, readOnly, schema}` (`schema` is free-form JSON-Schema-shaped record, never converted to zod). Exported `protocol/src/index.ts:21`.
+- Type: `packages/protocol/src/operations.ts` — `operationCategories` :3, `operationDefinitionSchema` :26 `{name, category, description, readOnly, destructive, schema}` (`schema` is free-form JSON-Schema-shaped record, never converted to zod; `destructive` is a required flag, E13-1). Exported `protocol/src/index.ts:21`.
 - Registry: `packages/server/src/operations.ts` — `OperationRegistry` :3 (`register/get/names/list`), `defaultOperationRegistry()` :25 is EMPTY. E6-5..15 register the real ops.
 - `ae_do` validation/recall helpers in `operations.ts`: `validateOperationArgs(schema, args)` :43 (JSON-Schema-shaped property map: type + enum, rejects unknown keys) and `closestNames(names, query)` :88 (Levenshtein). `ae_do` runs op via `callRaw(definition.name, args)`, then appends `get_selection` as `context`; unknown op → `UNKNOWN_TOOL` with closest names, bad args → `INVALID_ARGS`, both without touching AE.
 - `ae_catalog` returns `operations.list(category?)`; policy filtering arrives in E7-2.
