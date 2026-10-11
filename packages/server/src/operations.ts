@@ -1,4 +1,4 @@
-import type { OperationDefinition } from '@ae-mcp/protocol';
+import type { OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
 
 export class OperationRegistry {
   private readonly byName = new Map<string, OperationDefinition>();
@@ -22,8 +22,315 @@ export class OperationRegistry {
   }
 }
 
+function operation(
+  name: string,
+  category: OperationCategory,
+  description: string,
+  options: { readOnly?: boolean; destructive?: boolean; schema?: Record<string, unknown> } = {},
+): OperationDefinition {
+  return {
+    name,
+    category,
+    description,
+    readOnly: options.readOnly ?? false,
+    destructive: options.destructive ?? false,
+    schema: options.schema ?? {},
+  };
+}
+
+const comp = { type: 'string' };
+const layerIndex = { type: 'number' };
+const propertyName = { type: 'string' };
+
+// One entry per operation the bridge implements (`packages/bridge/src/handlers.js`
+// plus `batch.run` in `job-runner.js`), so `ae_do` can dispatch it and `ae_catalog`
+// lists it. Schemas mirror the arguments each handler reads. Destructive flags
+// follow docs/BACKLOG.md §E13: every delete/remove and `command.execute`.
 export function defaultOperationRegistry(): OperationRegistry {
-  const registry = new OperationRegistry();
+  const registry: OperationRegistry = new OperationRegistry();
+  const register = (definition: OperationDefinition): void => {
+    registry.register(definition);
+  };
+
+  // Project.
+  register(operation('project.info', 'project', 'Report the open project summary.', { readOnly: true }));
+  register(operation('project.export_json', 'project', 'Snapshot the whole project as JSON.', {
+    readOnly: true,
+  }));
+  register(operation('project.undo', 'project', 'Undo the last change.'));
+  register(operation('project.increment_save', 'project', 'File > Increment and Save the project.'));
+
+  // Comp (comp.info is the server tool ae_comp_info).
+  register(
+    operation('comp.create', 'comp', 'Create a composition.', {
+      schema: {
+        name: { type: 'string' },
+        width: { type: 'number' },
+        height: { type: 'number' },
+        pixelAspect: { type: 'number' },
+        duration: { type: 'number' },
+        fps: { type: 'number' },
+      },
+    }),
+  );
+  register(operation('comp.duplicate', 'comp', 'Duplicate a composition.', {
+    schema: { name: comp },
+  }));
+  register(
+    operation('comp.set_settings', 'comp', 'Change a composition width, height or frame rate.', {
+      schema: { name: comp, width: { type: 'number' }, height: { type: 'number' }, frameRate: { type: 'number' } },
+    }),
+  );
+  register(operation('comp.precompose', 'comp', 'Precompose a composition into a new comp.', {
+    schema: { name: comp, newName: comp },
+  }));
+  register(
+    operation('comp.layer_clip_frames', 'comp', 'Set every layer in-point and out-point.', {
+      schema: { name: comp, from: { type: 'number' }, to: { type: 'number' } },
+    }),
+  );
+
+  // Layer.
+  register(operation('layer.add_text', 'layer', 'Add a text layer.', { schema: { comp, text: comp } }));
+  register(operation('layer.add_shape', 'layer', 'Add a shape layer.', { schema: { comp } }));
+  register(operation('layer.add_solid', 'layer', 'Add a solid layer.', {
+    schema: { comp, color: { type: 'array' } },
+  }));
+  register(operation('layer.add_adjustment', 'layer', 'Add an adjustment layer.', { schema: { comp } }));
+  register(operation('layer.add_null', 'layer', 'Add a null layer.', { schema: { comp } }));
+  register(operation('layer.add_footage', 'layer', 'Add a footage layer.', { schema: { comp, name: comp } }));
+  register(operation('layer.center', 'layer', 'Center selected layers.', { schema: { comp } }));
+  register(operation('layer.set_transform', 'layer', 'Set a layer transform position.', {
+    schema: { comp, index: layerIndex, position: { type: 'array' } },
+  }));
+  register(operation('layer.set_parent', 'layer', 'Parent a layer to another layer.', {
+    schema: { comp, index: layerIndex, parent: layerIndex },
+  }));
+  register(operation('layer.delete', 'layer', 'Delete a layer.', {
+    destructive: true,
+    schema: { comp, index: layerIndex },
+  }));
+  register(operation('layer.bounds', 'layer', 'Report a layer bounds box.', {
+    readOnly: true,
+    schema: { comp, index: layerIndex },
+  }));
+
+  // Property.
+  register(operation('property.get', 'property', 'Read a layer 1 property value.', {
+    readOnly: true,
+    schema: { comp, name: propertyName },
+  }));
+  register(operation('property.list', 'property', 'List layer properties.', {
+    readOnly: true,
+    schema: { comp },
+  }));
+  register(operation('property.set', 'property', 'Set a layer 1 property value.', {
+    schema: { comp, name: propertyName, value: {} },
+  }));
+
+  // Keyframe.
+  register(operation('keyframe.add', 'keyframe', 'Add a keyframe on a property.', {
+    schema: { comp, index: layerIndex, time: { type: 'number' }, value: {}, property: propertyName },
+  }));
+  register(operation('keyframe.remove', 'keyframe', 'Remove a keyframe on a property.', {
+    destructive: true,
+    schema: { comp, index: layerIndex, time: { type: 'number' }, property: propertyName },
+  }));
+  register(
+    operation('keyframe.set_easing', 'keyframe', 'Set easing on a keyframe.', {
+      schema: {
+        comp,
+        index: layerIndex,
+        time: { type: 'number' },
+        easing: { type: 'string', enum: ['linear', 'ease', 'easeIn', 'easeOut', 'hold'] },
+        property: propertyName,
+      },
+    }),
+  );
+
+  // Expression.
+  register(operation('expression.set', 'expression', 'Set an expression on a layer 1 property.', {
+    schema: { comp, property: propertyName, value: {} },
+  }));
+  register(operation('expression.clear', 'expression', 'Clear the expression on a layer 1 property.', {
+    schema: { comp, property: propertyName },
+  }));
+  register(operation('expression.check_errors', 'expression', 'Check a layer 1 property expression errors.', {
+    readOnly: true,
+    schema: { comp, property: propertyName },
+  }));
+
+  // Effect (targets layer 1 unless the handler reads an index).
+  register(operation('effect.apply', 'effect', 'Apply an effect to layer 1.', {
+    schema: { comp, property: propertyName, value: {} },
+  }));
+  register(operation('effect.list_on_layer', 'effect', 'List effects on layer 1.', {
+    readOnly: true,
+    schema: { comp, property: propertyName },
+  }));
+  register(operation('effect.list_available', 'effect', 'List available effects.', {
+    readOnly: true,
+    schema: { comp },
+  }));
+  register(operation('effect.set_property', 'effect', 'Set an effect property on layer 1.', {
+    schema: { comp, property: propertyName, value: {} },
+  }));
+  register(operation('effect.set_keyframe', 'effect', 'Set an effect property keyframe.', {
+    schema: { comp, index: layerIndex, time: { type: 'number' }, value: {}, property: propertyName },
+  }));
+  register(operation('effect.remove', 'effect', 'Remove an effect from layer 1.', {
+    destructive: true,
+    schema: { comp, property: propertyName },
+  }));
+  register(operation('effect.apply_template', 'effect', 'Apply an effect template to layer 1.', {
+    schema: { comp, template: comp },
+  }));
+
+  // Preset.
+  register(operation('preset.apply_ffx', 'preset', 'Apply an .ffx preset to a layer.', {
+    schema: { comp, index: layerIndex, path: comp },
+  }));
+  register(operation('preset.list', 'preset', 'List installed presets.', {
+    readOnly: true,
+    schema: { category: comp },
+  }));
+  register(operation('preset.search', 'preset', 'Search installed presets.', {
+    readOnly: true,
+    schema: { query: comp },
+  }));
+
+  // Marker.
+  register(
+    operation('marker.add', 'marker', 'Add a marker to a comp or layer.', {
+      schema: {
+        comp,
+        layerIndex: { type: 'number' },
+        time: { type: 'number' },
+        comment: comp,
+        duration: { type: 'number' },
+      },
+    }),
+  );
+  register(operation('marker.add_bulk', 'marker', 'Add several markers to a comp or layer.', {
+    schema: { comp, layerIndex: { type: 'number' }, markers: { type: 'array' } },
+  }));
+  register(operation('marker.list', 'marker', 'List markers on a comp or layer.', {
+    readOnly: true,
+    schema: { comp, layerIndex: { type: 'number' } },
+  }));
+
+  // Mask.
+  register(
+    operation('mask.add', 'mask', 'Add a mask to a layer.', {
+      schema: {
+        comp,
+        layerIndex,
+        vertices: { type: 'array' },
+        inTangents: { type: 'array' },
+        outTangents: { type: 'array' },
+        closed: { type: 'boolean' },
+      },
+    }),
+  );
+  register(
+    operation('mask.set', 'mask', 'Set a mask shape on a layer.', {
+      schema: {
+        comp,
+        layerIndex,
+        maskIndex: layerIndex,
+        vertices: { type: 'array' },
+        inTangents: { type: 'array' },
+        outTangents: { type: 'array' },
+        closed: { type: 'boolean' },
+      },
+    }),
+  );
+  register(operation('mask.read', 'mask', 'Read a mask shape on a layer.', {
+    readOnly: true,
+    schema: { comp, layerIndex, maskIndex: layerIndex },
+  }));
+
+  // Shape.
+  register(
+    operation('shape.add', 'shape', 'Add a shape to a shape layer.', {
+      schema: {
+        comp,
+        layerIndex,
+        type: { type: 'string', enum: ['path', 'rect', 'ellipse'] },
+        name: comp,
+        size: { type: 'array' },
+        vertices: { type: 'array' },
+        inTangents: { type: 'array' },
+        outTangents: { type: 'array' },
+        closed: { type: 'boolean' },
+        fillColor: { type: 'array' },
+        strokeColor: { type: 'array' },
+        strokeWidth: { type: 'number' },
+      },
+    }),
+  );
+  register(
+    operation('shape.set', 'shape', 'Set the first vector path on a shape layer.', {
+      schema: {
+        comp,
+        layerIndex,
+        vertices: { type: 'array' },
+        inTangents: { type: 'array' },
+        outTangents: { type: 'array' },
+        closed: { type: 'boolean' },
+      },
+    }),
+  );
+  register(operation('shape.read', 'shape', 'Read shape layer contents.', {
+    readOnly: true,
+    schema: { comp, layerIndex },
+  }));
+
+  // Text.
+  register(operation('text.add', 'text', 'Add a text layer with optional styling.', {
+    schema: { comp, text: comp, fontSize: { type: 'number' }, fillColor: { type: 'array' } },
+  }));
+  register(
+    operation('text.set', 'text', 'Set text, font size or color on an existing text layer.', {
+      schema: { comp, layerIndex, text: comp, fontSize: { type: 'number' }, fillColor: { type: 'array' } },
+    }),
+  );
+  register(operation('text.read', 'text', 'Read text from a text layer.', {
+    readOnly: true,
+    schema: { comp, layerIndex },
+  }));
+
+  // Audio.
+  register(operation('audio.set_levels', 'audio', 'Set audio levels on a layer.', {
+    schema: { comp, layerIndex, levels: { type: 'array' } },
+  }));
+  register(operation('audio.info', 'audio', 'Report audio state on a layer.', {
+    readOnly: true,
+    schema: { comp, layerIndex },
+  }));
+  register(operation('audio.peaks_to_markers', 'audio', 'Write peak times as layer markers.', {
+    schema: { comp, layerIndex, peaks: { type: 'array' } },
+  }));
+
+  // Font and command.
+  register(operation('font.list', 'font', 'List installed fonts.', { readOnly: true }));
+  register(operation('command.find', 'command', 'Find a menu command ID by name.', {
+    readOnly: true,
+    schema: { name: comp },
+  }));
+  register(operation('command.list', 'command', 'List known menu command IDs.', { readOnly: true }));
+  register(operation('command.execute', 'command', 'Execute a menu command.', {
+    destructive: true,
+    schema: { id: { type: 'number' }, name: comp },
+  }));
+
+  // Batch (container; the E13 guard checks its sub-operations).
+  register(
+    operation('batch.run', 'batch', 'Run many operations as one undo group.', {
+      schema: { ops: { type: 'array', items: { type: 'object' } } },
+    }),
+  );
+
   return registry;
 }
 
