@@ -129,6 +129,7 @@ export class MockItem {
   comment = '';
   selected = false;
   parentFolder!: MockFolderItem;
+  project: MockProject | null = null;
 
   constructor(
     readonly id: number,
@@ -154,6 +155,7 @@ export class MockCompItem extends MockItem {
   workAreaDuration = 0;
   private readonly layerList: MockLayer[] = [];
   selectedLayers: MockLayer[] = [];
+  private nextId = 100;
 
   constructor(
     id: number,
@@ -166,6 +168,9 @@ export class MockCompItem extends MockItem {
     super(id, name);
   }
 
+  readonly layers = new MockLayerCollection(this);
+  readonly markerProperty = new MockMarkerPropertyGroup('Marker', 'ADBE Marker');
+
   get numLayers(): number {
     return this.layerList.length;
   }
@@ -174,10 +179,33 @@ export class MockCompItem extends MockItem {
     return this.layerList[index - 1] ?? null;
   }
 
-  addLayer(layer: MockLayer): MockLayer {
+  addLayer<T extends MockLayer>(layer: T): T {
     layer.index = this.layerList.length + 1;
     this.layerList.push(layer);
     return layer;
+  }
+
+  nextLayerId(): number {
+    this.nextId += 1;
+    return this.nextId;
+  }
+
+  property(indexOrName: number | string): MockProperty | MockPropertyGroup | null {
+    if (indexOrName === 'Marker' || indexOrName === 'ADBE Marker') {
+      return this.markerProperty;
+    }
+    return null;
+  }
+
+  duplicate(): MockCompItem {
+    const id = this.project ? this.project.allocateId() : this.id;
+    const copy = new MockCompItem(id, `${this.name} Copy`, this.width, this.height, this.frameRate, this.duration);
+    copy.pixelAspect = this.pixelAspect;
+    copy.bgColor = [this.bgColor[0], this.bgColor[1], this.bgColor[2]];
+    if (this.project) {
+      this.project.add(copy);
+    }
+    return copy;
   }
 }
 
@@ -227,7 +255,7 @@ export class MockPropertyGroup {
       return this.children[indexOrName - 1] ?? null;
     }
     for (const child of this.children) {
-      if (child.matchName === indexOrName) {
+      if (child.matchName === indexOrName || child.name === indexOrName) {
         return child;
       }
     }
@@ -244,6 +272,32 @@ export class MockEffect extends MockPropertyGroup {
   enabled = new MockProperty('enabled', 'ADBE Effect Enabled', true);
 }
 
+export class MockMarkerValue {
+  duration = 0;
+
+  constructor(public comment = '') {}
+}
+
+export class MockMarkerPropertyGroup extends MockPropertyGroup {
+  private readonly markerKeys: { time: number; value: MockMarkerValue }[] = [];
+
+  get numKeys(): number {
+    return this.markerKeys.length;
+  }
+
+  setValueAtTime(time: number, value: MockMarkerValue): void {
+    this.markerKeys.push({ time, value });
+  }
+
+  keyTime(index: number): number {
+    return this.markerKeys[index - 1].time;
+  }
+
+  keyValue(index: number): MockMarkerValue {
+    return this.markerKeys[index - 1].value;
+  }
+}
+
 export class MockLayer extends MockPropertyGroup {
   index = 1;
   id: number | null = null;
@@ -257,6 +311,13 @@ export class MockLayer extends MockPropertyGroup {
   stretch = 1;
   label = 0;
   parent: MockLayer | null = null;
+  adjustmentLayer = false;
+  nullLayer = false;
+
+  constructor(name: string, matchName: string) {
+    super(name, matchName);
+    this.add(new MockMarkerPropertyGroup('Marker', 'ADBE Marker'));
+  }
 }
 
 export class MockAVLayer extends MockLayer {
@@ -293,6 +354,94 @@ export class MockFootageItem extends MockItem {
   }
 }
 
+export class MockLayerCollection {
+  constructor(private readonly comp: MockCompItem) {}
+
+  get length(): number {
+    return this.comp.numLayers;
+  }
+
+  add(item: MockItem): MockAVLayer {
+    const layer = new MockAVLayer(item.name, 'Layer');
+    layer.id = this.comp.nextLayerId();
+    layer.source = item;
+    if (item instanceof MockFootageItem) {
+      layer.width = item.width;
+      layer.height = item.height;
+    }
+    return this.comp.addLayer(layer);
+  }
+
+  addShape(): MockShapeLayer {
+    const layer = new MockShapeLayer('Shape', 'Layer');
+    layer.id = this.comp.nextLayerId();
+    return this.comp.addLayer(layer);
+  }
+
+  addSolid(color: number[], name: string, width: number, height: number, pixelAspect: number, duration?: number): MockAVLayer {
+    const source = new MockFootageItem(this.comp.project ? this.comp.project.allocateId() : 0, name, width, height);
+    source.pixelAspect = pixelAspect;
+    source.duration = duration ?? 0;
+    const layer = new MockAVLayer(name, 'Layer');
+    layer.id = this.comp.nextLayerId();
+    layer.source = source;
+    layer.width = width;
+    layer.height = height;
+    void color;
+    return this.comp.addLayer(layer);
+  }
+
+  addNull(duration?: number): MockAVLayer {
+    const layer = new MockAVLayer('Null', 'Layer');
+    layer.id = this.comp.nextLayerId();
+    layer.nullLayer = true;
+    layer.outPoint = duration ?? 0;
+    return this.comp.addLayer(layer);
+  }
+
+  addText(sourceText?: string): MockTextLayer {
+    const layer = new MockTextLayer(sourceText || 'Text', 'Layer');
+    layer.id = this.comp.nextLayerId();
+    const textProperties = new MockPropertyGroup('Text', 'ADBE Text Properties');
+    textProperties.add(
+      new MockProperty('Source Text', 'ADBE Text Document', {
+        text: sourceText ?? '',
+        fontSize: 72,
+        font: 'ArialMT',
+        fillColor: [1, 1, 1],
+      }),
+    );
+    layer.add(textProperties);
+    return this.comp.addLayer(layer);
+  }
+
+  precompose(indices: number[], name: string): MockCompItem {
+    const comp = new MockCompItem(this.comp.project ? this.comp.project.allocateId() : 0, name, this.comp.width, this.comp.height, this.comp.frameRate, this.comp.duration);
+    if (this.comp.project) {
+      this.comp.project.add(comp);
+    }
+    void indices;
+    return comp;
+  }
+}
+
+export class MockItemCollection {
+  constructor(private readonly project: MockProject) {}
+
+  addComp(name: string, width: number, height: number, pixelAspect: number, duration: number, frameRate?: number): MockCompItem {
+    const comp = new MockCompItem(this.project.allocateId(), name, width, height, frameRate ?? 24, duration);
+    comp.pixelAspect = pixelAspect;
+    this.project.add(comp);
+    return comp;
+  }
+
+  addFolder(name: string): MockFolderItem {
+    const folder = new MockFolderItem(this.project.allocateId(), name);
+    this.project.add(folder);
+    return folder;
+  }
+}
+
 export class MockProject {
   file: MockFile | null = null;
   bitsPerChannel = 8;
@@ -300,6 +449,9 @@ export class MockProject {
   selection: MockItem[] = [];
   readonly rootFolder = new MockFolderItem(0, 'Root');
   private readonly all: MockItem[] = [];
+  private idCounter = 0;
+
+  readonly items = new MockItemCollection(this);
 
   get numItems(): number {
     return this.all.length;
@@ -309,7 +461,13 @@ export class MockProject {
     return this.all[index - 1];
   }
 
+  allocateId(): number {
+    this.idCounter += 1;
+    return 1000 + this.idCounter;
+  }
+
   add(item: MockItem, parent: MockFolderItem = this.rootFolder): MockItem {
+    item.project = this;
     parent.add(item);
     this.all.push(item);
     return item;
@@ -433,6 +591,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     ShapeLayer: MockShapeLayer,
     CameraLayer: MockCameraLayer,
     LightLayer: MockLightLayer,
+    MarkerValue: MockMarkerValue,
     File: function (path: string): MockFile {
       return new MockFile(ae, path);
     },

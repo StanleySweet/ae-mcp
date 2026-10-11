@@ -15,8 +15,10 @@ AEMCP.register('project.export_json', function () {
     return AEMCP.serialize.projectSnapshot();
 });
 
+// There is no undo method in the scripting API; the Edit > Undo menu command
+// is ID 16. Ref: https://ae-scripting.docsforadobe.dev/general/application/#appexecutecommand
 AEMCP.register('project.undo', function () {
-    app.project.undo();
+    app.executeCommand(16);
     return { success: true };
 });
 
@@ -62,8 +64,7 @@ AEMCP.register('comp.duplicate', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var newComp = comp.duplicate ? comp.duplicate() : app.project.items.addComp(comp.name + ' Copy', comp.width, comp.height, comp.frameRate, 10);
-    app.project.add(newComp);
+    var newComp = comp.duplicate();
     return { name: newComp.name, id: newComp.id };
 });
 
@@ -105,12 +106,14 @@ AEMCP.register('comp.precompose', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var newComp = app.project.items.addComp(newCompName || comp.name + ' Precomped', comp.width, comp.height, comp.frameRate, 10);
-    for (var i = 1; i <= comp.numLayers; i++) {
-        var layer = comp.layer(i);
-        app.project.addLayer(newComp, layer);
+    var indices = [];
+    for (var j = 1; j <= comp.numLayers; j++) {
+        indices.push(j);
     }
-    app.project.add(newComp);
+    if (indices.length === 0) {
+        return { success: false, error: 'Composition has no layers to precompose' };
+    }
+    var newComp = comp.layers.precompose(indices, newCompName || comp.name + ' Precomped', true);
     return { name: newComp.name, id: newComp.id };
 });
 
@@ -339,15 +342,8 @@ AEMCP.register('layer.add_text', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layers.add ? comp.layers.add() : null;
-    if (!layer) return { success: false, error: 'Cannot add layer' };
+    var layer = comp.layers.addText(text);
     layer.name = 'Text';
-    if (layer.property) {
-        var textProp = layer.property('ADBE Text Properties');
-        if (textProp) {
-            textProp.setValue(text);
-        }
-    }
     return { name: layer.name, id: layer.id };
 });
 
@@ -365,15 +361,8 @@ AEMCP.register('layer.add_shape', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layers.add ? comp.layers.add() : null;
-    if (!layer) return { success: false, error: 'Cannot add layer' };
+    var layer = comp.layers.addShape();
     layer.name = 'Shape';
-    if (layer.property) {
-        var fill = layer.property('ADBE Fill');
-        if (fill) {
-            fill.setValue([1, 1, 1]);
-        }
-    }
     return { name: layer.name, id: layer.id };
 });
 
@@ -392,15 +381,8 @@ AEMCP.register('layer.add_solid', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layers.add ? comp.layers.add() : null;
-    if (!layer) return { success: false, error: 'Cannot add layer' };
+    var layer = comp.layers.addSolid(color, 'Solid', comp.width, comp.height, comp.pixelAspect, comp.duration);
     layer.name = 'Solid';
-    if (layer.property) {
-        var solid = layer.property('ADBE Solid');
-        if (solid) {
-            solid.setValue(color);
-        }
-    }
     return { name: layer.name, id: layer.id };
 });
 
@@ -418,10 +400,9 @@ AEMCP.register('layer.add_adjustment', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layers.add ? comp.layers.add() : null;
-    if (!layer) return { success: false, error: 'Cannot add layer' };
+    var layer = comp.layers.addSolid([0.5, 0.5, 0.5], 'Adjustment', comp.width, comp.height, comp.pixelAspect, comp.duration);
     layer.name = 'Adjustment';
-    layer.adjustment = true;
+    layer.adjustmentLayer = true;
     return { name: layer.name, id: layer.id };
 });
 
@@ -439,16 +420,8 @@ AEMCP.register('layer.add_null', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layers.add ? comp.layers.add() : null;
-    if (!layer) return { success: false, error: 'Cannot add layer' };
+    var layer = comp.layers.addNull(comp.duration);
     layer.name = 'Null';
-    if (layer.property) {
-        var adbeTransform = layer.property('ADBE Transform Group');
-        if (adbeTransform) {
-            var position = adbeTransform.property('ADBE Position');
-            if (position) position.setValue([comp.width / 2, comp.height / 2]);
-        }
-    }
     return { name: layer.name, id: layer.id };
 });
 
@@ -467,9 +440,19 @@ AEMCP.register('layer.add_footage', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layers.add ? comp.layers.add() : null;
-    if (!layer) return { success: false, error: 'Cannot add layer' };
-    layer.name = footageName || 'Footage';
+    var source = null;
+    for (var j = 1; j <= project.numItems; j++) {
+        var candidate = project.item(j);
+        if ((candidate instanceof FootageItem || candidate instanceof CompItem) && candidate.name === footageName) {
+            source = candidate;
+            break;
+        }
+    }
+    if (!source) {
+        return { success: false, error: 'Footage item not found' };
+    }
+    var layer = comp.layers.add(source);
+    layer.name = footageName;
     return { name: layer.name, id: layer.id };
 });
 
@@ -1063,12 +1046,14 @@ AEMCP.register('marker.add', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var target = comp;
+    var markerProp;
     if (layerIndex !== null) {
-        target = comp.layer(layerIndex);
-        if (!target) return { success: false, error: 'Layer not found' };
+        var markerLayer = comp.layer(layerIndex);
+        if (!markerLayer) return { success: false, error: 'Layer not found' };
+        markerProp = markerLayer.property('ADBE Marker');
+    } else {
+        markerProp = comp.markerProperty;
     }
-    var markerProp = target.property('Marker');
     if (!markerProp) return { success: false, error: 'Marker property not found' };
     var mv = new MarkerValue(comment);
     if (duration > 0) {
@@ -1094,12 +1079,14 @@ AEMCP.register('marker.add_bulk', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var target = comp;
+    var markerProp;
     if (layerIndex !== null) {
-        target = comp.layer(layerIndex);
-        if (!target) return { success: false, error: 'Layer not found' };
+        var markerLayer = comp.layer(layerIndex);
+        if (!markerLayer) return { success: false, error: 'Layer not found' };
+        markerProp = markerLayer.property('ADBE Marker');
+    } else {
+        markerProp = comp.markerProperty;
     }
-    var markerProp = target.property('Marker');
     if (!markerProp) return { success: false, error: 'Marker property not found' };
     for (var j = 0; j < markers.length; j++) {
         var m = markers[j];
@@ -1125,12 +1112,14 @@ AEMCP.register('marker.list', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var target = comp;
+    var markerProp;
     if (layerIndex !== null) {
-        target = comp.layer(layerIndex);
-        if (!target) return { success: false, error: 'Layer not found' };
+        var markerLayer = comp.layer(layerIndex);
+        if (!markerLayer) return { success: false, error: 'Layer not found' };
+        markerProp = markerLayer.property('ADBE Marker');
+    } else {
+        markerProp = comp.markerProperty;
     }
-    var markerProp = target.property('Marker');
     var list = [];
     if (markerProp) {
         for (var k = 1; k <= markerProp.numKeys; k++) {
