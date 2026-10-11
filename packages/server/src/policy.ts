@@ -30,12 +30,7 @@ export function batchRunBlock(
     return null;
   }
   for (const sub of ops) {
-    const name =
-      sub !== null &&
-      typeof sub === 'object' &&
-      typeof (sub as { op?: unknown }).op === 'string'
-        ? (sub as { op: string }).op
-        : null;
+    const name = subOpName(sub);
     if (name === null) {
       continue;
     }
@@ -51,4 +46,29 @@ export function batchRunBlock(
     }
   }
   return null;
+}
+
+/** Whether any batch.run sub-operation is destructive and so needs the guard. */
+export function batchHasDestructive(registry: OperationRegistry, ops: unknown): boolean {
+  if (!Array.isArray(ops)) {
+    return false;
+  }
+  for (const sub of ops) {
+    const name = subOpName(sub);
+    if (name !== null) {
+      const definition = registry.get(name);
+      if (definition?.destructive) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function subOpName(sub: unknown): string | null {
+  return sub !== null &&
+    typeof sub === 'object' &&
+    typeof (sub as { op?: unknown }).op === 'string'
+    ? (sub as { op: string }).op
+    : null;
 }

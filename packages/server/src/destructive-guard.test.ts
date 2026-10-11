@@ -30,6 +30,16 @@ function registry(): OperationRegistry {
     destructive: true,
     schema: { index: { type: 'number' } },
   });
+  registry.register({
+    name: 'batch.run',
+    category: 'batch',
+    description: 'Run many operations as one undo step.',
+    readOnly: false,
+    destructive: false,
+    schema: {
+      ops: { type: 'array', items: { type: 'object' } },
+    },
+  });
   return registry;
 }
 
@@ -71,6 +81,10 @@ async function connectServer(
     'layer.delete': (args: unknown) => {
       calls.push('layer.delete');
       return { deleted: (args as { index: number }).index };
+    },
+    'batch.run': () => {
+      calls.push('batch.run');
+      return { results: [] };
     },
   };
   const consumer = createQueueConsumer(root, handlers);
@@ -168,5 +182,63 @@ describe('E13-3 destructive guard', () => {
     const result = await call(client, 'layer.delete', { index: 1 });
     expect(result.isError).toBe(false);
     expect(calls).toEqual(['layer.delete']);
+  });
+
+  it('increments once for a batch.run with a destructive sub-operation', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls);
+    closes.push(close);
+
+    const result = await call(client, 'batch.run', {
+      ops: [
+        { op: 'layer.rename', args: { index: 1, name: 'Hero' } },
+        { op: 'layer.delete', args: { index: 1 } },
+      ],
+    });
+    expect(result.isError).toBe(false);
+    expect(calls).toEqual(['project.increment_save', 'batch.run']);
+  });
+
+  it('increments exactly once for a batch.run with several destructive sub-operations', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls);
+    closes.push(close);
+
+    const result = await call(client, 'batch.run', {
+      ops: [
+        { op: 'layer.delete', args: { index: 1 } },
+        { op: 'layer.delete', args: { index: 2 } },
+      ],
+    });
+    expect(result.isError).toBe(false);
+    expect(calls).toEqual(['project.increment_save', 'batch.run']);
+  });
+
+  it('does not increment for a batch.run without destructive sub-operations', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls);
+    closes.push(close);
+
+    const result = await call(client, 'batch.run', {
+      ops: [{ op: 'layer.rename', args: { index: 1, name: 'Hero' } }],
+    });
+    expect(result.isError).toBe(false);
+    expect(calls).toEqual(['batch.run']);
+  });
+
+  it('refuses a batch.run with a destructive sub-operation when the project has never been saved', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      incrementResult: { success: false, error: 'project has never been saved' },
+    });
+    closes.push(close);
+
+    const result = await call(client, 'batch.run', {
+      ops: [{ op: 'layer.delete', args: { index: 1 } }],
+    });
+    expect(result.isError).toBe(true);
+    const error = errorSchema.parse(JSON.parse(result.text));
+    expect(error.code).toBe('UNSAVED_PROJECT');
+    expect(calls).toEqual(['project.increment_save']);
   });
 });

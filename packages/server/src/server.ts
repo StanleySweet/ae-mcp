@@ -10,7 +10,7 @@ import {
   type OperationRegistry,
 } from './operations.js';
 import { selectTransport, type Runner } from './osascript-transport.js';
-import { batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
+import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
 import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks } from './setup-checks.js';
 
@@ -297,7 +297,10 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (blocked) {
         return text(makeError(blocked.code, blocked.message), true);
       }
-      if (definition.destructive && settings.incrementBeforeDestructive) {
+      const needsIncrement =
+        definition.destructive ||
+        (definition.name === 'batch.run' && batchHasDestructive(operations, validation.args.ops));
+      if (needsIncrement && settings.incrementBeforeDestructive) {
         const increment = await callRaw('project.increment_save');
         if (!increment.ok) {
           return toResult(increment);
