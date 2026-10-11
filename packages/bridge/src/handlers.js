@@ -15,6 +15,21 @@ AEMCP.register('project.undo', function () {
     return { success: true };
 });
 
+// File > Increment and Save. Found by name because the command ID differs per
+// AE version and language package.
+// Ref: https://ae-scripting.docsforadobe.dev/general/application/#appfindmenucommandid
+AEMCP.register('project.increment_save', function () {
+    if (!app.project.file) {
+        return { success: false, error: 'project has never been saved' };
+    }
+    var id = app.findMenuCommandId('Increment and Save');
+    if (!id) {
+        return { success: false, error: 'Increment and Save command not found' };
+    }
+    app.executeCommand(id);
+    return { success: true, file: app.project.file ? app.project.file.fsName : null };
+});
+
 // Comp operation handlers (mutating, run via ae_do).
 // Ref: https://ae-scripting.docsforadobe.dev/itemCollection/itemCollection.html#itemcollection-addcomp
 AEMCP.register('comp.create', function (args) {
