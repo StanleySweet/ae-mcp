@@ -29,6 +29,22 @@ function registry(): OperationRegistry {
     destructive: false,
     schema: { name: { type: 'string' } },
   });
+  registry.register({
+    name: 'project.info',
+    category: 'project',
+    description: 'Get project info.',
+    readOnly: true,
+    destructive: false,
+    schema: {},
+  });
+  registry.register({
+    name: 'project.undo',
+    category: 'project',
+    description: 'Undo the last operation.',
+    readOnly: true,
+    destructive: false,
+    schema: {},
+  });
   return registry;
 }
 

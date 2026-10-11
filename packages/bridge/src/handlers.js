@@ -91,6 +91,30 @@ AEMCP.register('comp.set_settings', function (args) {
     return { success: true };
 });
 
+AEMCP.register('comp.info', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var project = app.project;
+    var comp;
+    if (compName) {
+        for (var i = 1; i <= project.numItems; i++) {
+            var item = project.item(i);
+            if (item instanceof CompItem && item.name === compName) {
+                comp = item;
+                break;
+            }
+        }
+        if (!comp) {
+            return { ok: false };
+        }
+    } else {
+        comp = app.project.activeItem;
+        if (!(comp instanceof CompItem)) {
+            return { ok: false };
+        }
+    }
+    return { ok: true, value: AEMCP.serialize.comp(comp) };
+});
+
 AEMCP.register('comp.precompose', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var newCompName = args && args.name ? args.name : (args && args.newName ? args.newName : null);
