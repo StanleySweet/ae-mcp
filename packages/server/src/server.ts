@@ -10,6 +10,8 @@ import {
   type OperationRegistry,
 } from './operations.js';
 import { selectTransport, type Runner } from './osascript-transport.js';
+import { batchRunBlock, isPermitted } from './policy.js';
+import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks } from './setup-checks.js';
 
 export const SERVER_NAME = 'ae-mcp';
@@ -24,6 +26,7 @@ export interface ServerOptions {
   client?: AEClient;
   maxResultBytes?: number;
   operations?: OperationRegistry;
+  settings?: Settings;
 }
 
 type ToolResult = {
@@ -72,6 +75,12 @@ export function createServer(options: ServerOptions = {}): McpServer {
       runner: options.runner,
     }).then((transport) => createAEClient({ transport, root }));
     return clientPromise;
+  };
+
+  let settingsPromise: Promise<Settings> | undefined;
+  const getSettings = (): Promise<Settings> => {
+    settingsPromise ??= options.settings ? Promise.resolve(options.settings) : loadSettings({ root });
+    return settingsPromise;
   };
 
   const callRaw = async (tool: string, args: unknown = null): Promise<ResultMessage> => {
@@ -232,7 +241,13 @@ export function createServer(options: ServerOptions = {}): McpServer {
         category: z.string().optional(),
       },
     },
-    async (args) => text({ operations: operations.list(args.category) }),
+    async (args) => {
+      const settings = await getSettings();
+      const allowed = operations
+        .list(args.category)
+        .filter((definition) => isPermitted(definition, settings));
+      return text({ operations: allowed });
+    },
   );
 
   server.registerTool(
@@ -258,6 +273,20 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const validation = validateOperationArgs(definition.schema, toolArgs.args);
       if (!validation.ok) {
         return text(makeError('INVALID_ARGS', validation.message), true);
+      }
+      const settings = await getSettings();
+      if (!isPermitted(definition, settings)) {
+        return text(
+          makeError('FORBIDDEN', `operation '${toolArgs.op}' is not permitted by the current policy`),
+          true,
+        );
+      }
+      const blocked =
+        definition.name === 'batch.run'
+          ? batchRunBlock(operations, validation.args.ops, settings)
+          : null;
+      if (blocked) {
+        return text(makeError(blocked.code, blocked.message), true);
       }
       const result = await callRaw(definition.name, validation.args);
       if (!result.ok) {

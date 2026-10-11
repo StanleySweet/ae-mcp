@@ -8,7 +8,9 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
   - `inputSchema` is a zod raw shape; the MCP SDK validates args against it before the handler runs (`InvalidParams` on failure).
 - Existing tools: `check_setup` :80, `ae_context` :96, `ae_project_info` :106, `ae_comp_info` :116, `ae_layer_info` :140, `ae_version_info` :173, `get_selection` :183, `find` :193, `ae_catalog` :224, `ae_do` :236.
 - Helpers: `text(value, isError?)` :32 (JSON.stringify → MCP text content), `toResult(ResultMessage)` :36 (ok → text, else text+`isError:true`), `callRaw(tool, args)` :75 (lazy memoized `AEClient.call`), `capArray` :41 (byte cap `MAX_RESULT_BYTES` 200_000, sets `truncated`).
-- `ServerOptions` :17-25 injects `root`, `client`, `operations`, `maxResultBytes` — used by tests.
+- `ServerOptions` :19-27 injects `root`, `client`, `operations`, `maxResultBytes`, `settings` — used by tests.
+- `getSettings()` :79 — lazy `loadSettings({root})`, or `Promise.resolve(options.settings)` when injected.
+- Policy (E7-2): `isPermitted(def, settings)` + `batchRunBlock(registry, ops, settings)` `server/src/policy.ts:4,11`. `ae_do` and `ae_catalog` enforce it: read-only hides non-`readOnly` ops, `allowedCategories` filters by category, `batch.run` is checked per sub-op. Rejection uses error code `FORBIDDEN` (added in `protocol/src/errors.ts`).
 
 ## Operations registry
 
