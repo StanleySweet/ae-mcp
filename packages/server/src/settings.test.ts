@@ -20,29 +20,42 @@ describe('loadSettings', () => {
 
   it('reads values from settings.json', async () => {
     const root = await settingsRoot();
-    await writeSettings(root, { readOnly: true, allowedCategories: ['project'], evalEnabled: true });
+    await writeSettings(root, {
+      readOnly: true,
+      allowedCategories: ['project'],
+      evalEnabled: true,
+      incrementBeforeDestructive: false,
+    });
     expect(await loadSettings({ root, env: {} })).toEqual({
       readOnly: true,
       allowedCategories: ['project'],
       evalEnabled: true,
+      incrementBeforeDestructive: false,
     });
   });
 
   it('lets environment variables override the file', async () => {
     const root = await settingsRoot();
-    await writeSettings(root, { readOnly: false, allowedCategories: ['project'], evalEnabled: false });
+    await writeSettings(root, {
+      readOnly: false,
+      allowedCategories: ['project'],
+      evalEnabled: false,
+      incrementBeforeDestructive: true,
+    });
     const settings = await loadSettings({
       root,
       env: {
         AE_MCP_READ_ONLY: '1',
         AE_MCP_ALLOWED_CATEGORIES: 'layer,comp',
         AE_MCP_EVAL_ENABLED: 'true',
+        AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE: 'false',
       },
     });
     expect(settings).toEqual({
       readOnly: true,
       allowedCategories: ['layer', 'comp'],
       evalEnabled: true,
+      incrementBeforeDestructive: false,
     });
   });
 

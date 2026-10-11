@@ -12,6 +12,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - `getSettings()` :79 — lazy `loadSettings({root})`, or `Promise.resolve(options.settings)` when injected.
 - Policy (E7-2): `isPermitted(def, settings)` + `batchRunBlock(registry, ops, settings)` `server/src/policy.ts:4,11`. `ae_do` and `ae_catalog` enforce it: read-only hides non-`readOnly` ops, `allowedCategories` filters by category, `batch.run` is checked per sub-op. Rejection uses error code `FORBIDDEN` (added in `protocol/src/errors.ts`).
 - eval gate (E7-3): `evalRunEnabled(def, settings)` `policy.ts:24` — `eval.run` is hidden from `ae_catalog` and rejected by `ae_do` (FORBIDDEN) unless `settings.evalEnabled`.
+- destructive guard (E13-3): in `ae_do` `server.ts:300` — a `destructive` op first runs `project.increment_save`; a project that has never been saved is refused with error code `UNSAVED_PROJECT`. Gated by `settings.incrementBeforeDestructive` (default on, env `AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE`).
 
 ## Operations registry
 
@@ -34,7 +35,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 
 ## Settings (`packages/server/src/settings.ts`)
 
-- `loadSettings({root, env})` :42 — reads `~/.ae-mcp/settings.json` (zod-validated, unknown keys rejected), env vars (`AE_MCP_READ_ONLY`, `AE_MCP_ALLOWED_CATEGORIES`, `AE_MCP_EVAL_ENABLED`) override the file. Defaults in `DEFAULT_SETTINGS` :18. Consumed by the E7 policy engine.
+- `loadSettings({root, env})` :42 — reads `~/.ae-mcp/settings.json` (zod-validated, unknown keys rejected), env vars (`AE_MCP_READ_ONLY`, `AE_MCP_ALLOWED_CATEGORIES`, `AE_MCP_EVAL_ENABLED`, `AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE`) override the file. Defaults in `DEFAULT_SETTINGS` :18. Consumed by the E7 policy engine.
 
 ## Ambient connection context
 

@@ -11,6 +11,7 @@ import { FileQueueTransport } from './file-queue-transport.js';
 import { OperationRegistry } from './operations.js';
 import { createServer } from './server.js';
 import type { Settings } from './settings.js';
+import { DEFAULT_SETTINGS } from './settings.js';
 
 function registry(): OperationRegistry {
   const registry = new OperationRegistry();
@@ -88,6 +89,10 @@ async function connectServer(
       calls.push('eval.run');
       return { success: true };
     },
+    'project.increment_save': () => {
+      calls.push('project.increment_save');
+      return { success: true, file: '/projects/P_v008.aep' };
+    },
   };
   const consumer = createQueueConsumer(root, handlers);
   await consumer.start();
@@ -127,15 +132,15 @@ function project(): FakeProject {
 }
 
 function readOnly(): Settings {
-  return { readOnly: true, allowedCategories: null, evalEnabled: false };
+  return { ...DEFAULT_SETTINGS, readOnly: true };
 }
 
 function allow(...categories: string[]): Settings {
-  return { readOnly: false, allowedCategories: categories, evalEnabled: false };
+  return { ...DEFAULT_SETTINGS, allowedCategories: categories };
 }
 
 function evalOn(): Settings {
-  return { readOnly: false, allowedCategories: null, evalEnabled: true };
+  return { ...DEFAULT_SETTINGS, evalEnabled: true };
 }
 
 describe('E7-2 policy engine', () => {
@@ -287,8 +292,7 @@ describe('E7-3 eval.run gate', () => {
   it('refuses eval.run while eval is disabled, before reaching AE', async () => {
     const calls: string[] = [];
     const { client, close } = await connectServer(project(), calls, {
-      readOnly: false,
-      allowedCategories: null,
+      ...DEFAULT_SETTINGS,
       evalEnabled: false,
     });
     closes.push(close);
@@ -307,6 +311,6 @@ describe('E7-3 eval.run gate', () => {
 
     const result = await call(client, 'ae_do', { op: 'eval.run', args: { code: '1 + 1' } });
     expect(result.isError).toBe(false);
-    expect(calls).toEqual(['eval.run']);
+    expect(calls).toEqual(['project.increment_save', 'eval.run']);
   });
 });

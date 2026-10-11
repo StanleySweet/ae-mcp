@@ -8,6 +8,7 @@ export const settingsSchema = z
     readOnly: z.boolean().optional(),
     allowedCategories: z.array(z.string()).nullable().optional(),
     evalEnabled: z.boolean().optional(),
+    incrementBeforeDestructive: z.boolean().optional(),
   })
   .strict();
 
@@ -15,12 +16,14 @@ export interface Settings {
   readOnly: boolean;
   allowedCategories: string[] | null;
   evalEnabled: boolean;
+  incrementBeforeDestructive: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   readOnly: false,
   allowedCategories: null,
   evalEnabled: false,
+  incrementBeforeDestructive: true,
 };
 
 export function settingsPath(root: string): string {
@@ -61,5 +64,9 @@ export async function loadSettings(
           ? null
           : categories.split(','),
     evalEnabled: envBool(env.AE_MCP_EVAL_ENABLED, fromFile.evalEnabled ?? DEFAULT_SETTINGS.evalEnabled),
+    incrementBeforeDestructive: envBool(
+      env.AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE,
+      fromFile.incrementBeforeDestructive ?? DEFAULT_SETTINGS.incrementBeforeDestructive,
+    ),
   };
 }

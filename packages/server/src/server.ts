@@ -297,6 +297,22 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (blocked) {
         return text(makeError(blocked.code, blocked.message), true);
       }
+      if (definition.destructive && settings.incrementBeforeDestructive) {
+        const increment = await callRaw('project.increment_save');
+        if (!increment.ok) {
+          return toResult(increment);
+        }
+        const saved = increment.result as { success?: boolean } | null;
+        if (!saved || saved.success !== true) {
+          return text(
+            makeError(
+              'UNSAVED_PROJECT',
+              `operation '${toolArgs.op}' is destructive and the project has never been saved`,
+            ),
+            true,
+          );
+        }
+      }
       const result = await callRaw(definition.name, validation.args);
       if (!result.ok) {
         return toResult(result);

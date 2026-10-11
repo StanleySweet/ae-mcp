@@ -7,6 +7,7 @@ export const errorCodes = [
   'INVALID_MESSAGE',
   'INVALID_ARGS',
   'FORBIDDEN',
+  'UNSAVED_PROJECT',
   'SCRIPT_ERROR',
   'TIMEOUT',
 ] as const;
@@ -22,6 +23,7 @@ export const errorHints: Record<ErrorCode, string> = {
   INVALID_MESSAGE: 'Client and server protocol versions differ; restart the client after upgrading.',
   INVALID_ARGS: 'Check the tool description for the expected arguments.',
   FORBIDDEN: 'Adjust ~/.ae-mcp/settings.json or the environment override.',
+  UNSAVED_PROJECT: 'Save the project once (File > Save) so Increment and Save can version it.',
   SCRIPT_ERROR: 'Open Window > Console in After Effects for the script error.',
   TIMEOUT: 'The job exceeded its deadline and was cancelled.',
 };
