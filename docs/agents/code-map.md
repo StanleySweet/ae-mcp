@@ -29,6 +29,10 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - Handlers: `handlers.js` `AEMCP.register(...)` :3,22,56,84,92,151; active-comp resolve `aemcpResolveComp` :47.
 - Build: `bridge/src/build.ts` prepends polyfills + `job-runner.js` + `serializers.js` + `handlers.js`.
 
+## Settings (`packages/server/src/settings.ts`)
+
+- `loadSettings({root, env})` :42 — reads `~/.ae-mcp/settings.json` (zod-validated, unknown keys rejected), env vars (`AE_MCP_READ_ONLY`, `AE_MCP_ALLOWED_CATEGORIES`, `AE_MCP_EVAL_ENABLED`) override the file. Defaults in `DEFAULT_SETTINGS` :18. Consumed by the E7 policy engine.
+
 ## Ambient connection context
 
 - `buildAeContext(root, {now, maxAgeMs})` `server/src/context.ts:20` — heartbeat-derived connection state (used by `ae_context`), NOT comp/selection.
