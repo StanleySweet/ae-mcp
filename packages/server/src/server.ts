@@ -10,7 +10,7 @@ import {
   type OperationRegistry,
 } from './operations.js';
 import { selectTransport, type Runner } from './osascript-transport.js';
-import { batchRunBlock, isPermitted } from './policy.js';
+import { batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
 import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks } from './setup-checks.js';
 
@@ -245,7 +245,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const settings = await getSettings();
       const allowed = operations
         .list(args.category)
-        .filter((definition) => isPermitted(definition, settings));
+        .filter((definition) => isPermitted(definition, settings) && evalRunEnabled(definition, settings));
       return text({ operations: allowed });
     },
   );
@@ -278,6 +278,15 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (!isPermitted(definition, settings)) {
         return text(
           makeError('FORBIDDEN', `operation '${toolArgs.op}' is not permitted by the current policy`),
+          true,
+        );
+      }
+      if (!evalRunEnabled(definition, settings)) {
+        return text(
+          makeError(
+            'FORBIDDEN',
+            'eval.run is disabled. Set evalEnabled in settings.json or AE_MCP_EVAL_ENABLED=1 to enable it.',
+          ),
           true,
         );
       }

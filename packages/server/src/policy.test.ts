@@ -44,6 +44,13 @@ function registry(): OperationRegistry {
       ops: { type: 'array', items: { type: 'object' } },
     },
   });
+  registry.register({
+    name: 'eval.run',
+    category: 'eval',
+    description: 'Run arbitrary ExtendScript.',
+    readOnly: false,
+    schema: { code: { type: 'string' } },
+  });
   return registry;
 }
 
@@ -71,6 +78,10 @@ async function connectServer(
     'batch.run': () => {
       calls.push('batch.run');
       return { results: [] };
+    },
+    'eval.run': () => {
+      calls.push('eval.run');
+      return { success: true };
     },
   };
   const consumer = createQueueConsumer(root, handlers);
@@ -116,6 +127,10 @@ function readOnly(): Settings {
 
 function allow(...categories: string[]): Settings {
   return { readOnly: false, allowedCategories: categories, evalEnabled: false };
+}
+
+function evalOn(): Settings {
+  return { readOnly: false, allowedCategories: null, evalEnabled: true };
 }
 
 describe('E7-2 policy engine', () => {
@@ -229,5 +244,64 @@ describe('E7-2 policy engine', () => {
     });
     expect(result.isError).toBe(false);
     expect(calls).toEqual(['layer.rename']);
+  });
+});
+
+describe('E7-3 eval.run gate', () => {
+  const closes: (() => Promise<void>)[] = [];
+
+  afterEach(async () => {
+    for (const close of closes.splice(0)) {
+      await close();
+    }
+  });
+
+  async function catalogNames(settings: Settings): Promise<string[]> {
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createServer({ operations: registry(), settings });
+    closes.push(() => server.close());
+    await server.connect(serverTransport);
+    const client = new Client({ name: 'test-client', version: '0.0.0' });
+    closes.push(() => client.close());
+    await client.connect(clientTransport);
+    const result = await client.callTool({ name: 'ae_catalog', arguments: {} });
+    const [first] = result.content as Array<{ type: string; text: string }>;
+    return (JSON.parse(first!.text) as { operations: { name: string }[] }).operations.map(
+      (op) => op.name,
+    );
+  }
+
+  it('hides eval.run from the catalog while eval is disabled', async () => {
+    expect(await catalogNames(allow('eval'))).not.toContain('eval.run');
+  });
+
+  it('lists eval.run when eval is enabled', async () => {
+    expect(await catalogNames(evalOn())).toContain('eval.run');
+  });
+
+  it('refuses eval.run while eval is disabled, before reaching AE', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      readOnly: false,
+      allowedCategories: null,
+      evalEnabled: false,
+    });
+    closes.push(close);
+
+    const result = await call(client, 'ae_do', { op: 'eval.run', args: { code: '1 + 1' } });
+    expect(result.isError).toBe(true);
+    const error = errorSchema.parse(JSON.parse(result.text));
+    expect(error.code).toBe('FORBIDDEN');
+    expect(calls).toEqual([]);
+  });
+
+  it('runs eval.run when eval is enabled', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, evalOn());
+    closes.push(close);
+
+    const result = await call(client, 'ae_do', { op: 'eval.run', args: { code: '1 + 1' } });
+    expect(result.isError).toBe(false);
+    expect(calls).toEqual(['eval.run']);
   });
 });

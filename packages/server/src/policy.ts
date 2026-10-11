@@ -15,6 +15,11 @@ export function isPermitted(definition: OperationDefinition, settings: Settings)
   return true;
 }
 
+/** eval.run exists only when eval is explicitly enabled. */
+export function evalRunEnabled(definition: OperationDefinition, settings: Settings): boolean {
+  return definition.name !== 'eval.run' || settings.evalEnabled;
+}
+
 /** The first policy-blocked sub-op of a batch.run, or null when none blocks it. */
 export function batchRunBlock(
   registry: OperationRegistry,
