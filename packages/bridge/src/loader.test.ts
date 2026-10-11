@@ -81,7 +81,7 @@ describe('bridge loader', () => {
     ae.fs.set(
       join(aeHome, 'current.jsx'),
       'var AEMCP_BRIDGE_VERSION = "9.9.9"; var PAYLOAD_RELOADED = 1;' +
-        'var AEMCP = { capabilities: function () { return []; },' +
+        '$.global.AEMCP = { capabilities: function () { return []; },' +
         ' busy: function () { return false; }, poll: function () {} };',
     );
     runInMockAE(source, ae);

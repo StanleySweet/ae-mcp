@@ -363,6 +363,7 @@ export class MockAE {
     os: string;
     getenv: (name: string) => string | undefined;
     evalFile?: (path: string) => unknown;
+    global?: unknown;
   } = {
     hiresTimer: () => this.clock,
     os: 'MockAE-OS',
@@ -416,13 +417,16 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
   };
   const context = vm.createContext(sandbox);
   ae.context = context;
+  ae.$.global = vm.runInContext('this', context);
   ae.$.evalFile = (path: string): unknown => {
     ae.evalFileCalls += 1;
     const content = ae.fs.get(path);
     if (content === undefined) {
       throw new Error(`file not found: ${path}`);
     }
-    return vm.runInContext(content, context);
+    // Real AE evaluates the file in the caller's local scope: its var and function
+    // declarations do not become globals. Mirror that so code must use $.global.
+    return vm.runInContext(`(function () {\n${content}\n}).call(this);`, context);
   };
   vm.runInContext(code, context);
   return context;

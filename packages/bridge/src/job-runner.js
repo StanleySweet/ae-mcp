@@ -149,6 +149,8 @@ function aemcpCapabilities() {
 }
 
 var AEMCP = {};
+// $.evalFile evaluates in the caller's local scope, so export through the global object.
+$.global.AEMCP = AEMCP;
 AEMCP.HANDLERS = {};
 AEMCP.processJob = function (jobPath) {
     return aemcpProcessJob(jobPath);
