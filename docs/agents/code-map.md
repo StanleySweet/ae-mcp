@@ -30,7 +30,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 ## Bridge runtime (`packages/bridge`, ES3 `.js`, concatenated)
 
 - `job-runner.js`: `aemcpInvoke(tool,args,deadline)` :30 (handler lookup :34, `UNKNOWN_TOOL` :36, one undo group `'Claude: '+tool` :38, `SCRIPT_ERROR` :51), `aemcpProcessJob` :59, `aemcpRegister` :111, `AEMCP.capabilities()` :124.
-- Handlers: `handlers.js` `AEMCP.register(...)` :3,22,56,84,92,151; active-comp resolve `aemcpResolveComp` :47.
+- Handlers: `handlers.js` `AEMCP.register(...)` :3,22,56,84,92,151; active-comp resolve `aemcpResolveComp` :47. E7-5 `project.export_json` uses `AEMCP.serialize.projectSnapshot` (item tree + comp layers snapshot, `format: 'aemcp-project/v1'`).
 - Build: `bridge/src/build.ts` prepends polyfills + `job-runner.js` + `serializers.js` + `handlers.js`.
 
 ## Settings (`packages/server/src/settings.ts`)

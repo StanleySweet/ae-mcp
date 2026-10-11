@@ -259,3 +259,50 @@ AEMCP.serialize.item = aemcpSerializeItem;
 AEMCP.serialize.comp = aemcpSerializeCompItem;
 AEMCP.serialize.layer = aemcpSerializeLayer;
 AEMCP.serialize.property = aemcpSerializeProperty;
+
+// Snapshot serializer used by project.export_json: a full dump of the item
+// tree, comp settings and every layer, so project.import_json (E7-6) can
+// rebuild the structure. Read-only; no side effects.
+function aemcpSerializeSnapshotComp(item) {
+    var out = aemcpSerializeCompItem(item);
+    var layers = [];
+    var i;
+    for (i = 1; i <= item.numLayers; i++) {
+        layers.push(aemcpSerializeLayer(item.layer(i)));
+    }
+    out.layers = layers;
+    return out;
+}
+
+function aemcpSerializeSnapshotItem(item) {
+    if (item instanceof CompItem) {
+        return aemcpSerializeSnapshotComp(item);
+    }
+    if (item instanceof FolderItem) {
+        return aemcpSerializeItem(item);
+    }
+    // FootageItem.
+    var out = aemcpSerializeItem(item);
+    if (item.file && item.file.fsName) {
+        out.file = item.file.fsName;
+    }
+    return out;
+}
+
+function aemcpSerializeProjectSnapshot() {
+    var project = app.project;
+    var items = [];
+    var i;
+    for (i = 1; i <= project.numItems; i++) {
+        items.push(aemcpSerializeSnapshotItem(project.item(i)));
+    }
+    return {
+        format: 'aemcp-project/v1',
+        file: project.file ? project.file.fsName : null,
+        numItems: project.numItems,
+        bitsPerChannel: project.bitsPerChannel,
+        items: items
+    };
+}
+
+AEMCP.serialize.projectSnapshot = aemcpSerializeProjectSnapshot;

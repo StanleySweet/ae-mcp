@@ -10,6 +10,11 @@ AEMCP.register('project.info', function () {
     return AEMCP.serialize.project();
 });
 
+// Snapshot the whole project as JSON, for later import (project.import_json).
+AEMCP.register('project.export_json', function () {
+    return AEMCP.serialize.projectSnapshot();
+});
+
 AEMCP.register('project.undo', function () {
     app.project.undo();
     return { success: true };
