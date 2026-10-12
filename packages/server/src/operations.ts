@@ -422,6 +422,37 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     ),
   );
+  register(
+    operation('bulk.apply_effect', 'bulk', 'Add an effect to every selected layer.', {
+      schema: {
+        comp,
+        layers: { type: 'array' },
+        effect: { type: 'string' },
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
+  register(
+    operation('bulk.set_expression', 'bulk', 'Set an expression on a property of every selected layer.', {
+      schema: {
+        comp,
+        layers: { type: 'array' },
+        property: { type: 'string' },
+        expression: { type: 'string' },
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
+  register(
+    operation('bulk.apply_preset', 'bulk', 'Apply a .ffx preset to every selected layer.', {
+      schema: {
+        comp,
+        layers: { type: 'array' },
+        preset: { type: 'string' },
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(

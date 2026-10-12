@@ -299,6 +299,10 @@ export class MockPropertyGroup {
     this.children.push(child);
     return child;
   }
+
+  addProperty(matchName: string): MockEffect {
+    return this.add(new MockEffect(matchName, matchName));
+  }
 }
 
 export class MockEffect extends MockPropertyGroup {
@@ -346,10 +350,24 @@ export class MockLayer extends MockPropertyGroup {
   parent: MockLayer | null = null;
   adjustmentLayer = false;
   nullLayer = false;
+  readonly presets: string[] = [];
 
   constructor(name: string, matchName: string) {
     super(name, matchName);
     this.add(new MockMarkerPropertyGroup('Marker', 'ADBE Marker'));
+  }
+
+  /** After Effects layers always carry an effect parade; create it on demand. */
+  property(indexOrName: number | string): MockProperty | MockPropertyGroup | null {
+    if (indexOrName === 'ADBE Effect Parade') {
+      const existing = super.property(indexOrName);
+      return existing ?? this.add(new MockPropertyGroup('Effects', 'ADBE Effect Parade'));
+    }
+    return super.property(indexOrName);
+  }
+
+  applyPreset(file: MockFile): void {
+    this.presets.push(file.fsName);
   }
 }
 

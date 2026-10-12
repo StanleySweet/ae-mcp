@@ -2038,5 +2038,191 @@ AEMCP.register('bulk.set_property', function (args) {
     };
 });
 
+// True when an effect parade already holds an effect with this name or match
+// name, so a re-run of a plan is a no-op rather than a duplicate effect.
+function aemcpHasEffect(parade, name) {
+    if (!aemcpIsGroup(parade)) {
+        return false;
+    }
+    var i, effect;
+    for (i = 1; i <= parade.numProperties; i++) {
+        effect = parade.property(i);
+        if (effect && (effect.name === name || effect.matchName === name)) {
+            return true;
+        }
+    }
+    return false;
+}
 
+// Ref: https://ae-scripting.docsforadobe.dev/property/propertygroup.html#propertygroupaddproperty
+AEMCP.register('bulk.apply_effect', function (args) {
+    var effectName = args && typeof args.effect === 'string' ? args.effect : '';
+    if (effectName === '') {
+        aemcpAbortArgs('effect is required');
+    }
+    var comp = aemcpResolveComp(args ? args.comp : null);
+    if (!comp) {
+        if (!args || args.comp === undefined || args.comp === null || args.comp === '') {
+            aemcpAbortArgs('no active composition');
+        }
+        aemcpAbortArgs('composition not found: ' + args.comp);
+    }
+    var indices = aemcpLayerIndices(args, comp);
+    var dryRun = !(args && args.dryRun === false);
+    var changes = [];
+    var skipped = [];
+    var parts = [];
+    var i, layer, parade, present;
+    for (i = 0; i < indices.length; i++) {
+        layer = comp.layer(indices[i]);
+        parade = layer.property('ADBE Effect Parade');
+        if (!aemcpIsGroup(parade)) {
+            skipped.push({ index: indices[i], reason: 'unsupported' });
+            parts.push('0');
+            continue;
+        }
+        present = aemcpHasEffect(parade, effectName);
+        parts.push(present ? '1' : '0');
+        if (present) {
+            skipped.push({ index: indices[i], reason: 'present' });
+            continue;
+        }
+        changes.push({ index: indices[i], effect: effectName });
+        if (!dryRun) {
+            parade.addProperty(effectName);
+        }
+    }
+    var fingerprint = 'effect:' + effectName + '#' + aemcpBulkFingerprint(comp.name, indices, parts);
+    if (dryRun) {
+        return {
+            dryRun: true,
+            comp: comp.name,
+            effect: effectName,
+            changes: changes,
+            skipped: skipped,
+            fingerprint: fingerprint
+        };
+    }
+    return {
+        dryRun: false,
+        comp: comp.name,
+        effect: effectName,
+        applied: changes.length,
+        changes: changes,
+        skipped: skipped,
+        fingerprint: fingerprint
+    };
+});
+
+// Ref: https://ae-scripting.docsforadobe.dev/property/property.html#propertyexpression
+AEMCP.register('bulk.set_expression', function (args) {
+    var propertyName = args && typeof args.property === 'string' ? args.property : '';
+    if (propertyName === '') {
+        aemcpAbortArgs('property is required');
+    }
+    if (!args || typeof args.expression !== 'string') {
+        aemcpAbortArgs('expression is required');
+    }
+    var comp = aemcpResolveComp(args ? args.comp : null);
+    if (!comp) {
+        if (!args || args.comp === undefined || args.comp === null || args.comp === '') {
+            aemcpAbortArgs('no active composition');
+        }
+        aemcpAbortArgs('composition not found: ' + args.comp);
+    }
+    var indices = aemcpLayerIndices(args, comp);
+    var expression = args.expression;
+    var dryRun = !(args && args.dryRun === false);
+    var changes = [];
+    var skipped = [];
+    var parts = [];
+    var i, layer, prop, from;
+    for (i = 0; i < indices.length; i++) {
+        layer = comp.layer(indices[i]);
+        prop = aemcpResolveProperty(layer, propertyName);
+        if (!prop || prop.expression === undefined) {
+            skipped.push({ index: indices[i], reason: 'no property' });
+            parts.push('-');
+            continue;
+        }
+        from = prop.expression;
+        parts.push(from);
+        if (from !== expression) {
+            changes.push({ index: indices[i], from: from, to: expression });
+            if (!dryRun) {
+                prop.expression = expression;
+                prop.expressionEnabled = expression !== '';
+            }
+        }
+    }
+    var fingerprint = 'expression:' + propertyName + '#' + aemcpBulkFingerprint(comp.name, indices, parts);
+    if (dryRun) {
+        return {
+            dryRun: true,
+            comp: comp.name,
+            property: propertyName,
+            changes: changes,
+            skipped: skipped,
+            fingerprint: fingerprint
+        };
+    }
+    return {
+        dryRun: false,
+        comp: comp.name,
+        property: propertyName,
+        applied: changes.length,
+        changes: changes,
+        skipped: skipped,
+        fingerprint: fingerprint
+    };
+});
+
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layer.html#layerapplypreset
+AEMCP.register('bulk.apply_preset', function (args) {
+    var presetPath = args && typeof args.preset === 'string' ? args.preset : '';
+    if (presetPath === '') {
+        aemcpAbortArgs('preset is required');
+    }
+    var ffxFile = new File(presetPath);
+    if (!ffxFile.exists) {
+        aemcpAbortArgs('preset file not found: ' + presetPath);
+    }
+    var comp = aemcpResolveComp(args ? args.comp : null);
+    if (!comp) {
+        if (!args || args.comp === undefined || args.comp === null || args.comp === '') {
+            aemcpAbortArgs('no active composition');
+        }
+        aemcpAbortArgs('composition not found: ' + args.comp);
+    }
+    var indices = aemcpLayerIndices(args, comp);
+    var dryRun = !(args && args.dryRun === false);
+    var changes = [];
+    var parts = [];
+    var i;
+    for (i = 0; i < indices.length; i++) {
+        changes.push({ index: indices[i] });
+        parts.push('1');
+        if (!dryRun) {
+            comp.layer(indices[i]).applyPreset(ffxFile);
+        }
+    }
+    var fingerprint = 'preset:' + presetPath + '#' + aemcpBulkFingerprint(comp.name, indices, parts);
+    if (dryRun) {
+        return {
+            dryRun: true,
+            comp: comp.name,
+            preset: presetPath,
+            changes: changes,
+            fingerprint: fingerprint
+        };
+    }
+    return {
+        dryRun: false,
+        comp: comp.name,
+        preset: presetPath,
+        applied: changes.length,
+        changes: changes,
+        fingerprint: fingerprint
+    };
+});
 

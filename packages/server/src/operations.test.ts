@@ -70,6 +70,9 @@ const BRIDGE_OPS = [
   'command.execute',
   'bulk.rename',
   'bulk.set_property',
+  'bulk.apply_effect',
+  'bulk.set_expression',
+  'bulk.apply_preset',
   'batch.run',
 ];
 

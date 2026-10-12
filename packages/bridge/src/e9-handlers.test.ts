@@ -9,6 +9,7 @@ import {
   MockAE,
   MockAVLayer,
   MockCompItem,
+  MockLayer,
   MockProperty,
   MockPropertyGroup,
   runInMockAE,
@@ -409,5 +410,259 @@ describe('bulk.set_property', () => {
     expect(outcome.ok).toBe(false);
     expect(outcome.issue?.code).toBe('INVALID_ARGS');
     expect(outcome.issue?.message).toContain('Nope');
+  });
+});
+
+function effectsOf(comp: MockCompItem, index: number): string[] {
+  const layer = comp.layer(index);
+  const parade = layer?.property('ADBE Effect Parade');
+  if (!(parade instanceof MockPropertyGroup)) {
+    return [];
+  }
+  const names: string[] = [];
+  for (let i = 1; i <= parade.numProperties; i += 1) {
+    names.push(parade.property(i)!.matchName);
+  }
+  return names;
+}
+
+function positionProperty(comp: MockCompItem, index: number): MockProperty | null {
+  const layer = comp.layer(index);
+  const group = layer?.property('ADBE Transform Group');
+  return ((group as MockPropertyGroup | null)?.property('ADBE Position') as MockProperty | null) ?? null;
+}
+
+function presetsOf(comp: MockCompItem, index: number): string[] {
+  return (comp.layer(index) as MockLayer | null)?.presets ?? [];
+}
+
+describe('bulk.apply_effect', () => {
+  it('previews the layer selection by default without adding effects', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer 1', 'Layer 2']);
+
+    const outcome = invoke(ctx, 'bulk.apply_effect', { comp: 'Main', effect: 'ADBE Box Blur2' });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({ dryRun: true, effect: 'ADBE Box Blur2' });
+    expect(outcome.value?.changes).toEqual([
+      { index: 1, effect: 'ADBE Box Blur2' },
+      { index: 2, effect: 'ADBE Box Blur2' },
+    ]);
+    expect(typeof outcome.value?.fingerprint).toBe('string');
+    expect(effectsOf(comp, 1)).toEqual([]);
+    expect(effectsOf(comp, 2)).toEqual([]);
+  });
+
+  it('adds the effect to each layer when dryRun is false', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer 1', 'Layer 2']);
+
+    const outcome = invoke(ctx, 'bulk.apply_effect', {
+      comp: 'Main',
+      effect: 'ADBE Box Blur2',
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ dryRun: false, applied: 2 });
+    expect(effectsOf(comp, 1)).toEqual(['ADBE Box Blur2']);
+    expect(effectsOf(comp, 2)).toEqual(['ADBE Box Blur2']);
+  });
+
+  it('skips layers that already carry the effect', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer 1', 'Layer 2']);
+    invoke(ctx, 'bulk.apply_effect', {
+      comp: 'Main',
+      layers: [1],
+      effect: 'ADBE Box Blur2',
+      dryRun: false,
+    });
+
+    const outcome = invoke(ctx, 'bulk.apply_effect', { comp: 'Main', effect: 'ADBE Box Blur2' });
+
+    expect(outcome.value?.changes).toEqual([{ index: 2, effect: 'ADBE Box Blur2' }]);
+    expect(outcome.value?.skipped).toEqual([{ index: 1, reason: 'present' }]);
+  });
+
+  it('limits the change to the requested layers', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer 1', 'Layer 2']);
+
+    invoke(ctx, 'bulk.apply_effect', {
+      comp: 'Main',
+      layers: [2],
+      effect: 'ADBE Box Blur2',
+      dryRun: false,
+    });
+
+    expect(effectsOf(comp, 1)).toEqual([]);
+    expect(effectsOf(comp, 2)).toEqual(['ADBE Box Blur2']);
+  });
+
+  it('requires an effect name', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer 1']);
+
+    const outcome = invoke(ctx, 'bulk.apply_effect', { comp: 'Main' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('reports a composition that does not exist', async () => {
+    const { ctx } = await payloadContext();
+
+    const outcome = invoke(ctx, 'bulk.apply_effect', { comp: 'Nope', effect: 'ADBE Box Blur2' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+    expect(outcome.issue?.message).toContain('Nope');
+  });
+});
+
+describe('bulk.set_expression', () => {
+  it('previews expression changes by default and leaves the property untouched', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedPositionComp(ae, 1, 'Main', [[0, 0]]);
+    ae.project.activeItem = comp;
+
+    const outcome = invoke(ctx, 'bulk.set_expression', {
+      comp: 'Main',
+      property: 'Position',
+      expression: 'wiggle(2, 30)',
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({ dryRun: true, property: 'Position' });
+    expect(outcome.value?.changes).toEqual([{ index: 1, from: '', to: 'wiggle(2, 30)' }]);
+    expect(positionProperty(comp, 1)?.expression).toBe('');
+  });
+
+  it('sets the expression and enables it when dryRun is false', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedPositionComp(ae, 1, 'Main', [[0, 0]]);
+    ae.project.activeItem = comp;
+
+    const outcome = invoke(ctx, 'bulk.set_expression', {
+      comp: 'Main',
+      property: 'Position',
+      expression: 'wiggle(2, 30)',
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ dryRun: false, applied: 1 });
+    expect(positionProperty(comp, 1)?.expression).toBe('wiggle(2, 30)');
+    expect(positionProperty(comp, 1)?.expressionEnabled).toBe(true);
+  });
+
+  it('clears and disables the expression when given an empty string', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedPositionComp(ae, 1, 'Main', [[0, 0]]);
+    ae.project.activeItem = comp;
+    invoke(ctx, 'bulk.set_expression', {
+      comp: 'Main',
+      property: 'Position',
+      expression: 'wiggle(2, 30)',
+      dryRun: false,
+    });
+
+    invoke(ctx, 'bulk.set_expression', {
+      comp: 'Main',
+      property: 'Position',
+      expression: '',
+      dryRun: false,
+    });
+
+    expect(positionProperty(comp, 1)?.expression).toBe('');
+    expect(positionProperty(comp, 1)?.expressionEnabled).toBe(false);
+  });
+
+  it('skips layers that have no such property', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Plain']);
+
+    const outcome = invoke(ctx, 'bulk.set_expression', {
+      comp: 'Main',
+      property: 'Position',
+      expression: 'time',
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.changes).toEqual([]);
+    expect(outcome.value?.skipped).toEqual([{ index: 1, reason: 'no property' }]);
+  });
+
+  it('requires a property name', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedPositionComp(ae, 1, 'Main', [[0, 0]]);
+
+    const outcome = invoke(ctx, 'bulk.set_expression', { comp: 'Main', expression: 'time' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('requires an expression', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedPositionComp(ae, 1, 'Main', [[0, 0]]);
+
+    const outcome = invoke(ctx, 'bulk.set_expression', { comp: 'Main', property: 'Position' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+});
+
+describe('bulk.apply_preset', () => {
+  const preset = '/presets/blur.ffx';
+
+  function seedPreset(ae: MockAE): void {
+    ae.fs.set(preset, 'fake ffx');
+  }
+
+  it('previews the layer selection by default without applying the preset', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer 1', 'Layer 2']);
+    seedPreset(ae);
+
+    const outcome = invoke(ctx, 'bulk.apply_preset', { comp: 'Main', preset });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({ dryRun: true, preset });
+    expect(outcome.value?.changes).toEqual([{ index: 1 }, { index: 2 }]);
+    expect(presetsOf(comp, 1)).toEqual([]);
+  });
+
+  it('applies the preset to each layer when dryRun is false', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer 1', 'Layer 2']);
+    seedPreset(ae);
+
+    const outcome = invoke(ctx, 'bulk.apply_preset', { comp: 'Main', preset, dryRun: false });
+
+    expect(outcome.value).toMatchObject({ dryRun: false, applied: 2 });
+    expect(presetsOf(comp, 1)).toEqual([preset]);
+    expect(presetsOf(comp, 2)).toEqual([preset]);
+  });
+
+  it('rejects a preset file that does not exist', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer 1']);
+
+    const outcome = invoke(ctx, 'bulk.apply_preset', { comp: 'Main', preset: '/nope.ffx' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('requires a preset path', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer 1']);
+
+    const outcome = invoke(ctx, 'bulk.apply_preset', { comp: 'Main' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
   });
 });
