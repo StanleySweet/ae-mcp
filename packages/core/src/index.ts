@@ -15,6 +15,14 @@ export type {
   InstallStatus,
   InstallerCheck,
 } from './install-payload.js';
+export {
+  LOADER_FILE_NAME,
+  elevatedCopyCommand,
+  installLoader,
+  loaderStartupDir,
+  osascriptElevatedWrite,
+} from './install-loader.js';
+export type { ElevatedWrite, InstallLoaderOptions, InstallLoaderResult } from './install-loader.js';
 export { discoverAerender, discoverAerenders } from './aerender-discovery.js';
 export type { AerenderInstall } from './aerender-discovery.js';
 export { parseAerenderLine } from './aerender-progress.js';
