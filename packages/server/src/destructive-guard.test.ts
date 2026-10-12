@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createQueueConsumer, FakeProject, observeHandlers } from '@ae-mcp/fake-bridge';
@@ -110,6 +110,7 @@ async function connectServer(
       await server.close();
       await consumer.stop();
     },
+    home,
   };
 }
 
@@ -437,5 +438,29 @@ describe('E13-3 destructive guard', () => {
     const error = errorSchema.parse(JSON.parse(result.text));
     expect(error.code).toBe('UNSAVED_PROJECT');
     expect(calls).toEqual(['project.increment_save']);
+  });
+});
+
+describe('E13-5 saved version path reporting', () => {
+  const closes: (() => Promise<void>)[] = [];
+
+  afterEach(async () => {
+    for (const close of closes.splice(0)) {
+      await close();
+    }
+  });
+
+  it('ae_do includes increment.incrementedFile and persists the path for check_setup', async () => {
+    const calls: string[] = [];
+    const { client, close, home } = await connectServer(project(), calls);
+    closes.push(close);
+
+    const result = await call(client, 'layer.delete', { index: 1 });
+    expect(result.isError).toBe(false);
+    const parsed = JSON.parse(result.text);
+    expect(parsed.increment).toEqual({ incrementedFile: '/projects/P_v008.aep' });
+
+    const savedVersion = await readFile(join(home, '.ae-mcp', 'bridge', 'last-saved-version'), 'utf8');
+    expect(savedVersion.trim()).toBe('/projects/P_v008.aep');
   });
 });

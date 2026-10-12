@@ -62,6 +62,37 @@ async function queueDirCheck(root: string): Promise<SetupCheck> {
   return { check: 'queue_permissions', status: 'ok' };
 }
 
+async function projectSavedVersionCheck(root: string): Promise<SetupCheck> {
+  const file = join(root, 'bridge', 'last-saved-version');
+  try {
+    const content = await readFile(file, 'utf8');
+    const savedPath = content.trim();
+    if (!savedPath) {
+      return fail(
+        'project_saved_version',
+        'The project has never been saved; run a destructive operation or File > Save once.',
+      );
+    }
+    const info = await stat(savedPath);
+    if (!info.isFile()) {
+      return fail(
+        'project_saved_version',
+        `The saved version no longer exists on disk: ${savedPath}.`,
+      );
+    }
+    return {
+      check: 'project_saved_version',
+      status: 'ok',
+      fix: `The saved project version is: ${savedPath}`,
+    };
+  } catch {
+    return fail(
+      'project_saved_version',
+      'The project has never been saved; run a destructive operation or File > Save once.',
+    );
+  }
+}
+
 export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {
   const now = deps.now ?? Date.now;
   const heartbeatMaxAgeMs = deps.heartbeatMaxAgeMs ?? 90_000;
@@ -69,5 +100,6 @@ export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {
     await afterEffectsCheck(deps.applicationsDir),
     await heartbeatCheck(deps.root, heartbeatMaxAgeMs, now),
     await queueDirCheck(deps.root),
+    await projectSavedVersionCheck(deps.root),
   ];
 }

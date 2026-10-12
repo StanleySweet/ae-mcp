@@ -13,4 +13,4 @@ The following operations trigger an automatic incremental save before execution 
 - `command.execute`
 - `eval.run` (always destructive)
 
-The guard makes one incremental save per call, per `batch.run`, and per bulk plan. The result includes `increment.incrementedFile` when an increment occurred, and the new versioned project file path is reported.
+The guard makes one incremental save per call, per `batch.run`, and per bulk plan. The result includes `increment.incrementedFile` when an increment occurred. The saved project path is also surfaced by the next `check_setup` run (`project_saved_version` check).

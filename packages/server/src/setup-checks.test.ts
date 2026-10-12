@@ -1,4 +1,4 @@
-import { chmod, mkdir, mkdtemp, utimes, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { outboxDir } from '@ae-mcp/protocol';
@@ -39,6 +39,11 @@ async function writeHeartbeat(root: string): Promise<string> {
   return file;
 }
 
+async function writeSavedVersion(root: string, path: string): Promise<void> {
+  await mkdir(join(root, 'bridge'), { recursive: true, mode: 0o700 });
+  await writeFile(join(root, 'bridge', 'last-saved-version'), path);
+}
+
 function statusOf(checks: { check: string; status: string }[], name: string): string | undefined {
   return checks.find((c) => c.check === name)?.status;
 }
@@ -47,6 +52,7 @@ describe('runSetupChecks', () => {
   it('reports every check ok when AE and the bridge are ready', async () => {
     const root = await queueRoot();
     await writeHeartbeat(root);
+    await writeSavedVersion(root, '/projects/P_v008.aep');
     const checks = await runSetupChecks({
       root,
       applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
@@ -55,6 +61,7 @@ describe('runSetupChecks', () => {
       'after_effects',
       'bridge_heartbeat',
       'queue_permissions',
+      'project_saved_version',
     ]);
     expect(checks.every((c) => c.status === 'ok')).toBe(true);
   });
@@ -100,5 +107,33 @@ describe('runSetupChecks', () => {
       applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
     });
     expect(statusOf(checks, 'queue_permissions')).toBe('fail');
+  });
+
+  it('fails project_saved_version when no saved version file exists', async () => {
+    const root = await queueRoot();
+    await writeHeartbeat(root);
+    const checks = await runSetupChecks({
+      root,
+      applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
+    });
+    expect(statusOf(checks, 'project_saved_version')).toBe('fail');
+    expect(checks.find((c) => c.check === 'project_saved_version')?.fix).toMatch(
+      /never been saved/,
+    );
+  });
+
+  it('fails project_saved_version when the saved version no longer exists on disk', async () => {
+    const root = await queueRoot();
+    await writeHeartbeat(root);
+    await writeSavedVersion(root, '/projects/P_v008.aep');
+    await rm('/projects/P_v008.aep', { force: true });
+    const checks = await runSetupChecks({
+      root,
+      applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
+    });
+    expect(statusOf(checks, 'project_saved_version')).toBe('fail');
+    expect(checks.find((c) => c.check === 'project_saved_version')?.fix).toMatch(
+      /no longer exists/,
+    );
   });
 });

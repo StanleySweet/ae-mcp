@@ -15,7 +15,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - `getSettings()` :79 — lazy `loadSettings({root})`, or `Promise.resolve(options.settings)` when injected.
 - Policy (E7-2): `isPermitted(def, settings)` + `batchRunBlock(registry, ops, settings)` `server/src/policy.ts:4,11`. `ae_do` and `ae_catalog` enforce it: read-only hides non-`readOnly` ops, `allowedCategories` filters by category, `batch.run` is checked per sub-op. Rejection uses error code `FORBIDDEN` (added in `protocol/src/errors.ts`).
 - eval gate (E7-3): `evalRunEnabled(def, settings)` `policy.ts:24` — `eval.run` is hidden from `ae_catalog` and rejected by `ae_do` (FORBIDDEN) unless `settings.evalEnabled`.
-- destructive guard (E13-3/4): in `ae_do` `server.ts:301` — a `destructive` op (or a `batch.run` containing one, via `batchHasDestructive` `policy.ts:60`) first runs `project.increment_save`; a project that has never been saved is refused with error code `UNSAVED_PROJECT`. One increment per call / per `batch.run`. Gated by `settings.incrementBeforeDestructive` (default on, env `AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE`).
+- destructive guard (E13-3/4): in `ae_do` `server.ts:301` — a `destructive` op (or a `batch.run` containing one, via `batchHasDestructive` `policy.ts:60`) first runs `project.increment_save`; a project that has never been saved is refused with error code `UNSAVED_PROJECT`. One increment per call / per `batch.run`. Gated by `settings.incrementBeforeDestructive` (default on, env `AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE`). The path produced by the last successful incremental save is persisted and surfaced by `check_setup` as the `project_saved_version` check (`server.ts`, `setup-checks.ts:65`).
 
 ## Operations registry
 

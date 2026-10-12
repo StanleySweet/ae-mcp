@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
-import { readFile } from 'node:fs/promises';
-import { resolve, sep } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join, resolve, sep } from 'node:path';
 import {
   discoverAerenders,
   runAerender,
@@ -72,6 +72,13 @@ function text(value: unknown, isError = false): ToolResult {
 
 function toResult(value: ResultMessage): ToolResult {
   return value.ok ? text(value.result) : text(value.error, true);
+}
+
+/** Records the path of the project file produced by the last successful incremental save, so
+`check_setup` can name it later. */
+async function persistSavedVersionPath(root: string, savedFile: string): Promise<void> {
+  await mkdir(join(root, 'bridge'), { recursive: true });
+  await writeFile(join(root, 'bridge', 'last-saved-version'), savedFile);
 }
 
 /** Reads a frame the bridge rendered, refusing anything outside `<root>/render`. */
@@ -604,6 +611,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         }
         if (typeof saved.file === 'string') {
           incrementInfo = { incrementedFile: saved.file };
+          await persistSavedVersionPath(root, saved.file);
         }
       }
       const result = await callRaw(definition.name, validation.args);
@@ -740,6 +748,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         }
         if (typeof saved.file === 'string') {
           incrementInfo = { incrementedFile: saved.file };
+          await persistSavedVersionPath(root, saved.file);
         }
       }
 
