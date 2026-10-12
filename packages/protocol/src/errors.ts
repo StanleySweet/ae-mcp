@@ -10,6 +10,8 @@ export const errorCodes = [
   'UNSAVED_PROJECT',
   'SCRIPT_ERROR',
   'TIMEOUT',
+  'UNKNOWN_JOB',
+  'AERENDER_NOT_FOUND',
 ] as const;
 
 export type ErrorCode = (typeof errorCodes)[number];
@@ -26,6 +28,8 @@ export const errorHints: Record<ErrorCode, string> = {
   UNSAVED_PROJECT: 'Save the project once (File > Save) so Increment and Save can version it.',
   SCRIPT_ERROR: 'Open Window > Console in After Effects for the script error.',
   TIMEOUT: 'The job exceeded its deadline and was cancelled.',
+  UNKNOWN_JOB: 'Poll job_status with the id returned when the job started.',
+  AERENDER_NOT_FOUND: 'Install After Effects so its aerender executable is available.',
 };
 
 export function makeError(

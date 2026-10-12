@@ -6,10 +6,11 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 
 - `createServer(options)` :91 — every tool is `server.registerTool(name, config, handler)`.
   - `inputSchema` is a zod raw shape; the MCP SDK validates args against it before the handler runs (`InvalidParams` on failure).
-- Existing tools: `check_setup` :121, `ae_context` :137, `ae_project_info` :147, `ae_comp_info` :157, `ae_layer_info` :181, `ae_version_info` :214, `get_selection` :224, `find` :234, `ae_render_frame` :265, `ae_catalog` :319, `ae_do` :337.
+- Existing tools: `check_setup` :188, `ae_context` :204, `ae_project_info` :214, `ae_comp_info` :224, `ae_layer_info` :248, `ae_version_info` :281, `get_selection` :291, `find` :301, `ae_render_frame` :332, `ae_render` :386, `job_status` :446, `ae_catalog` :464, `ae_do` :482.
 - Helpers: `text(value, isError?)` :44 (JSON.stringify → MCP text content), `toResult(ResultMessage)` :48 (ok → text, else text+`isError:true`), `readRenderedFrame(root, file, maxBytes)` :53 (reads a frame the bridge rendered, refusing paths outside `<root>/render`, base64 → image data; `MAX_RENDER_BYTES` 20_000_000 :22), `callRaw(tool, args)` :116 (lazy memoized `AEClient.call`), `capArray` :76 (byte cap `MAX_RESULT_BYTES` 200_000, sets `truncated`).
 - `ae_render_frame` (E8-2) runs `render.frame` then returns MCP `image` content (`mimeType: image/png`) plus a JSON metadata text block.
-- `ServerOptions` :19-27 injects `root`, `client`, `operations`, `maxResultBytes`, `settings` — used by tests.
+- `ae_render` (E8-5) starts an aerender render as a background job and returns `{jobId}`; `job_status` (E8-5) polls it. `findAerender` :137 uses `options.aerender` or `discoverAerenders(applicationsDir)`, `resolveProject` :146 defaults to the open project's file (from `ae_project_info`) and refuses an unsaved project (`UNSAVED_PROJECT`). See the job store below.
+- `ServerOptions` :25 injects `root`, `client`, `operations`, `maxResultBytes`, `settings`, and (E8-5) `aerender`, `spawnAerender`, `jobStore` — used by tests.
 - `getSettings()` :79 — lazy `loadSettings({root})`, or `Promise.resolve(options.settings)` when injected.
 - Policy (E7-2): `isPermitted(def, settings)` + `batchRunBlock(registry, ops, settings)` `server/src/policy.ts:4,11`. `ae_do` and `ae_catalog` enforce it: read-only hides non-`readOnly` ops, `allowedCategories` filters by category, `batch.run` is checked per sub-op. Rejection uses error code `FORBIDDEN` (added in `protocol/src/errors.ts`).
 - eval gate (E7-3): `evalRunEnabled(def, settings)` `policy.ts:24` — `eval.run` is hidden from `ae_catalog` and rejected by `ae_do` (FORBIDDEN) unless `settings.evalEnabled`.
@@ -33,6 +34,10 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - `job-runner.js`: `aemcpInvoke(tool,args,deadline)` :30 (handler lookup :34, `UNKNOWN_TOOL` :36, one undo group `'Claude: '+tool` :38, `SCRIPT_ERROR` :51), `aemcpProcessJob` :59, `aemcpRegister` :111, `AEMCP.capabilities()` :124.
 - Handlers: `handlers.js` `AEMCP.register(...)` :3,22,56,84,92,151; active-comp resolve `aemcpResolveComp` :47. E7-5 `project.export_json` uses `AEMCP.serialize.projectSnapshot` (item tree + comp layers snapshot, `format: 'aemcp-project/v1'`). E8-1 `render.frame` saves one PNG via `CompItem.saveFrameToPng`, falling back to the render queue + PNG output module; output defaults to `<queue root>/render/<comp>-<frame>.png`. E8-3 render-queue ops: `render.queue_add` (`RQueue.items.add` + time span), `render.queue_set_output` (`OutputModule.file`/`applyTemplate`), `render.queue_start` (`RenderQueue.render()`, destructive) and `render.status`; helpers `aemcpRequireRqItem`, `aemcpRenderItemInfo`, `aemcpRqStatusName`.
 - Build: `bridge/src/build.ts` prepends polyfills + `job-runner.js` + `serializers.js` + `handlers.js`.
+
+## Job store (`packages/server/src/jobs.ts`, E8-5)
+
+- `JobStore` — in-memory registry of long-running jobs (`JobRecord {id, kind, status, createdAt, finishedAt?, progress?, error?, result?}`; `JobStatus = running|succeeded|failed|cancelled`). `start(kind)` → id, `get`/`list` (return copies), `progress(id, {frame, rendered, seconds})`, `succeed`/`fail`/`cancel`; finished jobs are evicted past `maxFinished` (default 50). Consumers: `ae_render` + `job_status`.
 
 ## Core (`packages/core`, macOS install + aerender)
 

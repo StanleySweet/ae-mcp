@@ -1,11 +1,19 @@
 import { Buffer } from 'node:buffer';
 import { readFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
+import {
+  discoverAerenders,
+  runAerender,
+  type AerenderResult,
+  type AerenderRunHandle,
+  type SpawnAerender,
+} from '@ae-mcp/core';
 import { makeError, queueRoot, type ResultMessage } from '@ae-mcp/protocol';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
 import { buildAeContext } from './context.js';
+import { JobStore } from './jobs.js';
 import {
   closestNames,
   defaultOperationRegistry,
@@ -31,6 +39,12 @@ export interface ServerOptions {
   maxResultBytes?: number;
   operations?: OperationRegistry;
   settings?: Settings;
+  /** Explicit aerender executable; when omitted it is discovered under `applicationsDir`. */
+  aerender?: string;
+  /** Test seam for the aerender process spawner. */
+  spawnAerender?: SpawnAerender;
+  /** Background job registry; a fresh one is created when omitted. */
+  jobStore?: JobStore;
 }
 
 type ToolContent =
@@ -117,6 +131,58 @@ export function createServer(options: ServerOptions = {}): McpServer {
   const callRaw = async (tool: string, args: unknown = null): Promise<ResultMessage> => {
     const client = await getClient();
     return client.call(tool, args);
+  };
+
+  const jobStore = options.jobStore ?? new JobStore();
+
+  const findAerender = async (): Promise<string | null> => {
+    if (options.aerender !== undefined) {
+      return options.aerender;
+    }
+    const installs = await discoverAerenders(options.applicationsDir);
+    return installs[0]?.aerender ?? null;
+  };
+
+  /** Resolves the project file aerender should open, defaulting to the open project. */
+  const resolveProject = async (
+    explicit: string | undefined,
+  ): Promise<{ ok: true; file: string } | { ok: false; result: ToolResult }> => {
+    if (explicit !== undefined) {
+      return { ok: true, file: explicit };
+    }
+    const info = await callRaw('ae_project_info');
+    if (!info.ok) {
+      return { ok: false, result: toResult(info) };
+    }
+    const file = (info.result as { file?: string | null } | null)?.file;
+    if (typeof file !== 'string' || file === '') {
+      return {
+        ok: false,
+        result: text(
+          makeError(
+            'UNSAVED_PROJECT',
+            'aerender needs a saved project file; save it in After Effects or pass project explicitly',
+          ),
+          true,
+        ),
+      };
+    }
+    return { ok: true, file };
+  };
+
+  const finishRenderJob = (jobId: string, result: AerenderResult): void => {
+    if (result.cancelled) {
+      jobStore.cancel(jobId);
+      return;
+    }
+    if (result.code === 0) {
+      jobStore.succeed(jobId, { exitCode: 0 });
+      return;
+    }
+    const line = [...result.errors, ...result.output]
+      .reverse()
+      .find((entry) => entry.trim() !== '');
+    jobStore.fail(jobId, line ?? `aerender exited with code ${result.code ?? 'unknown'}`);
   };
 
   server.registerTool(
@@ -314,6 +380,91 @@ export function createServer(options: ServerOptions = {}): McpServer {
           },
         ],
       };
+    },
+  );
+
+  server.registerTool(
+    'ae_render',
+    {
+      description:
+        'Start an aerender render of a composition (comp) or a render-queue item (rqindex) as a background job and return its jobId. Poll progress and the result with job_status.',
+      inputSchema: {
+        comp: z.string().optional(),
+        rqindex: z.number().int().positive().optional(),
+        output: z.string().optional(),
+        omTemplate: z.string().optional(),
+        rsTemplate: z.string().optional(),
+        startFrame: z.number().int().optional(),
+        endFrame: z.number().int().optional(),
+        increment: z.number().int().positive().optional(),
+        project: z.string().optional(),
+      },
+    },
+    async (args) => {
+      if ((args.comp === undefined) === (args.rqindex === undefined)) {
+        return text(
+          makeError('INVALID_ARGS', 'aerender needs exactly one of comp or rqindex'),
+          true,
+        );
+      }
+      const aerender = await findAerender();
+      if (aerender === null) {
+        return text(makeError('AERENDER_NOT_FOUND', 'no aerender executable was found'), true);
+      }
+      const project = await resolveProject(args.project);
+      if (!project.ok) {
+        return project.result;
+      }
+      const jobId = jobStore.start('render');
+      let handle: AerenderRunHandle;
+      try {
+        handle = runAerender({
+          aerender,
+          project: project.file,
+          comp: args.comp,
+          rqindex: args.rqindex,
+          output: args.output,
+          omTemplate: args.omTemplate,
+          rsTemplate: args.rsTemplate,
+          startFrame: args.startFrame,
+          endFrame: args.endFrame,
+          increment: args.increment,
+          spawn: options.spawnAerender,
+          onEvent: (event) => {
+            if (event.type === 'progress') {
+              jobStore.progress(jobId, {
+                frame: event.frame,
+                rendered: event.rendered,
+                seconds: event.seconds,
+              });
+            }
+          },
+        });
+      } catch (error) {
+        const message = (error as Error).message;
+        jobStore.fail(jobId, message);
+        return text(makeError('SCRIPT_ERROR', `could not start aerender: ${message}`), true);
+      }
+      void handle.result.then((result) => finishRenderJob(jobId, result));
+      return text({ jobId });
+    },
+  );
+
+  server.registerTool(
+    'job_status',
+    {
+      description:
+        'Report the status, progress and result of a background job started by ae_render.',
+      inputSchema: {
+        jobId: z.string(),
+      },
+    },
+    async (args) => {
+      const record = jobStore.get(args.jobId);
+      if (record === undefined) {
+        return text(makeError('UNKNOWN_JOB', `no job with id '${args.jobId}'`), true);
+      }
+      return text(record);
     },
   );
 
