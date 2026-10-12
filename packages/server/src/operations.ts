@@ -513,6 +513,14 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(
+    operation('bulk.organize_items', 'bulk', 'Move items into project folders, creating missing folders.', {
+      schema: {
+        folders: { type: 'array' },
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(

@@ -1350,3 +1350,87 @@ describe('bulk.duplicate_comp', () => {
     expect(outcome.issue?.code).toBe('INVALID_ARGS');
   });
 });
+
+describe('bulk.organize_items', () => {
+  it('previews the moves without creating folders or moving items', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+    addFootage(ae, 50, 'clip.mov');
+
+    const outcome = invoke(ctx, 'bulk.organize_items', { folders: [{ name: 'Footage', items: [50] }] });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.changes).toEqual([
+      { id: 50, name: 'clip.mov', from: 'Root', to: 'Footage' },
+    ]);
+    expect(ae.project.numItems).toBe(2);
+    expect(ae.project.item(2)?.parentFolder?.name).toBe('Root');
+  });
+
+  it('creates the folder and moves the item when applied', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+    const footage = addFootage(ae, 50, 'clip.mov');
+
+    const outcome = invoke(ctx, 'bulk.organize_items', {
+      folders: [{ name: 'Footage', items: [50] }],
+      dryRun: false,
+    });
+
+    expect(outcome.value?.moved).toBe(1);
+    expect(footage.parentFolder?.name).toBe('Footage');
+    expect(ae.project.numItems).toBe(3);
+    expect(ae.project.item(3)?.name).toBe('Footage');
+  });
+
+  it('reuses an existing folder and skips items already inside', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+    const footage = addFootage(ae, 50, 'clip.mov');
+    const folder = ae.project.items.addFolder('Footage');
+    footage.parentFolder = folder;
+
+    const outcome = invoke(ctx, 'bulk.organize_items', {
+      folders: [{ name: 'Footage', items: ['clip.mov'] }],
+      dryRun: false,
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.changes).toEqual([]);
+    expect(ae.project.numItems).toBe(3);
+  });
+
+  it('skips identifiers that match no item', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.organize_items', { folders: [{ name: 'Footage', items: [999] }] });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.changes).toEqual([]);
+  });
+
+  it('requires folders', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.organize_items', {});
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('produces one fingerprint value for plan and apply on the same project', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+    addFootage(ae, 50, 'clip.mov');
+
+    const planned = invoke(ctx, 'bulk.organize_items', { folders: [{ name: 'Footage', items: [50] }] });
+    const applied = invoke(ctx, 'bulk.organize_items', {
+      folders: [{ name: 'Footage', items: [50] }],
+      dryRun: false,
+    });
+
+    expect(applied.value?.fingerprint).toBe(planned.value?.fingerprint);
+  });
+});

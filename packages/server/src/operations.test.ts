@@ -79,6 +79,7 @@ const BRIDGE_OPS = [
   'bulk.set_label',
   'bulk.remove_unused',
   'bulk.duplicate_comp',
+  'bulk.organize_items',
   'batch.run',
 ];
 

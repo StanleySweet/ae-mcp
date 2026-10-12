@@ -2596,4 +2596,90 @@ AEMCP.register('bulk.duplicate_comp', function (args) {
     };
 });
 
+// The project item matching an id number or an exact name, or null.
+function aemcpFindItem(key) {
+    var project = app.project;
+    var i, item;
+    for (i = 1; i <= project.numItems; i++) {
+        item = project.item(i);
+        if ((typeof key === 'number' && item.id === key) || (typeof key === 'string' && item.name === key)) {
+            return item;
+        }
+    }
+    return null;
+}
+
+// A folder item at the project root with the given name, or null.
+function aemcpFindFolder(name) {
+    var project = app.project;
+    var i, item;
+    for (i = 1; i <= project.numItems; i++) {
+        item = project.item(i);
+        if (item instanceof FolderItem && item.name === name) {
+            return item;
+        }
+    }
+    return null;
+}
+
+// Move items into project folders, creating a missing folder at the root.
+// Each spec is {name, items}, where items are matched by id number or exact
+// name; unmatched identifiers are skipped. Planned and applied like the other
+// bulk ops; the fingerprint covers every requested folder name and the
+// resolved item ids.
+// Ref: https://ae-scripting.docsforadobe.dev/item/item/#itemparentfolder
+// Ref: https://ae-scripting.docsforadobe.dev/itemCollection/itemCollection.html#itemcollection-addfolder
+AEMCP.register('bulk.organize_items', function (args) {
+    var folders = args && args.folders ? args.folders : null;
+    if (!folders || folders.length === 0) {
+        aemcpAbortArgs('folders is required');
+    }
+    var dryRun = !(args && args.dryRun === false);
+    var changes = [];
+    var parts = [];
+    var f, t, spec, item, folder;
+    for (f = 0; f < folders.length; f++) {
+        spec = folders[f];
+        if (!spec || typeof spec.name !== 'string' || spec.name === '') {
+            aemcpAbortArgs('every folder needs a name');
+        }
+        if (!spec.items || spec.items.length === 0) {
+            aemcpAbortArgs('folder ' + spec.name + ' needs items');
+        }
+        folder = aemcpFindFolder(spec.name);
+        if (folder === null && !dryRun) {
+            folder = app.project.items.addFolder(spec.name);
+        }
+        for (t = 0; t < spec.items.length; t++) {
+            item = aemcpFindItem(spec.items[t]);
+            if (item === null) {
+                continue;
+            }
+            if (folder !== null && item.parentFolder && item.parentFolder.name === folder.name) {
+                continue;
+            }
+            parts.push(spec.name + ':' + item.id);
+            changes.push({
+                id: item.id,
+                name: item.name,
+                from: item.parentFolder ? item.parentFolder.name : '',
+                to: spec.name
+            });
+            if (!dryRun) {
+                item.parentFolder = folder;
+            }
+        }
+    }
+    var fingerprint = 'organize:' + parts.join(',');
+    if (dryRun) {
+        return { dryRun: true, changes: changes, fingerprint: fingerprint };
+    }
+    return {
+        dryRun: false,
+        moved: changes.length,
+        changes: changes,
+        fingerprint: fingerprint
+    };
+});
+
 
