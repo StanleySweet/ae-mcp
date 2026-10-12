@@ -45,6 +45,8 @@ export type {
 } from './scripting-pref.js';
 export { claudeOpenArgs, handMcpbToClaude, openWithClaude } from './install-mcpb.js';
 export type { HandMcpbOptions, HandMcpbResult, OpenWithClaude } from './install-mcpb.js';
+export { TEST_COMP_NAME, isHeartbeatFresh, runLiveTest } from './live-test.js';
+export type { LaunchAE, LiveCall, LiveTestOptions } from './live-test.js';
 export { discoverAerender, discoverAerenders } from './aerender-discovery.js';
 export type { AerenderInstall } from './aerender-discovery.js';
 export { parseAerenderLine } from './aerender-progress.js';
