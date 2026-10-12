@@ -2226,3 +2226,74 @@ AEMCP.register('bulk.apply_preset', function (args) {
     };
 });
 
+// Find and replace text on every text layer of the target comp(s). Literal by
+// default, or a regular expression when `regex` is true.
+// Ref: https://ae-scripting.docsforadobe.dev/text/textdocument/
+AEMCP.register('bulk.replace_text', function (args) {
+    var find = args && typeof args.find === 'string' ? args.find : '';
+    if (find === '') {
+        aemcpAbortArgs('find is required');
+    }
+    var replace = args && typeof args.replace === 'string' ? args.replace : '';
+    var useRegex = args && args.regex === true;
+    var flags = args && typeof args.flags === 'string' ? args.flags : '';
+    if (useRegex) {
+        try {
+            new RegExp(find, flags);
+        } catch (err) {
+            aemcpAbortArgs('invalid regular expression: ' + String(err));
+        }
+    }
+    var comps = aemcpBulkComps(args);
+    var dryRun = !(args && args.dryRun === false);
+    var changes = [];
+    var skipped = [];
+    var parts = [];
+    var c, t;
+    for (c = 0; c < comps.length; c++) {
+        var comp = comps[c];
+        var indices = aemcpLayerIndices(args, comp);
+        for (t = 0; t < indices.length; t++) {
+            var layer = comp.layer(indices[t]);
+            var prop = aemcpResolveProperty(layer, 'Source Text');
+            var doc = prop ? prop.value : null;
+            if (!doc || typeof doc.text !== 'string') {
+                skipped.push({ comp: comp.name, index: indices[t] });
+                parts.push(comp.name + ':' + indices[t] + '=none');
+                continue;
+            }
+            var from = doc.text;
+            var to;
+            if (useRegex) {
+                to = from.replace(new RegExp(find, flags), replace);
+            } else {
+                to = aemcpReplaceAll(from, find, replace);
+            }
+            parts.push(comp.name + ':' + indices[t] + '=' + JSON.stringify(from));
+            if (to !== from) {
+                changes.push({ comp: comp.name, index: indices[t], from: from, to: to });
+                if (!dryRun) {
+                    doc.text = to;
+                    prop.setValue(doc);
+                }
+            }
+        }
+    }
+    var fingerprint = 'text:' + find + '#' + parts.join(',');
+    if (dryRun) {
+        return {
+            dryRun: true,
+            changes: changes,
+            skipped: skipped,
+            fingerprint: fingerprint
+        };
+    }
+    return {
+        dryRun: false,
+        applied: changes.length,
+        changes: changes,
+        skipped: skipped,
+        fingerprint: fingerprint
+    };
+});
+

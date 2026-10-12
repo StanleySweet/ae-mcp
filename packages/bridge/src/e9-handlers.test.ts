@@ -666,3 +666,163 @@ describe('bulk.apply_preset', () => {
     expect(outcome.issue?.code).toBe('INVALID_ARGS');
   });
 });
+
+function seedTextComp(ae: MockAE, id: number, name: string, texts: string[]): MockCompItem {
+  const comp = new MockCompItem(id, name, 1920, 1080, 25, 10);
+  ae.project.add(comp);
+  ae.project.activeItem = comp;
+  texts.forEach((text) => {
+    comp.layers.addText(text);
+  });
+  return comp;
+}
+
+function textAt(comp: MockCompItem, index: number): string | null {
+  const layer = comp.layer(index);
+  const group = layer?.property('ADBE Text Properties');
+  const prop = (group as MockPropertyGroup | null)?.property('ADBE Text Document');
+  const value = (prop as MockProperty | null)?.value;
+  if (value && typeof value === 'object' && 'text' in value) {
+    return (value as { text: string }).text;
+  }
+  return null;
+}
+
+describe('bulk.replace_text', () => {
+  it('previews the replacements by default and leaves the text untouched', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedTextComp(ae, 1, 'Main', ['Hello World', 'Hello Again']);
+
+    const outcome = invoke(ctx, 'bulk.replace_text', {
+      comp: 'Main',
+      find: 'Hello',
+      replace: 'Goodbye',
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({ dryRun: true });
+    expect(outcome.value?.changes).toEqual([
+      { comp: 'Main', index: 1, from: 'Hello World', to: 'Goodbye World' },
+      { comp: 'Main', index: 2, from: 'Hello Again', to: 'Goodbye Again' },
+    ]);
+    expect(typeof outcome.value?.fingerprint).toBe('string');
+    expect(textAt(comp, 1)).toBe('Hello World');
+    expect(textAt(comp, 2)).toBe('Hello Again');
+  });
+
+  it('replaces the text when dryRun is false', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedTextComp(ae, 1, 'Main', ['Hello World', 'Hello Again']);
+
+    const outcome = invoke(ctx, 'bulk.replace_text', {
+      comp: 'Main',
+      find: 'Hello',
+      replace: 'Goodbye',
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ dryRun: false, applied: 2 });
+    expect(textAt(comp, 1)).toBe('Goodbye World');
+    expect(textAt(comp, 2)).toBe('Goodbye Again');
+  });
+
+  it('replaces by regular expression with capture groups', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedTextComp(ae, 1, 'Main', ['foo_01', 'foo_02']);
+
+    const outcome = invoke(ctx, 'bulk.replace_text', {
+      comp: 'Main',
+      find: 'foo_(\\d+)',
+      replace: 'bar_$1',
+      regex: true,
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ applied: 2 });
+    expect(textAt(comp, 1)).toBe('bar_01');
+    expect(textAt(comp, 2)).toBe('bar_02');
+  });
+
+  it('replaces across several comps', async () => {
+    const { ctx, ae } = await payloadContext();
+    const compA = seedTextComp(ae, 1, 'Comp A', ['text']);
+    const compB = seedTextComp(ae, 2, 'Comp B', ['text']);
+
+    const outcome = invoke(ctx, 'bulk.replace_text', {
+      comps: ['Comp A', 'Comp B'],
+      find: 'text',
+      replace: 'copy',
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ applied: 2 });
+    expect(textAt(compA, 1)).toBe('copy');
+    expect(textAt(compB, 1)).toBe('copy');
+    expect(outcome.value?.changes).toEqual([
+      { comp: 'Comp A', index: 1, from: 'text', to: 'copy' },
+      { comp: 'Comp B', index: 1, from: 'text', to: 'copy' },
+    ]);
+  });
+
+  it('limits the change to the requested layers', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedTextComp(ae, 1, 'Main', ['text', 'text']);
+
+    invoke(ctx, 'bulk.replace_text', {
+      comp: 'Main',
+      layers: [2],
+      find: 'text',
+      replace: 'copy',
+      dryRun: false,
+    });
+
+    expect(textAt(comp, 1)).toBe('text');
+    expect(textAt(comp, 2)).toBe('copy');
+  });
+
+  it('skips layers that are not text layers', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Solid']);
+
+    const outcome = invoke(ctx, 'bulk.replace_text', { comp: 'Main', find: 'a', replace: 'b' });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.changes).toEqual([]);
+    expect(outcome.value?.skipped).toEqual([{ comp: 'Main', index: 1 }]);
+  });
+
+  it('requires a find string', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedTextComp(ae, 1, 'Main', ['text']);
+
+    const outcome = invoke(ctx, 'bulk.replace_text', { comp: 'Main', replace: 'b' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('rejects an invalid regular expression', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedTextComp(ae, 1, 'Main', ['text']);
+
+    const outcome = invoke(ctx, 'bulk.replace_text', {
+      comp: 'Main',
+      find: '(',
+      replace: 'b',
+      regex: true,
+    });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('reports a composition that does not exist', async () => {
+    const { ctx } = await payloadContext();
+
+    const outcome = invoke(ctx, 'bulk.replace_text', { comp: 'Nope', find: 'a', replace: 'b' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+    expect(outcome.issue?.message).toContain('Nope');
+  });
+});

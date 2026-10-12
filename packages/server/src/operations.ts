@@ -453,6 +453,20 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(
+    operation('bulk.replace_text', 'bulk', 'Find and replace text on the text layers of one or more comps.', {
+      schema: {
+        comp,
+        comps: { type: 'array' },
+        layers: { type: 'array' },
+        find: { type: 'string' },
+        replace: { type: 'string' },
+        regex: { type: 'boolean' },
+        flags: { type: 'string' },
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(
