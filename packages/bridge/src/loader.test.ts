@@ -51,7 +51,7 @@ describe('bridge loader', () => {
     const beat = heartbeat(ae, home);
     expect(heartbeatSchema.parse(beat)).toMatchObject({
       protocolVersion: 1,
-      bridgeVersion: '0.0.0',
+      bridgeVersion: expect.stringMatching(/^0\.0\.0/),
       aeVersion: 'MockAE-25',
       os: 'MockAE-OS',
       capabilities: expect.arrayContaining(CORE_TOOLS),
@@ -76,7 +76,7 @@ describe('bridge loader', () => {
     const aeHome = join(home, '.ae-mcp', 'bridge');
     runInMockAE(source, ae);
     expect(ae.evalFileCalls).toBe(1);
-    expect(ae.fs.get(join(aeHome, '.payload-version'))).toBe('0.0.0');
+    expect(ae.fs.get(join(aeHome, '.payload-version'))).toMatch(/^0\.0\.0.*\|/);
 
     ae.fs.set(
       join(aeHome, 'current.jsx'),
@@ -86,7 +86,7 @@ describe('bridge loader', () => {
     );
     runInMockAE(source, ae);
     expect(ae.evalFileCalls).toBe(2);
-    expect(ae.fs.get(join(aeHome, '.payload-version'))).toBe('9.9.9');
+    expect(ae.fs.get(join(aeHome, '.payload-version'))).toBe('9.9.9|null');
 
     // Same session, next beat: nothing changed, so no reload.
     ae.advance(30000);

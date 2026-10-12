@@ -226,7 +226,7 @@ describe('bridge serializers', () => {
     const probe = vm.runInContext("AEMCP.invoke('ae_version_info', null, null).value", ctx);
     expect(probe).toMatchObject({
       aeVersion: 'MockAE-25',
-      bridgeVersion: '0.0.0',
+      bridgeVersion: expect.stringMatching(/^0\.0\.0/),
     });
     expect(probe.capabilities).toContain('ae_version_info');
     expect(probe.capabilities).toContain('ae_project_info');

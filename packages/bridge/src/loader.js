@@ -12,6 +12,20 @@ function aemcpPayloadVersion(source) {
     return source.slice(start, end);
 }
 
+function aemcpPayloadBuilt(source) {
+    var marker = 'built: ';
+    var at = source.indexOf(marker);
+    if (at < 0) {
+        return null;
+    }
+    var start = at + marker.length;
+    var end = source.indexOf('\n', start);
+    if (end < 0) {
+        return null;
+    }
+    return source.slice(start, end).replace(/\r$/, '').trim();
+}
+
 function aemcpLoadPayload(root) {
     var path = root + '/bridge/current.jsx';
     var source = aemcpReadFile(path);
@@ -19,12 +33,15 @@ function aemcpLoadPayload(root) {
         return null;
     }
     var version = aemcpPayloadVersion(source);
+    // The build stamps a fresh timestamp on every build, so comparing it reloads the
+    // payload even when the version string is unchanged (e.g. iterating on a dirty tree).
+    var stamp = version + '|' + aemcpPayloadBuilt(source);
     var markerFile = root + '/bridge/.payload-version';
     var loaded = aemcpReadFile(markerFile);
     // The marker file survives restarts but AEMCP does not: always load in a fresh session.
-    if (loaded !== version || typeof AEMCP === 'undefined') {
+    if (loaded !== stamp || typeof AEMCP === 'undefined') {
         $.evalFile(path);
-        aemcpWriteFile(markerFile, version);
+        aemcpWriteFile(markerFile, stamp);
     }
     return version;
 }

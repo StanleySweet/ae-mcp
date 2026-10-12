@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,9 +10,31 @@ const SHARED_SOURCES = ['es3-polyfills.js', 'es3-json2.js', 'bridge-fs.js'];
 const PAYLOAD_SOURCES = [...SHARED_SOURCES, 'job-runner.js', 'serializers.js', 'handlers.js'];
 const LOADER_SOURCES = [...SHARED_SOURCES, 'loader.js'];
 
+/** Short git revision, suffixed `-dirty` when the tree has uncommitted changes. Null outside a repo. */
+function gitRevision(): string | null {
+  try {
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      cwd: SRC_DIR,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim();
+    const dirty = execFileSync('git', ['status', '--porcelain'], {
+      cwd: SRC_DIR,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .toString()
+      .trim();
+    return dirty === '' ? sha : `${sha}-dirty`;
+  } catch {
+    return null;
+  }
+}
+
 async function bridgeVersion(): Promise<string> {
   const pkg = JSON.parse(await readFile(join(SRC_DIR, '..', 'package.json'), 'utf8'));
-  return pkg.version;
+  const revision = gitRevision();
+  return revision === null ? pkg.version : `${pkg.version}+${revision}`;
 }
 
 function stamp(version: string): string {
