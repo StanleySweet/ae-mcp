@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { mkdtemp, stat, writeFile } from 'node:fs/promises';
+import { mkdtemp, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AerenderProcess, SpawnAerender } from '@ae-mcp/core';
@@ -280,7 +280,14 @@ describe('ae_render / job_status', () => {
     })) as { content: unknown[] };
     const { jobId } = textContent(started);
 
+    const record = harness.store.list().find((job) => job.status === 'running')!;
     await writeFile(output, 'partial');
+    // ext4 derives a file's mtime from a coarse per-tick clock that can lag
+    // Date.now(), so a file written right after `createdAt` can appear older
+    // than the job start. Pin the partial file's mtime past that instant so the
+    // cleanup guard is deterministic on every filesystem.
+    const partialAt = new Date(record.createdAt + 1000);
+    await utimes(output, partialAt, partialAt);
 
     const process = harness.processes[0]!;
     const cancelled = (await harness.client.callTool({
