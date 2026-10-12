@@ -6,6 +6,7 @@ import { defaultOperationRegistry } from './operations.js';
 const BRIDGE_OPS = [
   'project.info',
   'project.export_json',
+  'project.report_usage',
   'project.undo',
   'project.increment_save',
   'comp.create',

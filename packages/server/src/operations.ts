@@ -57,6 +57,9 @@ export function defaultOperationRegistry(): OperationRegistry {
   register(operation('project.export_json', 'project', 'Snapshot the whole project as JSON.', {
     readOnly: true,
   }));
+  register(operation('project.report_usage', 'project', 'Report unused items and footage with a missing source file.', {
+    readOnly: true,
+  }));
   register(operation('project.undo', 'project', 'Undo the last change.'));
   register(operation('project.increment_save', 'project', 'File > Increment and Save the project.'));
 

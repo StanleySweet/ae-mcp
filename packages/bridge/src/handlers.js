@@ -37,6 +37,71 @@ AEMCP.register('project.increment_save', function () {
     return { success: true, file: app.project.file ? app.project.file.fsName : null };
 });
 
+// The set of project item ids that some composition places as a layer source.
+function aemcpUsedItemIds(project) {
+    var used = {};
+    var i, l, comp, src;
+    for (i = 1; i <= project.numItems; i++) {
+        if (project.item(i) instanceof CompItem) {
+            comp = project.item(i);
+            for (l = 1; l <= comp.numLayers; l++) {
+                src = comp.layer(l).source;
+                if (src) {
+                    used[src.id] = true;
+                }
+            }
+        }
+    }
+    return used;
+}
+
+// Items other than comps and folders that no composition uses.
+function aemcpUnusedItems(project) {
+    var used = aemcpUsedItemIds(project);
+    var out = [];
+    var i, item;
+    for (i = 1; i <= project.numItems; i++) {
+        item = project.item(i);
+        if (item instanceof CompItem || item instanceof FolderItem) {
+            continue;
+        }
+        if (!used[item.id]) {
+            out.push({ id: item.id, name: item.name, type: aemcpItemType(item) });
+        }
+    }
+    return out;
+}
+
+// Report project hygiene: items no composition uses, and footage whose source
+// file is missing.
+// Ref: https://ae-scripting.docsforadobe.dev/item/footageitem/#footageitemfootagemissing
+// Ref: https://ae-scripting.docsforadobe.dev/general/project/
+AEMCP.register('project.report_usage', function () {
+    var project = app.project;
+    var unused = aemcpUnusedItems(project);
+    var missing = [];
+    var i, item;
+    for (i = 1; i <= project.numItems; i++) {
+        item = project.item(i);
+        if (item instanceof FootageItem && item.footageMissing) {
+            missing.push({
+                id: item.id,
+                name: item.name,
+                file: item.file ? item.file.fsName : null
+            });
+        }
+    }
+    return {
+        unusedItems: unused,
+        missingFootage: missing,
+        counts: {
+            items: project.numItems,
+            unused: unused.length,
+            missing: missing.length
+        }
+    };
+});
+
 // Comp operation handlers (mutating, run via ae_do).
 function aemcpAbortArgs(message) {
     aemcpAbort(aemcpErrorIssue('INVALID_ARGS', message));

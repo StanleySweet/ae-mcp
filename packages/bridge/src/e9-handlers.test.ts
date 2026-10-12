@@ -9,6 +9,9 @@ import {
   MockAE,
   MockAVLayer,
   MockCompItem,
+  MockFile,
+  MockFolderItem,
+  MockFootageItem,
   MockLayer,
   MockProperty,
   MockPropertyGroup,
@@ -1138,5 +1141,79 @@ describe('bulk.set_label', () => {
     expect(outcome.ok).toBe(false);
     expect(outcome.issue?.code).toBe('INVALID_ARGS');
     expect(outcome.issue?.message).toContain('Nope');
+  });
+});
+
+function addFootage(ae: MockAE, id: number, name: string): MockFootageItem {
+  const footage = new MockFootageItem(id, name, 1920, 1080);
+  ae.project.add(footage);
+  return footage;
+}
+
+function placeFootage(comp: MockCompItem, footage: MockFootageItem): MockAVLayer {
+  const layer = new MockAVLayer(footage.name, 'Layer');
+  layer.source = footage;
+  return comp.addLayer(layer);
+}
+
+describe('project.report_usage', () => {
+  it('reports footage that no composition uses', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+    const footage = addFootage(ae, 50, 'unused.mov');
+
+    const outcome = invoke(ctx, 'project.report_usage', {});
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.unusedItems).toEqual([
+      { id: footage.id, name: 'unused.mov', type: 'Footage' },
+    ]);
+  });
+
+  it('does not report footage that a composition places', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer']);
+    const footage = addFootage(ae, 50, 'clip.mov');
+    placeFootage(comp, footage);
+
+    const outcome = invoke(ctx, 'project.report_usage', {});
+
+    expect(outcome.value?.unusedItems).toEqual([]);
+  });
+
+  it('never reports comps or folders as unused', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+    ae.project.add(new MockFolderItem(60, 'Folder'));
+
+    const outcome = invoke(ctx, 'project.report_usage', {});
+
+    expect(outcome.value?.unusedItems).toEqual([]);
+  });
+
+  it('reports footage whose source file is missing', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer']);
+    const footage = addFootage(ae, 50, 'clip.mov');
+    footage.footageMissing = true;
+    footage.file = new MockFile(ae, '/footage/clip.mov');
+    placeFootage(comp, footage);
+
+    const outcome = invoke(ctx, 'project.report_usage', {});
+
+    expect(outcome.value?.missingFootage).toEqual([
+      { id: footage.id, name: 'clip.mov', file: '/footage/clip.mov' },
+    ]);
+    expect(outcome.value?.unusedItems).toEqual([]);
+  });
+
+  it('reports counts for the whole project', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+    addFootage(ae, 50, 'unused.mov');
+
+    const outcome = invoke(ctx, 'project.report_usage', {});
+
+    expect(outcome.value?.counts).toEqual({ items: 2, unused: 1, missing: 0 });
   });
 });
