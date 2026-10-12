@@ -34,6 +34,13 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - Handlers: `handlers.js` `AEMCP.register(...)` :3,22,56,84,92,151; active-comp resolve `aemcpResolveComp` :47. E7-5 `project.export_json` uses `AEMCP.serialize.projectSnapshot` (item tree + comp layers snapshot, `format: 'aemcp-project/v1'`). E8-1 `render.frame` saves one PNG via `CompItem.saveFrameToPng`, falling back to the render queue + PNG output module; output defaults to `<queue root>/render/<comp>-<frame>.png`. E8-3 render-queue ops: `render.queue_add` (`RQueue.items.add` + time span), `render.queue_set_output` (`OutputModule.file`/`applyTemplate`), `render.queue_start` (`RenderQueue.render()`, destructive) and `render.status`; helpers `aemcpRequireRqItem`, `aemcpRenderItemInfo`, `aemcpRqStatusName`.
 - Build: `bridge/src/build.ts` prepends polyfills + `job-runner.js` + `serializers.js` + `handlers.js`.
 
+## Core (`packages/core`, macOS install + aerender)
+
+- `discoverAEVersions(dir)` `ae-discovery.ts` + `MIN_SUPPORTED_AE_YEAR` — finds AE installs (folder layout `/Applications/Adobe After Effects <year>/…app`, or a bare `.app`), newest first; `AEInstall = {appName, year, path}`.
+- `discoverAerender(install)` / `discoverAerenders(dir?)` `aerender-discovery.ts` (E8-4) — aerender ships in the version folder next to the `.app`, checked before the in-bundle `Contents/Resources` fallback; `AerenderInstall = AEInstall & {aerender}`.
+- `parseAerenderLine(line)` `aerender-progress.ts` (E8-4) — one stdout/stderr line → `AerenderEvent` (`version`/`launching`/`progress {frame,rendered,seconds}`/`error`) or null.
+- `buildAerenderArgs(options)` / `runAerender(options)` `aerender-runner.ts` (E8-4) — builds `-project/-comp/-rqindex/-RStemplate/-OMtemplate/-output/-s/-e/-i/-reuse/-v/-close` and spawns aerender, streaming lines and parsed events; returns `{result, cancel}`, cancelled by the handle or an `AbortSignal`. `spawn` is injectable (test seam); default uses `node:child_process.spawn`.
+
 ## Settings (`packages/server/src/settings.ts`)
 
 - `loadSettings({root, env})` :42 — reads `~/.ae-mcp/settings.json` (zod-validated, unknown keys rejected), env vars (`AE_MCP_READ_ONLY`, `AE_MCP_ALLOWED_CATEGORIES`, `AE_MCP_EVAL_ENABLED`, `AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE`) override the file. Defaults in `DEFAULT_SETTINGS` :18. Consumed by the E7 policy engine.
