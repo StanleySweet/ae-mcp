@@ -73,24 +73,54 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
-  register(operation('comp.duplicate', 'comp', 'Duplicate a composition.', {
-    schema: { name: comp },
-  }));
   register(
-    operation('comp.set_settings', 'comp', 'Change a composition width, height or frame rate.', {
-      schema: { name: comp, width: { type: 'number' }, height: { type: 'number' }, frameRate: { type: 'number' } },
-    }),
-  );
-  register(operation('comp.precompose', 'comp', 'Precompose a composition into a new comp.', {
-    schema: { name: comp, comp: comp, newName: comp, layers: { type: "array" } },
-  }));
-  register(
-    operation('comp.layer_clip_frames', 'comp', 'Set every layer in-point and out-point.', {
-      schema: { name: comp, from: { type: 'number' }, to: { type: 'number' } },
+    operation('comp.duplicate', 'comp', 'Duplicate a composition.', {
+      schema: { comp, name: comp, newName: comp },
     }),
   );
   register(
-    operation("comp.info", "comp", "Report composition information.", { readOnly: true, schema: { comp: comp } }),
+    operation('comp.set_settings', 'comp', 'Change a composition width, height, pixel aspect, duration, frame rate, background colour or name.', {
+      schema: {
+        comp,
+        name: comp,
+        width: { type: 'number' },
+        height: { type: 'number' },
+        pixelAspect: { type: 'number' },
+        duration: { type: 'number' },
+        fps: { type: 'number' },
+        frameRate: { type: 'number' },
+        bgColor: { type: 'array' },
+        newName: comp,
+      },
+    }),
+  );
+  register(
+    operation('comp.precompose', 'comp', 'Precompose layers of a composition into a new comp.', {
+      schema: {
+        comp,
+        name: comp,
+        newName: comp,
+        layers: { type: 'array' },
+        moveAllAttributes: { type: 'boolean' },
+      },
+    }),
+  );
+  register(
+    operation('comp.layer_clip_frames', 'comp', 'Set layer in-point and out-point from frame numbers.', {
+      schema: {
+        comp,
+        name: comp,
+        from: { type: 'integer' },
+        to: { type: 'integer' },
+        layers: { type: 'array' },
+      },
+    }),
+  );
+  register(
+    operation('comp.info', 'comp', 'Report composition information.', {
+      readOnly: true,
+      schema: { comp, name: comp },
+    }),
   );
 
   // Layer.

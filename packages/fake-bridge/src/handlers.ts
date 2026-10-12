@@ -1,7 +1,7 @@
 import type { HandlerMap } from './consumer.js';
 import type { Comp, CompLayer, FakeProject } from './project.js';
 
-function compInfo(comp: Comp): Record<string, unknown> {
+export function compInfo(comp: Comp): Record<string, unknown> {
   return {
     id: comp.id,
     name: comp.name,
@@ -12,10 +12,10 @@ function compInfo(comp: Comp): Record<string, unknown> {
     comment: '',
     width: comp.width,
     height: comp.height,
-    pixelAspect: 1,
+    pixelAspect: comp.pixelAspect,
     frameRate: comp.frameRate,
-    duration: 0,
-    bgColor: [0, 0, 0],
+    duration: comp.duration,
+    bgColor: [...comp.bgColor],
     numLayers: comp.layers.length,
     workAreaStart: 0,
     workAreaDuration: 0,
@@ -28,7 +28,7 @@ function requestedComps(args: unknown): (string | number)[] {
   return Array.isArray(comps) ? (comps as (string | number)[]) : [];
 }
 
-function findComp(project: FakeProject, key: unknown): Comp | undefined {
+export function findComp(project: FakeProject, key: unknown): Comp | undefined {
   if (key === undefined || key === null || key === '') {
     return project.comps[0];
   }

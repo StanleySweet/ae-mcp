@@ -185,6 +185,23 @@ export class MockCompItem extends MockItem {
     return layer;
   }
 
+  removeLayerAt(index: number): MockLayer | null {
+    const removed = this.layerList.splice(index - 1, 1)[0] ?? null;
+    this.reindexLayers();
+    return removed;
+  }
+
+  insertLayerAt(index: number, layer: MockLayer): void {
+    this.layerList.splice(index - 1, 0, layer);
+    this.reindexLayers();
+  }
+
+  private reindexLayers(): void {
+    this.layerList.forEach((layer, i) => {
+      layer.index = i + 1;
+    });
+  }
+
   nextLayerId(): number {
     this.nextId += 1;
     return this.nextId;
@@ -204,6 +221,11 @@ export class MockCompItem extends MockItem {
     copy.bgColor = [this.bgColor[0], this.bgColor[1], this.bgColor[2]];
     if (this.project) {
       this.project.add(copy);
+    }
+    for (const layer of this.layerList) {
+      const clone = Object.create(Object.getPrototypeOf(layer)) as MockLayer;
+      Object.assign(clone, layer);
+      copy.addLayer(clone);
     }
     return copy;
   }
@@ -415,12 +437,41 @@ export class MockLayerCollection {
     return this.comp.addLayer(layer);
   }
 
-  precompose(indices: number[], name: string): MockCompItem {
-    const comp = new MockCompItem(this.comp.project ? this.comp.project.allocateId() : 0, name, this.comp.width, this.comp.height, this.comp.frameRate, this.comp.duration);
-    if (this.comp.project) {
-      this.comp.project.add(comp);
+  precompose(indices: number[], name: string, moveAllAttributes = true): MockCompItem {
+    const source = this.comp;
+    const project = source.project;
+    const comp = new MockCompItem(
+      project ? project.allocateId() : 0,
+      name,
+      source.width,
+      source.height,
+      source.frameRate,
+      source.duration,
+    );
+    comp.pixelAspect = source.pixelAspect;
+    comp.bgColor = [source.bgColor[0], source.bgColor[1], source.bgColor[2]];
+    if (project) {
+      project.add(comp);
     }
-    void indices;
+    const sorted = [...indices].sort((a, b) => a - b);
+    const moved: MockLayer[] = [];
+    for (const index of sorted) {
+      const layer = source.layer(index);
+      if (layer) {
+        moved.push(layer);
+      }
+    }
+    for (const layer of moved) {
+      comp.addLayer(layer);
+    }
+    for (let i = sorted.length - 1; i >= 0; i -= 1) {
+      source.removeLayerAt(sorted[i]!);
+    }
+    const holder = new MockAVLayer(name, 'Layer');
+    holder.id = source.nextLayerId();
+    holder.outPoint = source.duration;
+    source.insertLayerAt(sorted[0]!, holder);
+    void moveAllAttributes;
     return comp;
   }
 }

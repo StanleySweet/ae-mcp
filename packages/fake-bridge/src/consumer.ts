@@ -10,11 +10,23 @@ import {
   jobSchema,
   resultSchema,
   makeError,
+  type ErrorCode,
   type ResultMessage,
 } from '@ae-mcp/protocol';
 
 export type ToolHandler = (args: unknown) => unknown | Promise<unknown>;
 export type HandlerMap = Record<string, ToolHandler>;
+
+/** A handler failure carrying the protocol error code to report. */
+export class HandlerError extends Error {
+  readonly code: ErrorCode;
+
+  constructor(code: ErrorCode, message: string) {
+    super(message);
+    this.name = 'HandlerError';
+    this.code = code;
+  }
+}
 
 export interface QueueConsumer {
   start(): Promise<void>;
@@ -77,10 +89,13 @@ export function createQueueConsumer(
             result = {
               protocolVersion: PROTOCOL_VERSION,
               ok: false,
-              error: makeError(
-                'SCRIPT_ERROR',
-                error instanceof Error ? error.message : String(error),
-              ),
+              error:
+                error instanceof HandlerError
+                  ? makeError(error.code, error.message)
+                  : makeError(
+                      'SCRIPT_ERROR',
+                      error instanceof Error ? error.message : String(error),
+                    ),
             };
           }
         }

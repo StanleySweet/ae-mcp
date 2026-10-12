@@ -38,6 +38,59 @@ AEMCP.register('project.increment_save', function () {
 });
 
 // Comp operation handlers (mutating, run via ae_do).
+function aemcpAbortArgs(message) {
+    aemcpAbort(aemcpErrorIssue('INVALID_ARGS', message));
+}
+
+// Resolve a comp by name, id or the active comp, or abort with INVALID_ARGS.
+function aemcpRequireComp(key) {
+    var comp = aemcpResolveComp(key);
+    if (!comp) {
+        if (key === undefined || key === null || key === '') {
+            aemcpAbortArgs('no active composition');
+        }
+        aemcpAbortArgs('composition not found: ' + key);
+    }
+    return comp;
+}
+
+// Read the comp key argument, accepting `comp` or `name` (the older spelling).
+function aemcpCompKey(args) {
+    if (!args) {
+        return null;
+    }
+    if (args.comp !== undefined && args.comp !== null) {
+        return args.comp;
+    }
+    if (args.name !== undefined && args.name !== null) {
+        return args.name;
+    }
+    return null;
+}
+
+// Collect layer indices from `layers`, or every layer when it is absent.
+function aemcpLayerIndices(args, comp) {
+    var indices = [];
+    var i;
+    if (args && args.layers !== undefined && args.layers !== null) {
+        if (args.layers.length === 0) {
+            aemcpAbortArgs('layers must be a non-empty array of layer indices');
+        }
+        for (i = 0; i < args.layers.length; i += 1) {
+            var index = args.layers[i];
+            if (typeof index !== 'number' || index !== Math.floor(index) || index < 1 || index > comp.numLayers) {
+                aemcpAbortArgs('layer index out of range: ' + index);
+            }
+            indices.push(index);
+        }
+        return indices;
+    }
+    for (i = 1; i <= comp.numLayers; i += 1) {
+        indices.push(i);
+    }
+    return indices;
+}
+
 // Ref: https://ae-scripting.docsforadobe.dev/itemCollection/itemCollection.html#itemcollection-addcomp
 AEMCP.register('comp.create', function (args) {
     var name = args && args.name ? args.name : 'New Comp';
@@ -47,132 +100,102 @@ AEMCP.register('comp.create', function (args) {
     var duration = args && typeof args.duration === 'number' ? args.duration : 10;
     var frameRate = args && typeof args.fps === 'number' ? args.fps : (args && typeof args.frameRate === 'number' ? args.frameRate : 30);
     var comp = app.project.items.addComp(name, width, height, pixelAspect, duration, frameRate);
-    return { name: comp.name, id: comp.id };
+    return AEMCP.serialize.comp(comp);
 });
 
+// Ref: https://ae-scripting.docsforadobe.dev/item/item.html#itemduplicate
 AEMCP.register('comp.duplicate', function (args) {
-    var compName = args && args.name ? args.name : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var copy = comp.duplicate();
+    if (args && args.newName) {
+        copy.name = args.newName;
     }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
-    var newComp = comp.duplicate();
-    return { name: newComp.name, id: newComp.id };
+    return AEMCP.serialize.comp(copy);
 });
 
 AEMCP.register('comp.set_settings', function (args) {
-    var compName = args && args.name ? args.name : null;
-    var width = args && args.width ? args.width : null;
-    var height = args && args.height ? args.height : null;
-    var frameRate = args && args.frameRate ? args.frameRate : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var changed = 0;
+    if (args && typeof args.width === 'number') {
+        comp.width = args.width;
+        changed += 1;
+    }
+    if (args && typeof args.height === 'number') {
+        comp.height = args.height;
+        changed += 1;
+    }
+    if (args && typeof args.pixelAspect === 'number') {
+        comp.pixelAspect = args.pixelAspect;
+        changed += 1;
+    }
+    if (args && typeof args.duration === 'number') {
+        comp.duration = args.duration;
+        changed += 1;
+    }
+    if (args && typeof args.fps === 'number') {
+        comp.frameRate = args.fps;
+        changed += 1;
+    }
+    if (args && args.bgColor) {
+        if (args.bgColor.length !== 3) {
+            aemcpAbortArgs('bgColor must be [r, g, b]');
         }
+        comp.bgColor = [args.bgColor[0], args.bgColor[1], args.bgColor[2]];
+        changed += 1;
     }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
+    if (args && args.newName) {
+        comp.name = args.newName;
+        changed += 1;
     }
-    if (width !== null) comp.width = width;
-    if (height !== null) comp.height = height;
-    if (frameRate !== null) comp.frameRate = frameRate;
-    return { success: true };
+    if (changed === 0) {
+        aemcpAbortArgs('no settings to change');
+    }
+    return AEMCP.serialize.comp(comp);
 });
 
 AEMCP.register('comp.info', function (args) {
-    var compName = args && args.comp ? args.comp : null;
-    var project = app.project;
-    var comp;
-    if (compName) {
-        for (var i = 1; i <= project.numItems; i++) {
-            var item = project.item(i);
-            if (item instanceof CompItem && item.name === compName) {
-                comp = item;
-                break;
-            }
-        }
-        if (!comp) {
-            return { ok: false };
-        }
-    } else {
-        comp = app.project.activeItem;
-        if (!(comp instanceof CompItem)) {
-            return { ok: false };
-        }
-    }
-    return { ok: true, value: AEMCP.serialize.comp(comp) };
+    return AEMCP.serialize.comp(aemcpRequireComp(aemcpCompKey(args)));
 });
 
+// Ref: https://ae-scripting.docsforadobe.dev/layerCollection/layerCollection.html#layercollection-precompose
 AEMCP.register('comp.precompose', function (args) {
-    var compName = args && args.comp ? args.comp : null;
-    var newCompName = args && args.name ? args.name : (args && args.newName ? args.newName : null);
-    var layers = args && args.layers ? args.layers : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
-    var indices: number[] = [];
-    if (layers) {
-        for (var j = 0; j < layers.length; j += 1) {
-            var li = layers[j];
-            if (typeof li === 'number' && li >= 1 && li <= comp.numLayers) {
-                indices.push(li);
-            }
-        }
-    } else {
-        for (var j = 1; j <= comp.numLayers; j++) {
-            indices.push(j);
-        }
-    }
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var indices = aemcpLayerIndices(args, comp);
     if (indices.length === 0) {
-        return { success: false, error: 'Composition has no layers to precompose' };
+        aemcpAbortArgs('composition has no layers to precompose');
     }
-    var newComp = comp.layers.precompose(indices, newCompName || comp.name + ' Precomped', true);
-    return { numLayers: indices.length, precomp: { name: newComp.name } };
+    var moveAllAttributes = !(args && args.moveAllAttributes === false);
+    if (!moveAllAttributes && indices.length > 1) {
+        aemcpAbortArgs('moveAllAttributes can only be false when exactly one layer is precomposed');
+    }
+    var newName = args && args.newName ? args.newName : (args && args.comp !== undefined && args.name ? args.name : null);
+    var newComp = comp.layers.precompose(indices, newName || 'Pre-comp', moveAllAttributes);
+    return {
+        name: newComp.name,
+        comp: comp.name,
+        numLayers: comp.numLayers,
+        precomp: AEMCP.serialize.comp(newComp)
+    };
 });
 
 AEMCP.register('comp.layer_clip_frames', function (args) {
-    var compName = args && args.name ? args.name : null;
-    var from = args && args.from ? args.from : 0;
-    var to = args && args.to ? args.to : 0;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var from = args ? args.from : undefined;
+    var to = args ? args.to : undefined;
+    if (typeof from !== 'number' || typeof to !== 'number' || from !== Math.floor(from) || to !== Math.floor(to) || from < 0 || to <= from) {
+        aemcpAbortArgs('from and to must be integer frames with 0 <= from < to');
     }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
+    var indices = aemcpLayerIndices(args, comp);
+    var frameDuration = 1 / comp.frameRate;
+    var inPoint = from * frameDuration;
+    var outPoint = to * frameDuration;
+    var i, layer;
+    for (i = 0; i < indices.length; i += 1) {
+        layer = comp.layer(indices[i]);
+        layer.inPoint = inPoint;
+        layer.outPoint = outPoint;
     }
-    for (var i = 1; i <= comp.numLayers; i++) {
-        var layer = comp.layer(i);
-        if (layer.setInPoint) layer.setInPoint(from);
-        if (layer.setOutPoint) layer.setOutPoint(to);
-    }
-    return { success: true };
+    return { comp: comp.name, inPoint: inPoint, outPoint: outPoint, layers: indices };
 });
 
 function aemcpFindComp(key) {
