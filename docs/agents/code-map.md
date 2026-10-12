@@ -35,6 +35,10 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - Handlers: `handlers.js` `AEMCP.register(...)` :3,22,56,84,92,151; active-comp resolve `aemcpResolveComp` :47. E7-5 `project.export_json` uses `AEMCP.serialize.projectSnapshot` (item tree + comp layers snapshot, `format: 'aemcp-project/v1'`). E8-1 `render.frame` saves one PNG via `CompItem.saveFrameToPng`, falling back to the render queue + PNG output module; output defaults to `<queue root>/render/<comp>-<frame>.png`. E8-3 render-queue ops: `render.queue_add` (`RQueue.items.add` + time span), `render.queue_set_output` (`OutputModule.file`/`applyTemplate`), `render.queue_start` (`RenderQueue.render()`, destructive) and `render.status`; helpers `aemcpRequireRqItem`, `aemcpRenderItemInfo`, `aemcpRqStatusName`.
 - Build: `bridge/src/build.ts` prepends polyfills + `job-runner.js` + `serializers.js` + `handlers.js`.
 
+## Plan store (`packages/server/src/plans.ts`, E9-1)
+
+- `PlanStore<T>` — in-memory store of previewed (dry-run) bulk edits. `create(changes, fingerprint)` → `planId`, `get(planId, fingerprint)` (non-consuming), `take(planId, fingerprint)` (consumes on success), `size()`. A plan is valid only while unexpired (`ttlMs`, default 10 min) and the project `fingerprint` still matches; failures are `unknown` | `expired` | `changed`. Expired plans are pruned on `create`/`size` and the oldest are evicted past `maxPlans` (default 20). `now`/`ttlMs`/`maxPlans` are injectable. The project fingerprint source is chosen by the E9-2+ bulk tools.
+
 ## Job store (`packages/server/src/jobs.ts`, E8-5/E8-6)
 
 - `JobStore` — in-memory registry of long-running jobs (`JobRecord {id, kind, status, createdAt, finishedAt?, progress?, error?, result?}`; `JobStatus = running|succeeded|failed|cancelled`). `start(kind)` → id, `get`/`list` (return copies), `progress(id, {frame, rendered, seconds})`, `succeed`/`fail`/`cancel`; finished jobs are evicted past `maxFinished` (default 50). Consumers: `ae_render` + `job_status` + `job_cancel`.
