@@ -1,3 +1,6 @@
+import { Buffer } from 'node:buffer';
+import { readFile } from 'node:fs/promises';
+import { resolve, sep } from 'node:path';
 import { makeError, queueRoot, type ResultMessage } from '@ae-mcp/protocol';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -17,6 +20,7 @@ import { runSetupChecks } from './setup-checks.js';
 export const SERVER_NAME = 'ae-mcp';
 export const SERVER_VERSION = '0.0.0';
 export const MAX_RESULT_BYTES = 200_000;
+export const MAX_RENDER_BYTES = 20_000_000;
 
 export interface ServerOptions {
   root?: string;
@@ -29,8 +33,12 @@ export interface ServerOptions {
   settings?: Settings;
 }
 
+type ToolContent =
+  | { type: 'text'; text: string }
+  | { type: 'image'; data: string; mimeType: string };
+
 type ToolResult = {
-  content: { type: 'text'; text: string }[];
+  content: ToolContent[];
   isError?: boolean;
 };
 
@@ -40,6 +48,29 @@ function text(value: unknown, isError = false): ToolResult {
 
 function toResult(value: ResultMessage): ToolResult {
   return value.ok ? text(value.result) : text(value.error, true);
+}
+
+/** Reads a frame the bridge rendered, refusing anything outside `<root>/render`. */
+async function readRenderedFrame(
+  root: string,
+  file: string,
+  maxBytes: number,
+): Promise<{ ok: true; data: string } | { ok: false; message: string }> {
+  const renderDir = resolve(root, 'render');
+  const target = resolve(file);
+  if (target !== renderDir && !target.startsWith(renderDir + sep)) {
+    return { ok: false, message: `refusing to read outside the render directory: ${file}` };
+  }
+  let buffer: Buffer;
+  try {
+    buffer = await readFile(target);
+  } catch (error) {
+    return { ok: false, message: `could not read rendered frame: ${(error as Error).message}` };
+  }
+  if (buffer.length > maxBytes) {
+    return { ok: false, message: `rendered frame is too large (${buffer.length} bytes)` };
+  }
+  return { ok: true, data: buffer.toString('base64') };
 }
 
 /** Keeps the longest prefix of an array whose JSON fits the byte cap. */
@@ -229,6 +260,60 @@ export function createServer(options: ServerOptions = {}): McpServer {
         properties: properties.items,
         truncated: layers.truncated || properties.truncated,
       });
+    },
+  );
+
+  server.registerTool(
+    'ae_render_frame',
+    {
+      description:
+        'Render a single frame of a composition (default: the active comp, frame 0) to PNG and return it as image content plus metadata.',
+      inputSchema: {
+        comp: z.union([z.string(), z.number()]).optional(),
+        time: z.number().optional(),
+      },
+    },
+    async (args) => {
+      const result = await callRaw('render.frame', { comp: args.comp, time: args.time });
+      if (!result.ok) {
+        return toResult(result);
+      }
+      const value = result.result as {
+        method?: string;
+        comp?: string | null;
+        file?: string;
+        time?: number;
+        frame?: number;
+        width?: number;
+        height?: number;
+      };
+      if (typeof value.file !== 'string') {
+        return text(
+          makeError('SCRIPT_ERROR', 'render.frame did not return a file path'),
+          true,
+        );
+      }
+      const read = await readRenderedFrame(root, value.file, MAX_RENDER_BYTES);
+      if (!read.ok) {
+        return text(makeError('SCRIPT_ERROR', read.message), true);
+      }
+      return {
+        content: [
+          { type: 'image', data: read.data, mimeType: 'image/png' },
+          {
+            type: 'text',
+            text: JSON.stringify({
+              method: value.method ?? null,
+              comp: value.comp ?? null,
+              file: value.file,
+              time: value.time ?? null,
+              frame: value.frame ?? null,
+              width: value.width ?? null,
+              height: value.height ?? null,
+            }),
+          },
+        ],
+      };
     },
   );
 
