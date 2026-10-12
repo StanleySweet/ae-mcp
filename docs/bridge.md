@@ -23,6 +23,7 @@ The bridge uses the same queue layout as the protocol (`AE_MCP_ROOT`, default
 | `bridge/outbox/heartbeat.json`     | bridge  | latest heartbeat (overwritten each beat)  |
 | `bridge/current.jsx`               | server  | current payload, read by the loader       |
 | `bridge/.payload-version`          | bridge  | last-evaluated payload version            |
+| `render/`                          | bridge  | PNG frames saved by `render.frame`        |
 
 ## Loader behavior
 

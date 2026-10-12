@@ -229,6 +229,13 @@ export class MockCompItem extends MockItem {
     }
     return copy;
   }
+
+  // Ref: https://developer.adobe.com/after-effects/uxp/after-effects-api/compitem
+  saveFrameToPng(time: number, file: MockFile): void {
+    file.open('w');
+    file.write(`PNG:${this.name}:${time}`);
+    file.close();
+  }
 }
 
 export class MockProperty {
@@ -493,6 +500,75 @@ export class MockItemCollection {
   }
 }
 
+export class MockOutputModule {
+  file: MockFile | null = null;
+  template: string | null = null;
+  readonly templates = ['PNG Sequence', 'Lossless'];
+
+  // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/outputmodule/
+  applyTemplate(name: string): void {
+    this.template = name;
+  }
+}
+
+export class MockRenderQueueItem {
+  timeSpanStart = 0;
+  timeSpanDuration = 0;
+  removed = false;
+  private readonly first: MockOutputModule = new MockOutputModule();
+
+  constructor(readonly comp: MockItem) {}
+
+  // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueueitem/
+  outputModule(index: number): MockOutputModule | null {
+    return index === 1 ? this.first : null;
+  }
+
+  get outputModules(): MockOutputModule[] {
+    return [this.first];
+  }
+
+  remove(): void {
+    this.removed = true;
+  }
+}
+
+export class MockRenderQueue {
+  private readonly list: MockRenderQueueItem[] = [];
+
+  // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/rqitemcollection/
+  readonly items = {
+    add: (comp: MockItem): MockRenderQueueItem => {
+      const item = new MockRenderQueueItem(comp);
+      this.list.push(item);
+      return item;
+    },
+  };
+
+  get numItems(): number {
+    return this.list.length;
+  }
+
+  item(index: number): MockRenderQueueItem | null {
+    return this.list[index - 1] ?? null;
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueue/
+  render(): void {
+    for (const item of this.list) {
+      if (item.removed) {
+        continue;
+      }
+      const file = item.outputModule(1)?.file;
+      if (file) {
+        file.open('w');
+        file.write(`PNG:${item.comp.name}:${item.timeSpanStart}`);
+        file.close();
+      }
+    }
+  }
+}
+
 export class MockProject {
   file: MockFile | null = null;
   bitsPerChannel = 8;
@@ -503,6 +579,7 @@ export class MockProject {
   private idCounter = 0;
 
   readonly items = new MockItemCollection(this);
+  readonly renderQueue = new MockRenderQueue();
 
   get numItems(): number {
     return this.all.length;

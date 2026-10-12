@@ -198,6 +198,67 @@ AEMCP.register('comp.layer_clip_frames', function (args) {
     return { comp: comp.name, inPoint: inPoint, outPoint: outPoint, layers: indices };
 });
 
+// Sanitise a comp name for use as a file name.
+function aemcpRenderFileName(comp, time) {
+    var frame = Math.round(time * comp.frameRate);
+    var safe = comp.name.replace(/[^A-Za-z0-9._-]/g, '_');
+    return safe + '-' + frame + '.png';
+}
+
+// Default output path under the queue root: <root>/render/<comp>-<frame>.png.
+function aemcpRenderPath(comp, time) {
+    var dir = aemcpQueueRoot() + '/render';
+    var folder = new Folder(dir);
+    if (!folder.exists) {
+        folder.create();
+    }
+    return dir + '/' + aemcpRenderFileName(comp, time);
+}
+
+// Fallback when CompItem.saveFrameToPng is unavailable: render a single frame
+// through the render queue with a PNG output module, then remove the item.
+// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueue/
+// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/rqitemcollection/
+// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/outputmodule/
+function aemcpRenderFrameViaQueue(comp, time, file) {
+    var queue = app.project.renderQueue;
+    var item = queue.items.add(comp);
+    item.timeSpanStart = time;
+    item.timeSpanDuration = 1 / comp.frameRate;
+    var output = item.outputModule(1);
+    output.file = new File(file);
+    try {
+        output.applyTemplate('PNG Sequence');
+    } catch (err) {
+        // Template may be missing on some installs; the output path still applies.
+    }
+    queue.render();
+    item.remove();
+}
+
+// Ref: https://developer.adobe.com/after-effects/uxp/after-effects-api/compitem
+AEMCP.register('render.frame', function (args) {
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var time = args && typeof args.time === 'number' ? args.time : 0;
+    var file = args && args.file ? args.file : aemcpRenderPath(comp, time);
+    var frame = Math.round(time * comp.frameRate);
+    var method = typeof comp.saveFrameToPng === 'function' ? 'direct' : 'queue';
+    if (method === 'direct') {
+        comp.saveFrameToPng(time, new File(file));
+    } else {
+        aemcpRenderFrameViaQueue(comp, time, file);
+    }
+    return {
+        method: method,
+        comp: comp.name,
+        file: file,
+        time: time,
+        frame: frame,
+        width: comp.width,
+        height: comp.height
+    };
+});
+
 function aemcpFindComp(key) {
     var project = app.project;
     var i, item;

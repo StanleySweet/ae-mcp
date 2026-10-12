@@ -59,6 +59,7 @@ const BRIDGE_OPS = [
   'audio.set_levels',
   'audio.info',
   'audio.peaks_to_markers',
+  'render.frame',
   'font.list',
   'command.find',
   'command.list',

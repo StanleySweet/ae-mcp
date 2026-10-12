@@ -345,6 +345,14 @@ export function defaultOperationRegistry(): OperationRegistry {
     schema: { comp, layerIndex, peaks: { type: 'array' } },
   }));
 
+  // Render.
+  register(
+    operation('render.frame', 'render', 'Save a single frame of a composition as a PNG.', {
+      readOnly: true,
+      schema: { comp, time: { type: 'number' }, file: comp },
+    }),
+  );
+
   // Font and command.
   register(operation('font.list', 'font', 'List installed fonts.', { readOnly: true }));
   register(operation('command.find', 'command', 'Find a menu command ID by name.', {
