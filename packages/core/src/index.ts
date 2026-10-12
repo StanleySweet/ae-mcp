@@ -8,6 +8,13 @@ export {
 export type { ClaudeDesktopInstall, DiscoverClaudeOptions } from './claude-discovery.js';
 export { detectEnvironment } from './environment.js';
 export type { DetectEnvironmentOptions, DetectedEnvironment } from './environment.js';
+export { installPayload, payloadVersion } from './install-payload.js';
+export type {
+  InstallPayloadOptions,
+  InstallPayloadResult,
+  InstallStatus,
+  InstallerCheck,
+} from './install-payload.js';
 export { discoverAerender, discoverAerenders } from './aerender-discovery.js';
 export type { AerenderInstall } from './aerender-discovery.js';
 export { parseAerenderLine } from './aerender-progress.js';
