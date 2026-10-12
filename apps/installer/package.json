@@ -2,5 +2,11 @@
   "name": "@ae-mcp/installer",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@ae-mcp/core": "^0.0.0"
+  },
+  "devDependencies": {
+    "electron": "^44.7.0"
+  }
 }

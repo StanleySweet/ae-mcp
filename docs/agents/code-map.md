@@ -59,6 +59,11 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - `parseAerenderLine(line)` `aerender-progress.ts` (E8-4) — one stdout/stderr line → `AerenderEvent` (`version`/`launching`/`progress {frame,rendered,seconds}`/`error`) or null.
 - `buildAerenderArgs(options)` / `runAerender(options)` `aerender-runner.ts` (E8-4) — builds `-project/-comp/-rqindex/-RStemplate/-OMtemplate/-output/-s/-e/-i/-reuse/-v/-close` and spawns aerender, streaming lines and parsed events; returns `{result, cancel}`, cancelled by the handle or an `AbortSignal`. `spawn` is injectable (test seam); default uses `node:child_process.spawn`.
 
+## Installer app (`apps/installer`, Electron Setup)
+
+- `createInstallerService({root, payload, loader, environment?, fileName?})` `apps/installer/src/service.ts` (E10-8) — the typed glue between the Setup UI and `packages/core`: `detect()` → `DetectedEnvironment`, `repair(install?)` → `RepairResult`, `uninstall(install?)` → `UninstallResult` (both resolve the newest detected AE install when none is passed). Idempotent.
+- `IPC_CHANNELS` (`installer:detect|repair|uninstall`) + `InstallerApi` `apps/installer/src/ipc.ts` (E10-8) — the contract shared by main and preload. `main.ts` (E10-8) registers one `ipcMain.handle` per channel and opens the `BrowserWindow`; `preload.ts` (E10-8) exposes the API as `window.installer` via `contextBridge`; `global.d.ts` types it. Electron ^44 is a devDependency; `index.html` is the (still empty) window shell the checklist UI fills in E10-9.
+
 ## Settings (`packages/server/src/settings.ts`)
 
 - `loadSettings({root, env})` :42 — reads `~/.ae-mcp/settings.json` (zod-validated, unknown keys rejected), env vars (`AE_MCP_READ_ONLY`, `AE_MCP_ALLOWED_CATEGORIES`, `AE_MCP_EVAL_ENABLED`, `AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE`) override the file. Defaults in `DEFAULT_SETTINGS` :18. Consumed by the E7 policy engine.
