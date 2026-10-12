@@ -2558,4 +2558,42 @@ AEMCP.register('bulk.remove_unused', function (args) {
     };
 });
 
+// Duplicate a composition with a new name and an optional new size, planned
+// and applied like the other bulk ops. Width and height default to the source
+// comp; the fingerprint covers the source name and the requested result.
+// Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemduplicate
+// Ref: https://ae-scripting.docsforadobe.dev/item/avitem/#avitemwidth
+AEMCP.register('bulk.duplicate_comp', function (args) {
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var name = args && args.name ? args.name : '';
+    if (name === '') {
+        aemcpAbortArgs('name is required');
+    }
+    var width = args && typeof args.width === 'number' ? args.width : comp.width;
+    var height = args && typeof args.height === 'number' ? args.height : comp.height;
+    if (width !== Math.floor(width) || width < 1 || width > 30000) {
+        aemcpAbortArgs('width must be an integer from 1 to 30000');
+    }
+    if (height !== Math.floor(height) || height < 1 || height > 30000) {
+        aemcpAbortArgs('height must be an integer from 1 to 30000');
+    }
+    var dryRun = !(args && args.dryRun === false);
+    var fingerprint = 'duplicate:' + comp.name + '#' + width + 'x' + height + '>' + name;
+    var change = { from: comp.name, to: { name: name, width: width, height: height } };
+    if (dryRun) {
+        return { dryRun: true, changes: [change], fingerprint: fingerprint };
+    }
+    var copy = comp.duplicate();
+    copy.name = name;
+    copy.width = width;
+    copy.height = height;
+    return {
+        dryRun: false,
+        createdId: copy.id,
+        created: { id: copy.id, name: name, width: width, height: height },
+        changes: [change],
+        fingerprint: fingerprint
+    };
+});
+
 

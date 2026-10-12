@@ -502,6 +502,17 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(
+    operation('bulk.duplicate_comp', 'bulk', 'Duplicate a composition with a new name and optional new size.', {
+      schema: {
+        comp,
+        name: { type: 'string' },
+        width: { type: 'number' },
+        height: { type: 'number' },
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(

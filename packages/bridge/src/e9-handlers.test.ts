@@ -1280,3 +1280,73 @@ describe('bulk.remove_unused', () => {
     expect(applied.value?.fingerprint).toBe(planned.value?.fingerprint);
   });
 });
+
+describe('bulk.duplicate_comp', () => {
+  it('previews the new name and size without creating a comp', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.duplicate_comp', { comp: 'Main', name: 'Copy', width: 640, height: 360 });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.dryRun).toBe(true);
+    expect(outcome.value?.changes).toEqual([
+      { from: 'Main', to: { name: 'Copy', width: 640, height: 360 } },
+    ]);
+    expect(ae.project.numItems).toBe(1);
+  });
+
+  it('creates a duplicate with the new name and size when applied', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.duplicate_comp', {
+      comp: 'Main',
+      name: 'Copy',
+      width: 640,
+      height: 360,
+      dryRun: false,
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.created).toEqual({ id: 1001, name: 'Copy', width: 640, height: 360 });
+    expect(ae.project.numItems).toBe(2);
+    const copy = ae.project.item(2);
+    expect(copy?.name).toBe('Copy');
+    expect(copy).toBeInstanceOf(MockCompItem);
+    expect((copy as MockCompItem).width).toBe(640);
+    expect((copy as MockCompItem).height).toBe(360);
+    expect((copy as MockCompItem).numLayers).toBe(1);
+    const source = ae.project.item(1);
+    expect(source?.name).toBe('Main');
+  });
+
+  it('keeps the source comp size when width and height are omitted', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.duplicate_comp', { comp: 'Main', name: 'Copy', dryRun: false });
+
+    expect(outcome.value?.created).toEqual({ id: 1001, name: 'Copy', width: 1920, height: 1080 });
+  });
+
+  it('requires a name', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.duplicate_comp', { comp: 'Main' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('rejects a size outside 1..30000', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.duplicate_comp', { comp: 'Main', name: 'Copy', width: 0 });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+});
