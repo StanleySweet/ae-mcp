@@ -1,6 +1,10 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
 import {
   detectEnvironment,
   ensureScriptingPref,
+  formatDiagnostics,
   repairAeMcp,
   uninstallAeMcp,
   type AEInstall,
@@ -85,6 +89,14 @@ export function createInstallerService(options: InstallerServiceOptions): Instal
         install: resolved,
         fileName: options.fileName,
       });
+    },
+    diagnostics: async (): Promise<string> => {
+      const environment = await detectEnvironment(options.environment);
+      const home = options.environment?.homeDir ?? homedir();
+      const target = join(home, 'Desktop', 'ae-mcp-diagnostics.txt');
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(target, formatDiagnostics({ environment }), 'utf8');
+      return target;
     },
   };
 }

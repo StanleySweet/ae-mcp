@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AEInstall } from '@ae-mcp/core';
@@ -147,5 +147,24 @@ describe('createInstallerService', () => {
     const result = await service.uninstall();
     expect(result.status).toBe('fail');
     expect(result.removed).toEqual([]);
+  });
+
+  it('exports a diagnostics report', async () => {
+    const homeDir = await mkdtemp(join(tmpdir(), 'ae-mcp-home-'));
+    const applicationsDir = await mkdtemp(join(tmpdir(), 'ae-mcp-apps-'));
+    const install = await createApp(applicationsDir);
+    const service = createInstallerService({
+      root: join(homeDir, '.ae-mcp'),
+      payload: PAYLOAD,
+      loader: LOADER,
+      environment: { applicationsDir, homeDir },
+    });
+
+    const path = await service.diagnostics();
+
+    expect(path).toBe(join(homeDir, 'Desktop', 'ae-mcp-diagnostics.txt'));
+    const report = await readFile(path, 'utf8');
+    expect(report).toContain('AE-MCP diagnostics');
+    expect(report).toContain(install.path);
   });
 });

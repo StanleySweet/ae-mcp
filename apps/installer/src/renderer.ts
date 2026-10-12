@@ -52,6 +52,7 @@ async function main(): Promise<void> {
   const progress = document.querySelector<HTMLElement>('#progress');
   const quitPrompt = document.querySelector<HTMLElement>('#quit-prompt');
   const retryBtn = document.querySelector<HTMLButtonElement>('#retry');
+  const diagnosticsBtn = document.querySelector<HTMLButtonElement>('#diagnostics');
   if (!list) return;
 
   let environment = await window.installer.detect();
@@ -90,6 +91,20 @@ async function main(): Promise<void> {
 
   retryBtn?.addEventListener('click', () => {
     void runRepair('Retrying...');
+  });
+
+  diagnosticsBtn?.addEventListener('click', async () => {
+    if (!progress) return;
+    diagnosticsBtn.disabled = true;
+    progress.textContent = 'Exporting diagnostics...';
+    try {
+      const path = await window.installer.diagnostics();
+      progress.textContent = `Diagnostics saved to ${path}`;
+    } catch {
+      progress.textContent = 'Export failed';
+    } finally {
+      diagnosticsBtn.disabled = false;
+    }
   });
 
   uninstallBtn?.addEventListener('click', async () => {

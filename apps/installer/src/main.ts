@@ -17,6 +17,7 @@ function registerIpc(): void {
   ipcMain.handle(IPC_CHANNELS.detect, () => service.detect());
   ipcMain.handle(IPC_CHANNELS.repair, (_event, install) => service.repair(install));
   ipcMain.handle(IPC_CHANNELS.uninstall, (_event, install) => service.uninstall(install));
+  ipcMain.handle(IPC_CHANNELS.diagnostics, () => service.diagnostics());
 }
 
 function createWindow(): void {

@@ -8,6 +8,8 @@ export {
 export type { ClaudeDesktopInstall, DiscoverClaudeOptions } from './claude-discovery.js';
 export { detectEnvironment } from './environment.js';
 export type { DetectEnvironmentOptions, DetectedEnvironment } from './environment.js';
+export { formatDiagnostics } from './diagnostics.js';
+export type { DiagnosticsInput } from './diagnostics.js';
 export { installPayload, payloadVersion } from './install-payload.js';
 export type {
   InstallPayloadOptions,
