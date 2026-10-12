@@ -2682,4 +2682,55 @@ AEMCP.register('bulk.organize_items', function (args) {
     };
 });
 
+// Batch resize a composition into several named formats, each an independent
+// duplicate at its own size (like bulk.duplicate_comp but for many outputs).
+// Planned and applied through ae_plan/ae_apply; the fingerprint covers the
+// source name plus every requested format.
+// Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemduplicate
+// Ref: https://ae-scripting.docsforadobe.dev/item/avitem/#avitemwidth
+AEMCP.register('bulk.resize_comp', function (args) {
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var formats = args && args.formats ? args.formats : null;
+    if (!formats || formats.length === 0) {
+        aemcpAbortArgs('formats is required');
+    }
+    var dryRun = !(args && args.dryRun === false);
+    var changes = [];
+    var created = [];
+    var parts = [];
+    var f, spec, copy;
+    for (f = 0; f < formats.length; f++) {
+        spec = formats[f];
+        if (!spec || typeof spec.name !== 'string' || spec.name === '') {
+            aemcpAbortArgs('every format needs a name');
+        }
+        if (typeof spec.width !== 'number' || spec.width !== Math.floor(spec.width) || spec.width < 1 || spec.width > 30000) {
+            aemcpAbortArgs('format ' + spec.name + ' needs an integer width from 1 to 30000');
+        }
+        if (typeof spec.height !== 'number' || spec.height !== Math.floor(spec.height) || spec.height < 1 || spec.height > 30000) {
+            aemcpAbortArgs('format ' + spec.name + ' needs an integer height from 1 to 30000');
+        }
+        parts.push(spec.name + ':' + spec.width + 'x' + spec.height);
+        changes.push({ from: comp.name, to: { name: spec.name, width: spec.width, height: spec.height } });
+        if (!dryRun) {
+            copy = comp.duplicate();
+            copy.name = spec.name;
+            copy.width = spec.width;
+            copy.height = spec.height;
+            created.push({ id: copy.id, name: spec.name, width: spec.width, height: spec.height });
+        }
+    }
+    var fingerprint = 'resize:' + comp.name + '#' + parts.join(',');
+    if (dryRun) {
+        return { dryRun: true, changes: changes, fingerprint: fingerprint };
+    }
+    return {
+        dryRun: false,
+        applied: created.length,
+        created: created,
+        changes: changes,
+        fingerprint: fingerprint
+    };
+});
+
 

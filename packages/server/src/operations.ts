@@ -521,6 +521,15 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(
+    operation('bulk.resize_comp', 'bulk', 'Batch resize a composition into several named formats.', {
+      schema: {
+        comp,
+        formats: { type: 'array' },
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(

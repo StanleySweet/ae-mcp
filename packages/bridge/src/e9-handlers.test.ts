@@ -1434,3 +1434,92 @@ describe('bulk.organize_items', () => {
     expect(applied.value?.fingerprint).toBe(planned.value?.fingerprint);
   });
 });
+
+describe('bulk.resize_comp', () => {
+  const formats = [
+    { name: 'Square', width: 1080, height: 1080 },
+    { name: 'Vertical', width: 1080, height: 1920 },
+  ];
+
+  it('previews every format without creating comps', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.resize_comp', { comp: 'Main', formats });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.dryRun).toBe(true);
+    expect(outcome.value?.changes).toEqual([
+      { from: 'Main', to: { name: 'Square', width: 1080, height: 1080 } },
+      { from: 'Main', to: { name: 'Vertical', width: 1080, height: 1920 } },
+    ]);
+    expect(ae.project.numItems).toBe(1);
+  });
+
+  it('creates one resized comp per format when applied', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.resize_comp', { comp: 'Main', formats, dryRun: false });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.applied).toBe(2);
+    expect(outcome.value?.created).toEqual([
+      { id: 1001, name: 'Square', width: 1080, height: 1080 },
+      { id: 1002, name: 'Vertical', width: 1080, height: 1920 },
+    ]);
+    expect(ae.project.numItems).toBe(3);
+    const square = ae.project.item(2) as MockCompItem;
+    expect(square.name).toBe('Square');
+    expect(square.width).toBe(1080);
+    expect(square.height).toBe(1080);
+    expect(square.numLayers).toBe(1);
+    expect(ae.project.item(1)?.name).toBe('Main');
+  });
+
+  it('requires formats', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.resize_comp', { comp: 'Main' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('rejects a format without a name', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.resize_comp', {
+      comp: 'Main',
+      formats: [{ width: 100, height: 100 }],
+    });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('rejects a format with an out-of-range width', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const outcome = invoke(ctx, 'bulk.resize_comp', {
+      comp: 'Main',
+      formats: [{ name: 'Bad', width: 0, height: 100 }],
+    });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('produces one fingerprint value for plan and apply on the same project', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+
+    const planned = invoke(ctx, 'bulk.resize_comp', { comp: 'Main', formats });
+    const applied = invoke(ctx, 'bulk.resize_comp', { comp: 'Main', formats, dryRun: false });
+
+    expect(applied.value?.fingerprint).toBe(planned.value?.fingerprint);
+  });
+});
