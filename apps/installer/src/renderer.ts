@@ -1,3 +1,4 @@
+import type { InstallerCheck } from '@ae-mcp/core';
 import { buildChecklist, type ChecklistRow } from './checklist.js';
 
 const STATUS_TEXT: Record<ChecklistRow['status'], string> = {
@@ -49,31 +50,46 @@ async function main(): Promise<void> {
   const installBtn = document.querySelector<HTMLButtonElement>('#install');
   const uninstallBtn = document.querySelector<HTMLButtonElement>('#uninstall');
   const progress = document.querySelector<HTMLElement>('#progress');
+  const quitPrompt = document.querySelector<HTMLElement>('#quit-prompt');
+  const retryBtn = document.querySelector<HTMLButtonElement>('#retry');
   if (!list) return;
 
   let environment = await window.installer.detect();
   renderChecklist(list, buildChecklist(environment));
 
-  const refresh = async (checks?: Parameters<typeof buildChecklist>[1]): Promise<void> => {
+  const refresh = async (checks: InstallerCheck[] = []): Promise<void> => {
     environment = await window.installer.detect();
     renderChecklist(list, buildChecklist(environment, checks));
+    if (quitPrompt) {
+      quitPrompt.hidden = !checks.some((check) => check.needsQuit === true);
+    }
   };
 
-  installBtn?.addEventListener('click', async () => {
-    if (!installBtn || !progress) return;
-    installBtn.disabled = true;
-    if (uninstallBtn) uninstallBtn.disabled = true;
-    progress.textContent = 'Installing...';
+  const runRepair = async (label: string): Promise<boolean> => {
+    if (!progress) return false;
+    progress.textContent = label;
     try {
       const result = await window.installer.repair();
       await refresh(result.checks);
       progress.textContent = result.ok ? 'Install complete' : 'Install finished with issues';
+      return result.ok;
     } catch {
       progress.textContent = 'Install failed';
-    } finally {
-      installBtn.disabled = false;
-      if (uninstallBtn) uninstallBtn.disabled = false;
+      return false;
     }
+  };
+
+  installBtn?.addEventListener('click', async () => {
+    if (!installBtn) return;
+    installBtn.disabled = true;
+    if (uninstallBtn) uninstallBtn.disabled = true;
+    await runRepair('Installing...');
+    installBtn.disabled = false;
+    if (uninstallBtn) uninstallBtn.disabled = false;
+  });
+
+  retryBtn?.addEventListener('click', () => {
+    void runRepair('Retrying...');
   });
 
   uninstallBtn?.addEventListener('click', async () => {
@@ -93,17 +109,8 @@ async function main(): Promise<void> {
     }
   });
 
-  window.addEventListener('installer:fix-row', async (event) => {
-    if (!progress) return;
-    const id = (event as CustomEvent<{ id?: string }>).detail?.id;
-    progress.textContent = `Repairing ${id}...`;
-    try {
-      const result = await window.installer.repair();
-      await refresh(result.checks);
-      progress.textContent = 'Repair complete';
-    } catch {
-      progress.textContent = 'Repair failed';
-    }
+  window.addEventListener('installer:fix-row', () => {
+    void runRepair('Repairing...');
   });
 }
 

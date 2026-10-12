@@ -37,6 +37,19 @@
         font-size: 0.9rem;
         opacity: 0.8;
       }
+      .quit-prompt {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        margin-top: 1rem;
+        padding: 0.75rem 1rem;
+        border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+        border-radius: 8px;
+        background: color-mix(in srgb, currentColor 6%, transparent);
+      }
+      .quit-prompt[hidden] {
+        display: none;
+      }
       .checklist {
         list-style: none;
         margin: 1.5rem 0;
@@ -70,6 +83,10 @@
         <button id="install" type="button">Install</button>
         <button id="uninstall" type="button">Uninstall</button>
         <span id="progress" class="progress" aria-live="polite"></span>
+      </div>
+      <div id="quit-prompt" class="quit-prompt" role="alert" hidden>
+        <span>After Effects is open. Quit it (&#8984;Q), then retry.</span>
+        <button id="retry" type="button">Retry</button>
       </div>
       <ul id="checklist" class="checklist"></ul>
     </main>

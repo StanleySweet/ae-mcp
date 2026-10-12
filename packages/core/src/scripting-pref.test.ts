@@ -6,6 +6,7 @@ import {
   aePrefsRoot,
   discoverPrefsDirs,
   enableScriptingPref,
+  ensureScriptingPref,
   findPrefsFile,
   readScriptingPref,
   SCRIPTING_PREF_KEY,
@@ -124,6 +125,50 @@ describe('enableScriptingPref', () => {
     const result = await enableScriptingPref({ prefsFile: join(dir, 'nope Prefs.txt') });
 
     expect(result.status).toBe('fail');
+    expect(result.fix).toBeTruthy();
+  });
+});
+
+describe('ensureScriptingPref', () => {
+  async function prefsRootWithFile(): Promise<string> {
+    const root = await tempDir('ae-mcp-prefs-');
+    const dir = join(root, '26.5');
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'Adobe After Effects 26.5 Prefs.txt'), PREFS);
+    return root;
+  }
+
+  it('asks to quit After Effects when it is running', async () => {
+    const result = await ensureScriptingPref({
+      appName: 'Adobe After Effects 2026',
+      prefsRoot: await prefsRootWithFile(),
+      isRunning: async () => true,
+    });
+
+    expect(result).toMatchObject({ check: 'scripting_pref', status: 'fail', needsQuit: true });
+  });
+
+  it('enables the pref once After Effects is quit', async () => {
+    const root = await prefsRootWithFile();
+
+    const result = await ensureScriptingPref({
+      appName: 'Adobe After Effects 2026',
+      prefsRoot: root,
+      isRunning: async () => false,
+    });
+
+    expect(result).toMatchObject({ check: 'scripting_pref', status: 'ok' });
+    expect(readScriptingPref(await readFile(join(root, '26.5', 'Adobe After Effects 26.5 Prefs.txt'), 'utf8'))).toBe(1);
+  });
+
+  it('reports a fix when no AE prefs folder exists', async () => {
+    const result = await ensureScriptingPref({
+      appName: 'Adobe After Effects 2026',
+      prefsRoot: await tempDir('ae-mcp-prefs-'),
+      isRunning: async () => false,
+    });
+
+    expect(result).toMatchObject({ check: 'scripting_pref', status: 'fail' });
     expect(result.fix).toBeTruthy();
   });
 });

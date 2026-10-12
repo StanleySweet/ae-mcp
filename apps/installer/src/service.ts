@@ -1,9 +1,11 @@
 import {
   detectEnvironment,
+  ensureScriptingPref,
   repairAeMcp,
   uninstallAeMcp,
   type AEInstall,
   type DetectEnvironmentOptions,
+  type IsRunning,
   type RepairResult,
   type UninstallResult,
 } from '@ae-mcp/core';
@@ -18,6 +20,10 @@ export interface InstallerServiceOptions {
   loader: string;
   environment?: DetectEnvironmentOptions;
   fileName?: string;
+  /** AE prefs root; defaults to `aePrefsRoot()`. Injectable for tests. */
+  prefsRoot?: string;
+  /** AE-running probe; injectable for tests. */
+  isRunning?: IsRunning;
 }
 
 export type InstallerService = InstallerApi;
@@ -49,13 +55,20 @@ export function createInstallerService(options: InstallerServiceOptions): Instal
           ],
         };
       }
-      return repairAeMcp({
+      const result = await repairAeMcp({
         root: options.root,
         install: resolved,
         payload: options.payload,
         loader: options.loader,
         fileName: options.fileName,
       });
+      const scriptingPref = await ensureScriptingPref({
+        appName: resolved.appName,
+        prefsRoot: options.prefsRoot,
+        isRunning: options.isRunning,
+      });
+      const checks = [...result.checks, scriptingPref];
+      return { ok: checks.every((check) => check.status === 'ok'), checks };
     },
     uninstall: async (install?: AEInstall): Promise<UninstallResult> => {
       const resolved = await resolve(install);

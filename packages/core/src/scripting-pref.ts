@@ -1,6 +1,7 @@
 import { copyFile, readFile, readdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { isAfterEffectsRunning, type IsRunning } from './ae-process.js';
 import type { InstallerCheck } from './install-payload.js';
 
 export const SCRIPTING_PREF_KEY = 'Pref_SCRIPTING_FILE_NETWORK_SECURITY';
@@ -169,4 +170,51 @@ export async function enableScriptingPref(
     };
   }
   return { check: 'scripting_pref', status: 'ok', changed: true, value: 1, backup };
+}
+
+export interface EnsureScriptingPrefOptions {
+  /** AE application name, e.g. `Adobe After Effects 2026`. */
+  appName: string;
+  /** AE prefs root; defaults to `aePrefsRoot()`. */
+  prefsRoot?: string;
+  /** AE-running probe; defaults to `isAfterEffectsRunning`. Injectable for tests. */
+  isRunning?: IsRunning;
+}
+
+/**
+ * Enables the scripting preference for the newest AE prefs folder, refusing
+ * while AE is running (it rewrites prefs on quit). Returns a `scripting_pref`
+ * row; the row carries `needsQuit: true` when AE must be quit and retried.
+ * Never throws.
+ */
+export async function ensureScriptingPref(
+  options: EnsureScriptingPrefOptions,
+): Promise<InstallerCheck> {
+  const dirs = await discoverPrefsDirs(options.prefsRoot ?? aePrefsRoot());
+  const newest = dirs[0];
+  if (newest === undefined) {
+    return {
+      check: 'scripting_pref',
+      status: 'fail',
+      fix: 'Open After Effects once so it writes its preferences, then run Setup again.',
+    };
+  }
+  const isRunning = options.isRunning ?? isAfterEffectsRunning;
+  if (await isRunning(options.appName)) {
+    return {
+      check: 'scripting_pref',
+      status: 'fail',
+      needsQuit: true,
+      fix: 'Quit After Effects (Cmd+Q), then click Retry.',
+    };
+  }
+  const prefsFile = await findPrefsFile(newest.dir);
+  if (prefsFile === null) {
+    return {
+      check: 'scripting_pref',
+      status: 'fail',
+      fix: 'Open After Effects once so it writes its preferences, then run Setup again.',
+    };
+  }
+  return enableScriptingPref({ prefsFile });
 }

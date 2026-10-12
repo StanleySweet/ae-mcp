@@ -8,6 +8,8 @@ export interface InstallerCheck {
   check: string;
   status: InstallStatus;
   fix?: string;
+  /** Set when the step needs After Effects quit before it can run (E10-12). */
+  needsQuit?: boolean;
 }
 
 export interface InstallPayloadOptions {

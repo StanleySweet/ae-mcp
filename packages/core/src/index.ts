@@ -33,6 +33,7 @@ export {
   aePrefsRoot,
   discoverPrefsDirs,
   enableScriptingPref,
+  ensureScriptingPref,
   findPrefsFile,
   readScriptingPref,
   setScriptingPref,
@@ -41,8 +42,11 @@ export type {
   AEPrefsDir,
   EnableScriptingPrefOptions,
   EnableScriptingPrefResult,
+  EnsureScriptingPrefOptions,
   ScriptingPrefEdit,
 } from './scripting-pref.js';
+export { isAfterEffectsRunning } from './ae-process.js';
+export type { IsRunning } from './ae-process.js';
 export { claudeOpenArgs, handMcpbToClaude, openWithClaude } from './install-mcpb.js';
 export type { HandMcpbOptions, HandMcpbResult, OpenWithClaude } from './install-mcpb.js';
 export { TEST_COMP_NAME, isHeartbeatFresh, runLiveTest } from './live-test.js';

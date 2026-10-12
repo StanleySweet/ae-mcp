@@ -1,12 +1,13 @@
-import { mkdir, mkdtemp, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AEInstall } from '@ae-mcp/core';
 import { describe, expect, it } from 'vitest';
-import { createInstallerService } from './service.js';
+import { createInstallerService, type InstallerServiceOptions } from './service.js';
 
 const PAYLOAD = 'var AEMCP_BRIDGE_VERSION = "1.0.0";';
 const LOADER = 'var AEMCP_LOADER = true;';
+const PREFS = '[Main Pref Section v2]\n"Pref_SCRIPTING_FILE_NETWORK_SECURITY" = "0"\n';
 
 async function createApp(applicationsDir: string, year = 2026): Promise<AEInstall> {
   const appName = `Adobe After Effects ${year}`;
@@ -17,6 +18,21 @@ async function createApp(applicationsDir: string, year = 2026): Promise<AEInstal
 
 async function fakeInstall(): Promise<AEInstall> {
   return createApp(await mkdtemp(join(tmpdir(), 'ae-mcp-apps-')));
+}
+
+/** A prefs root holding one AE version folder with a Prefs.txt. */
+async function fakePrefsRoot(): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), 'ae-mcp-prefs-'));
+  const dir = join(root, '26.5');
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, 'Adobe After Effects 26.5 Prefs.txt'), PREFS);
+  return root;
+}
+
+function service(
+  options: InstallerServiceOptions,
+): ReturnType<typeof createInstallerService> {
+  return createInstallerService(options);
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -49,11 +65,40 @@ describe('createInstallerService', () => {
     const root = await mkdtemp(join(tmpdir(), 'ae-mcp-home-'));
     const install = await fakeInstall();
 
-    const service = createInstallerService({ root, payload: PAYLOAD, loader: LOADER });
+    const result = await service({
+      root,
+      payload: PAYLOAD,
+      loader: LOADER,
+      prefsRoot: await fakePrefsRoot(),
+      isRunning: async () => false,
+    }).repair(install);
 
-    const result = await service.repair(install);
     expect(result.ok).toBe(true);
+    expect(result.checks.map((check) => check.check)).toEqual([
+      'bridge_payload',
+      'bridge_loader',
+      'scripting_pref',
+    ]);
     expect(await exists(join(root, 'bridge', 'current.jsx'))).toBe(true);
+  });
+
+  it('asks to quit After Effects when the pref step needs it', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ae-mcp-home-'));
+    const install = await fakeInstall();
+
+    const result = await service({
+      root,
+      payload: PAYLOAD,
+      loader: LOADER,
+      prefsRoot: await fakePrefsRoot(),
+      isRunning: async () => true,
+    }).repair(install);
+
+    expect(result.ok).toBe(false);
+    expect(result.checks.find((check) => check.check === 'scripting_pref')).toMatchObject({
+      status: 'fail',
+      needsQuit: true,
+    });
   });
 
   it('fails repair when no After Effects is found', async () => {
@@ -75,7 +120,13 @@ describe('createInstallerService', () => {
     const root = await mkdtemp(join(tmpdir(), 'ae-mcp-home-'));
     const install = await fakeInstall();
 
-    const service = createInstallerService({ root, payload: PAYLOAD, loader: LOADER });
+    const service = createInstallerService({
+      root,
+      payload: PAYLOAD,
+      loader: LOADER,
+      prefsRoot: await fakePrefsRoot(),
+      isRunning: async () => false,
+    });
     await service.repair(install);
 
     const result = await service.uninstall(install);
