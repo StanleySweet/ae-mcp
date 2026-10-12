@@ -18,11 +18,20 @@ export function renderChecklist(list: HTMLElement, rows: ChecklistRow[]): void {
       label.className = 'row__label';
       label.textContent = row.label;
 
-      const status = document.createElement('span');
-      status.className = 'row__status';
-      status.textContent = STATUS_TEXT[row.status];
+      const statusEl = document.createElement('button');
+      statusEl.className = 'row__status';
+      statusEl.textContent = STATUS_TEXT[row.status];
+      statusEl.type = 'button';
+      if (row.status !== 'fail') {
+        statusEl.disabled = true;
+      }
+      statusEl.addEventListener('click', () => {
+        if (row.status === 'fail') {
+          window.dispatchEvent(new CustomEvent('installer:fix-row', { detail: { id: row.id } }));
+        }
+      });
 
-      item.append(label, status);
+      item.append(label, statusEl);
 
       if (row.fix) {
         const fix = document.createElement('p');
@@ -81,6 +90,21 @@ async function main(): Promise<void> {
     } finally {
       uninstallBtn.disabled = false;
       installBtn?.removeAttribute('disabled');
+    }
+  });
+
+  window.addEventListener('installer:fix-row', async (event) => {
+    if (!progress) return;
+    const id = (event as CustomEvent<{ id: string }>).detail?.id;
+    progress.textContent = `Repairing ${id}...`;
+    try {
+      const result = await window.installer.repair();
+      environment = await window.installer.detect();
+      rows = buildChecklist(environment, result.checks);
+      renderChecklist(list, rows);
+      progress.textContent = 'Repair complete';
+    } catch (error) {
+      progress.textContent = 'Repair failed';
     }
   });
 }
