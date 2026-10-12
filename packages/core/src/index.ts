@@ -1,5 +1,13 @@
 export { MIN_SUPPORTED_AE_YEAR, discoverAEVersions } from './ae-discovery.js';
 export type { AEInstall } from './ae-discovery.js';
+export {
+  CLAUDE_APP_NAME,
+  claudeConfigDir,
+  discoverClaudeDesktop,
+} from './claude-discovery.js';
+export type { ClaudeDesktopInstall, DiscoverClaudeOptions } from './claude-discovery.js';
+export { detectEnvironment } from './environment.js';
+export type { DetectEnvironmentOptions, DetectedEnvironment } from './environment.js';
 export { discoverAerender, discoverAerenders } from './aerender-discovery.js';
 export type { AerenderInstall } from './aerender-discovery.js';
 export { parseAerenderLine } from './aerender-progress.js';
