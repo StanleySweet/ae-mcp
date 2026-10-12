@@ -1777,6 +1777,134 @@ AEMCP.register('command.execute', function (args) {
     return { success: true, commandId: id };
 });
 
+// Bulk operation handlers (previewed edits; run via ae_do, or planned and
+// applied via ae_plan/ae_apply). Every bulk handler honours `dryRun`, which
+// defaults to true, and returns a `fingerprint` of its targets so the server
+// can refuse a stale plan.
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layer.html
+
+// Replace every literal occurrence without relying on a global RegExp.
+function aemcpReplaceAll(text, find, replacement) {
+    if (find === '') {
+        return text;
+    }
+    return text.split(find).join(replacement);
+}
+
+function aemcpPadNumber(value, width) {
+    var text = '' + value;
+    while (text.length < width) {
+        text = '0' + text;
+    }
+    return text;
+}
+
+// The new name for one layer, or the old name when nothing matches. `position`
+// is the layer's 0-based place among the targets, used for numbering.
+function aemcpRenamedLayerName(base, spec, position) {
+    var out = base;
+    if (typeof spec.match === 'string' && spec.match !== '') {
+        if (spec.regex) {
+            out = out.replace(new RegExp(spec.match, spec.flags), spec.replace);
+        } else {
+            out = aemcpReplaceAll(out, spec.match, spec.replace);
+        }
+    }
+    if (spec.prefix) {
+        out = spec.prefix + out;
+    }
+    if (spec.suffix) {
+        out = out + spec.suffix;
+    }
+    if (spec.numbering) {
+        var start = typeof spec.numbering.start === 'number' ? spec.numbering.start : 1;
+        var step = typeof spec.numbering.step === 'number' ? spec.numbering.step : 1;
+        var padding = typeof spec.numbering.padding === 'number' ? spec.numbering.padding : 0;
+        var label = aemcpPadNumber(start + position * step, padding);
+        if (spec.numbering.position === 'prefix') {
+            out = label + out;
+        } else {
+            out = out + label;
+        }
+    }
+    return out;
+}
+
+// Fingerprint of the target layers: it changes when a target is renamed,
+// removed or reordered, so a plan made against the old names is refused.
+function aemcpBulkFingerprint(compName, indices, names) {
+    var parts = [];
+    var i;
+    for (i = 0; i < indices.length; i++) {
+        parts.push(indices[i] + '=' + names[i]);
+    }
+    return compName + '#' + indices.length + ':' + parts.join(',');
+}
+
+AEMCP.register('bulk.rename', function (args) {
+    var comp = aemcpResolveComp(args ? args.comp : null);
+    if (!comp) {
+        if (!args || args.comp === undefined || args.comp === null || args.comp === '') {
+            aemcpAbortArgs('no active composition');
+        }
+        aemcpAbortArgs('composition not found: ' + args.comp);
+    }
+    var indices = aemcpLayerIndices(args, comp);
+    var hasMatch = args && typeof args.match === 'string' && args.match !== '';
+    var hasPrefix = args && typeof args.prefix === 'string' && args.prefix !== '';
+    var hasSuffix = args && typeof args.suffix === 'string' && args.suffix !== '';
+    var hasNumbering = args && args.numbering !== undefined && args.numbering !== null;
+    if (!hasMatch && !hasPrefix && !hasSuffix && !hasNumbering) {
+        aemcpAbortArgs('provide one of match, prefix, suffix or numbering');
+    }
+    if (hasNumbering && typeof args.numbering !== 'object') {
+        aemcpAbortArgs('numbering must be an object');
+    }
+    var spec = {
+        match: hasMatch ? args.match : null,
+        replace: args && typeof args.replace === 'string' ? args.replace : '',
+        regex: args && args.regex === true,
+        flags: args && typeof args.flags === 'string' ? args.flags : '',
+        prefix: hasPrefix ? args.prefix : '',
+        suffix: hasSuffix ? args.suffix : '',
+        numbering: hasNumbering ? args.numbering : null
+    };
+    if (spec.regex && typeof spec.match === 'string') {
+        try {
+            new RegExp(spec.match, spec.flags);
+        } catch (err) {
+            aemcpAbortArgs('invalid regular expression: ' + String(err));
+        }
+    }
+    var names = [];
+    var changes = [];
+    var dryRun = !(args && args.dryRun === false);
+    var i, layer, from, to;
+    for (i = 0; i < indices.length; i++) {
+        layer = comp.layer(indices[i]);
+        from = layer.name;
+        to = aemcpRenamedLayerName(from, spec, i);
+        names.push(from);
+        if (to !== from) {
+            changes.push({ index: indices[i], from: from, to: to });
+        }
+    }
+    var fingerprint = aemcpBulkFingerprint(comp.name, indices, names);
+    if (dryRun) {
+        return { dryRun: true, comp: comp.name, changes: changes, fingerprint: fingerprint };
+    }
+    for (i = 0; i < changes.length; i++) {
+        comp.layer(changes[i].index).name = changes[i].to;
+    }
+    return {
+        dryRun: false,
+        comp: comp.name,
+        applied: changes.length,
+        changes: changes,
+        fingerprint: fingerprint
+    };
+});
+
 
 
 

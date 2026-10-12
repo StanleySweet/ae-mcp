@@ -388,6 +388,24 @@ export function defaultOperationRegistry(): OperationRegistry {
     schema: { id: { type: 'number' }, name: comp },
   }));
 
+  // Bulk (previewed edits; every bulk op honours `dryRun`, defaulting to true).
+  register(
+    operation('bulk.rename', 'bulk', 'Rename layers of a composition by pattern, regex or numbering.', {
+      schema: {
+        comp,
+        layers: { type: 'array' },
+        match: { type: 'string' },
+        replace: { type: 'string' },
+        regex: { type: 'boolean' },
+        flags: { type: 'string' },
+        prefix: { type: 'string' },
+        suffix: { type: 'string' },
+        numbering: { type: 'object' },
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
+
   // Batch (container; the E13 guard checks its sub-operations).
   register(
     operation('batch.run', 'batch', 'Run many operations as one undo group.', {

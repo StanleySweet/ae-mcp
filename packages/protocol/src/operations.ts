@@ -17,6 +17,7 @@ export const operationCategories = [
   'render',
   'font',
   'command',
+  'bulk',
   'batch',
   'eval',
 ] as const;

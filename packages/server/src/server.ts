@@ -21,6 +21,7 @@ import {
   type OperationRegistry,
 } from './operations.js';
 import { selectTransport, type Runner } from './osascript-transport.js';
+import { PlanStore } from './plans.js';
 import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
 import { cleanupPartialOutput } from './render-output.js';
 import { loadSettings, type Settings } from './settings.js';
@@ -46,6 +47,14 @@ export interface ServerOptions {
   spawnAerender?: SpawnAerender;
   /** Background job registry; a fresh one is created when omitted. */
   jobStore?: JobStore;
+  /** Plan registry for previewed bulk edits; a fresh one is created when omitted. */
+  planStore?: PlanStore<BulkStep>;
+}
+
+/** One operation invocation stored in a previewed bulk plan. */
+export interface BulkStep {
+  op: string;
+  args: Record<string, unknown>;
 }
 
 type ToolContent =
@@ -135,6 +144,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
   };
 
   const jobStore = options.jobStore ?? new JobStore();
+  const planStore = options.planStore ?? new PlanStore<BulkStep>();
 
   /** Running render jobs, keyed by job id, so they can be cancelled. */
   const runs = new Map<string, { cancel: () => void; done: Promise<void> }>();
@@ -601,6 +611,109 @@ export function createServer(options: ServerOptions = {}): McpServer {
         result: result.result,
         context: selection.ok ? selection.result : null,
       });
+    },
+  );
+
+  server.registerTool(
+    'ae_plan',
+    {
+      description:
+        'Preview a bulk operation (an ae_catalog operation in the "bulk" category) and register it as a plan without changing the project. Returns {planId, changes}. Apply it with ae_apply.',
+      inputSchema: {
+        op: z.string(),
+        args: z.record(z.string(), z.unknown()).optional(),
+      },
+    },
+    async (toolArgs) => {
+      const definition = operations.get(toolArgs.op);
+      if (definition === undefined) {
+        const suggestions = closestNames(operations.names(), toolArgs.op);
+        const suffix = suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : '';
+        return text(makeError('UNKNOWN_TOOL', `unknown operation '${toolArgs.op}'.${suffix}`), true);
+      }
+      if (definition.category !== 'bulk') {
+        return text(
+          makeError('INVALID_ARGS', `operation '${toolArgs.op}' is not a bulk operation`),
+          true,
+        );
+      }
+      const validation = validateOperationArgs(definition.schema, toolArgs.args);
+      if (!validation.ok) {
+        return text(makeError('INVALID_ARGS', validation.message), true);
+      }
+      const settings = await getSettings();
+      if (!isPermitted(definition, settings)) {
+        return text(
+          makeError('FORBIDDEN', `operation '${toolArgs.op}' is not permitted by the current policy`),
+          true,
+        );
+      }
+      const dry = await callRaw(definition.name, { ...validation.args, dryRun: true });
+      if (!dry.ok) {
+        return toResult(dry);
+      }
+      const value = dry.result as { changes?: unknown[]; fingerprint?: unknown } | null;
+      if (typeof value?.fingerprint !== 'string') {
+        return text(
+          makeError('SCRIPT_ERROR', `operation '${toolArgs.op}' did not return a plan fingerprint`),
+          true,
+        );
+      }
+      const planId = planStore.create(
+        [{ op: definition.name, args: validation.args }],
+        value.fingerprint,
+      );
+      return text({ planId, changes: value.changes ?? [] });
+    },
+  );
+
+  server.registerTool(
+    'ae_apply',
+    {
+      description:
+        'Apply a bulk plan registered by ae_plan, running the planned operation as one undo group. Refuses a plan that has expired or was made before the project changed.',
+      inputSchema: {
+        planId: z.string(),
+      },
+    },
+    async (toolArgs) => {
+      const peeked = planStore.peek(toolArgs.planId);
+      if (peeked === undefined) {
+        return text(makeError('UNKNOWN_PLAN', `no plan with id '${toolArgs.planId}'`), true);
+      }
+      const step = peeked.steps[0];
+      if (step === undefined) {
+        return text(makeError('SCRIPT_ERROR', `plan '${toolArgs.planId}' has no steps`), true);
+      }
+      if (operations.get(step.op) === undefined) {
+        return text(
+          makeError('UNKNOWN_TOOL', `plan references unknown operation '${step.op}'`),
+          true,
+        );
+      }
+      const dry = await callRaw(step.op, { ...step.args, dryRun: true });
+      if (!dry.ok) {
+        return toResult(dry);
+      }
+      const current = (dry.result as { fingerprint?: unknown } | null)?.fingerprint;
+      const taken = planStore.take(toolArgs.planId, typeof current === 'string' ? current : '');
+      if (!taken.ok) {
+        if (taken.reason === 'expired') {
+          return text(makeError('PLAN_EXPIRED', `plan '${toolArgs.planId}' has expired`), true);
+        }
+        if (taken.reason === 'changed') {
+          return text(
+            makeError('PLAN_CHANGED', 'the project changed since the plan was made'),
+            true,
+          );
+        }
+        return text(makeError('UNKNOWN_PLAN', `no plan with id '${toolArgs.planId}'`), true);
+      }
+      const result = await callRaw(step.op, { ...step.args, dryRun: false });
+      if (!result.ok) {
+        return toResult(result);
+      }
+      return text({ planId: toolArgs.planId, op: step.op, result: result.result });
     },
   );
 

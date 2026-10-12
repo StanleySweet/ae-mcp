@@ -469,7 +469,7 @@ Sources: kumo = [kumoproductions/mcp-aftereffects](https://github.com/kumoproduc
 | batch            | run (many ops, one undo step)                        | kumo |
 | eval             | run (arbitrary ExtendScript, off by default)         | both |
 
-**Top-level MCP tools:** `check_setup`, `ae_context`, `ae_project_info`, `ae_comp_info`, `ae_layer_info`, `ae_version_info`, `get_selection`, `find`, `ae_catalog`, `ae_do`, `ae_render_frame`, `ae_render`, `job_status`, `job_cancel`, `ae_save_project`, plus the bulk tools from E9.
+**Top-level MCP tools:** `check_setup`, `ae_context`, `ae_project_info`, `ae_comp_info`, `ae_layer_info`, `ae_version_info`, `get_selection`, `find`, `ae_catalog`, `ae_do`, `ae_render_frame`, `ae_render`, `job_status`, `job_cancel`, `ae_save_project`, plus the bulk tools from E9 (`ae_plan` and `ae_apply`, which preview and apply any `bulk` operation).
 
 Added in v1.1: `project.increment_save` (E13); `thirdparty.apply_preset`, `thirdparty.search`, `ease.preset`, `anchor.move_preserving`, `expression.snippet` and `rig.null_controller` (E14). All operations flagged destructive go through the E13 guard.
 

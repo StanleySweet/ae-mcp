@@ -25,7 +25,7 @@ describe('PlanStore', () => {
     const result = store.get(planId, 'fp1');
     expect(result).toEqual({
       ok: true,
-      plan: { planId, fingerprint: 'fp1', changes: ['rename layer 1'], createdAt: 1_000 },
+      plan: { planId, fingerprint: 'fp1', steps: ['rename layer 1'], createdAt: 1_000 },
     });
   });
 
@@ -82,24 +82,34 @@ describe('PlanStore', () => {
     expect(store.get(third, 'fp1').ok).toBe(true);
   });
 
-  it('hands out copies so callers cannot mutate stored changes', () => {
+  it('hands out copies so callers cannot mutate stored steps', () => {
     const { store } = clocked();
     const planId = store.create(['x'], 'fp1');
     const result = store.get(planId, 'fp1');
     if (!result.ok) throw new Error('expected a plan');
-    result.plan.changes.push('injected');
+    result.plan.steps.push('injected');
     const again = store.get(planId, 'fp1');
     if (!again.ok) throw new Error('expected a plan');
-    expect(again.plan.changes).toEqual(['x']);
+    expect(again.plan.steps).toEqual(['x']);
   });
 
-  it('copies the input changes on create', () => {
+  it('copies the input steps on create', () => {
     const { store } = clocked();
-    const changes = ['x'];
-    const planId = store.create(changes, 'fp1');
-    changes.push('injected');
+    const steps = ['x'];
+    const planId = store.create(steps, 'fp1');
+    steps.push('injected');
     const result = store.get(planId, 'fp1');
     if (!result.ok) throw new Error('expected a plan');
-    expect(result.plan.changes).toEqual(['x']);
+    expect(result.plan.steps).toEqual(['x']);
+  });
+
+  it('peeks at a plan without the fingerprint, pruning expired ones', () => {
+    const { store, setNow } = clocked({ ttlMs: 100 });
+    const planId = store.create(['x'], 'fp1');
+    expect(store.peek(planId)?.steps).toEqual(['x']);
+    expect(store.peek('plan-nope')).toBeUndefined();
+
+    setNow(1_000 + 100);
+    expect(store.peek(planId)).toBeUndefined();
   });
 });

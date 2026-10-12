@@ -3,7 +3,7 @@ export type PlanFailure = 'unknown' | 'expired' | 'changed';
 export interface Plan<T = unknown> {
   planId: string;
   fingerprint: string;
-  changes: T[];
+  steps: T[];
   createdAt: number;
 }
 
@@ -38,17 +38,34 @@ export class PlanStore<T = unknown> {
   }
 
   /** Registers a previewed plan and returns its id. */
-  create(changes: T[], fingerprint: string): string {
+  create(steps: T[], fingerprint: string): string {
     this.sequence += 1;
     const planId = `plan-${this.sequence}`;
     this.plans.set(planId, {
       planId,
       fingerprint,
-      changes: [...changes],
+      steps: [...steps],
       createdAt: this.now(),
     });
     this.prune();
     return planId;
+  }
+
+  /**
+   * Looks up a plan's payload without checking the fingerprint, so a caller can
+   * read the target operation before computing the current fingerprint. Expired
+   * plans are pruned and reported as absent.
+   */
+  peek(planId: string): Plan<T> | undefined {
+    const plan = this.plans.get(planId);
+    if (plan === undefined) {
+      return undefined;
+    }
+    if (this.isExpired(plan)) {
+      this.plans.delete(planId);
+      return undefined;
+    }
+    return clone(plan);
   }
 
   /** Number of live (unexpired) plans; expired entries are pruned first. */
@@ -102,5 +119,5 @@ export class PlanStore<T = unknown> {
 }
 
 function clone<T>(plan: Plan<T>): Plan<T> {
-  return { ...plan, changes: [...plan.changes] };
+  return { ...plan, steps: [...plan.steps] };
 }

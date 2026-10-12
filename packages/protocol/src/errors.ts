@@ -12,6 +12,9 @@ export const errorCodes = [
   'TIMEOUT',
   'UNKNOWN_JOB',
   'AERENDER_NOT_FOUND',
+  'UNKNOWN_PLAN',
+  'PLAN_EXPIRED',
+  'PLAN_CHANGED',
 ] as const;
 
 export type ErrorCode = (typeof errorCodes)[number];
@@ -30,6 +33,9 @@ export const errorHints: Record<ErrorCode, string> = {
   TIMEOUT: 'The job exceeded its deadline and was cancelled.',
   UNKNOWN_JOB: 'Poll job_status with the id returned when the job started.',
   AERENDER_NOT_FOUND: 'Install After Effects so its aerender executable is available.',
+  UNKNOWN_PLAN: 'Call ae_plan again to preview the change and get a fresh planId.',
+  PLAN_EXPIRED: 'Plans expire after 10 minutes; call ae_plan again and apply right away.',
+  PLAN_CHANGED: 'The project changed since the plan was made; call ae_plan again to re-preview.',
 };
 
 export function makeError(
