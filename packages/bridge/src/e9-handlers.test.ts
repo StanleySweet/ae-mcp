@@ -1217,3 +1217,66 @@ describe('project.report_usage', () => {
     expect(outcome.value?.counts).toEqual({ items: 2, unused: 1, missing: 0 });
   });
 });
+
+describe('bulk.remove_unused', () => {
+  it('reports the unused items without removing them by default', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+    const unused = addFootage(ae, 50, 'unused.mov');
+
+    const outcome = invoke(ctx, 'bulk.remove_unused', {});
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.dryRun).toBe(true);
+    expect(outcome.value?.changes).toEqual([
+      { id: unused.id, name: 'unused.mov', type: 'Footage' },
+    ]);
+    expect(ae.project.numItems).toBe(2);
+  });
+
+  it('removes only the unused items when applied', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer']);
+    const used = addFootage(ae, 60, 'clip.mov');
+    placeFootage(comp, used);
+    const unused = addFootage(ae, 50, 'unused.mov');
+    ae.project.add(new MockFolderItem(70, 'Folder'));
+
+    const outcome = invoke(ctx, 'bulk.remove_unused', { dryRun: false });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.dryRun).toBe(false);
+    expect(outcome.value?.removed).toBe(1);
+    expect(outcome.value?.changes).toEqual([
+      { id: unused.id, name: 'unused.mov', type: 'Footage' },
+    ]);
+    expect(ae.project.numItems).toBe(3);
+    expect(ae.project.item(2)?.name).toBe('clip.mov');
+    expect(ae.project.item(3)?.name).toBe('Folder');
+  });
+
+  it('reports no changes when every item is used', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer']);
+    const used = addFootage(ae, 50, 'clip.mov');
+    placeFootage(comp, used);
+
+    const outcome = invoke(ctx, 'bulk.remove_unused', {});
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.changes).toEqual([]);
+    expect(outcome.value?.fingerprint).toBe('remove-unused:#0');
+    expect(ae.project.numItems).toBe(2);
+  });
+
+  it('produces one fingerprint value for plan and apply on the same project', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer']);
+    addFootage(ae, 50, 'unused.mov');
+
+    const planned = invoke(ctx, 'bulk.remove_unused', {});
+    const applied = invoke(ctx, 'bulk.remove_unused', { dryRun: false });
+
+    expect(applied.value?.fingerprint).toBe(planned.value?.fingerprint);
+  });
+});

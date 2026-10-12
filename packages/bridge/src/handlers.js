@@ -2516,4 +2516,46 @@ AEMCP.register('bulk.set_label', function (args) {
     };
 });
 
+// Remove every item that no composition uses (reusing the report from
+// E9-8). Comps and folders are never removed. Deleting goes right-to-left so
+// earlier item indices stay valid as the project shrinks.
+// Ref: https://ae-scripting.docsforadobe.dev/item/item/#itemremove
+AEMCP.register('bulk.remove_unused', function (args) {
+    var project = app.project;
+    var dryRun = !(args && args.dryRun === false);
+    var unused = aemcpUnusedItems(project);
+    var byId = {};
+    var ids = [];
+    var i, u, item;
+    for (u = 0; u < unused.length; u++) {
+        byId[unused[u].id] = unused[u];
+        ids.push(unused[u].id);
+    }
+    ids.sort(function (a, b) { return a - b; });
+    var changes = [];
+    for (i = project.numItems; i >= 1; i--) {
+        item = project.item(i);
+        if (byId[item.id]) {
+            changes.push({ id: item.id, name: item.name, type: byId[item.id].type });
+            if (!dryRun) {
+                item.remove();
+            }
+        }
+    }
+    var fingerprint = 'remove-unused:' + ids.join(',') + '#' + unused.length;
+    if (dryRun) {
+        return {
+            dryRun: true,
+            changes: changes,
+            fingerprint: fingerprint
+        };
+    }
+    return {
+        dryRun: false,
+        removed: changes.length,
+        changes: changes,
+        fingerprint: fingerprint
+    };
+});
+
 

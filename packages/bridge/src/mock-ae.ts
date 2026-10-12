@@ -135,6 +135,10 @@ export class MockItem {
     readonly id: number,
     public name: string,
   ) {}
+
+  remove(): void {
+    this.project?.removeItem(this);
+  }
 }
 
 export class MockFolderItem extends MockItem {
@@ -690,6 +694,20 @@ export class MockProject {
     parent.add(item);
     this.all.push(item);
     return item;
+  }
+
+  removeItem(item: MockItem): void {
+    const index = this.all.indexOf(item);
+    if (index >= 0) {
+      this.all.splice(index, 1);
+    }
+    if (item.parentFolder && item.parentFolder.items) {
+      const folderIndex = item.parentFolder.items.indexOf(item);
+      if (folderIndex >= 0) {
+        item.parentFolder.items.splice(folderIndex, 1);
+      }
+    }
+    item.project = null;
   }
 }
 

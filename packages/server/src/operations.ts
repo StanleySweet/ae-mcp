@@ -494,6 +494,14 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(
+    operation('bulk.remove_unused', 'bulk', 'Remove every item that no composition uses.', {
+      destructive: true,
+      schema: {
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(
