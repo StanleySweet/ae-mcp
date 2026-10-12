@@ -467,6 +467,19 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(
+    operation('bulk.stagger', 'bulk', 'Offset layer start times or keyframe times by a fixed or proportional step.', {
+      schema: {
+        comp,
+        layers: { type: 'array' },
+        target: { type: 'string' },
+        mode: { type: 'string' },
+        offset: { type: 'number' },
+        property: { type: 'string' },
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(

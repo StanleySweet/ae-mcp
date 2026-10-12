@@ -266,6 +266,25 @@ export class MockProperty {
     return this;
   }
 
+  setValueAtTime(time: number, value: unknown): void {
+    const existing = this.keys.find((entry) => entry.time === time);
+    if (existing) {
+      existing.value = value;
+      return;
+    }
+    const entry = { time, value };
+    const at = this.keys.findIndex((k) => k.time > time);
+    if (at === -1) {
+      this.keys.push(entry);
+    } else {
+      this.keys.splice(at, 0, entry);
+    }
+  }
+
+  removeKey(index: number): void {
+    this.keys.splice(index - 1, 1);
+  }
+
   setValue(value: unknown): void {
     this.value = value;
   }

@@ -826,3 +826,202 @@ describe('bulk.replace_text', () => {
     expect(outcome.issue?.message).toContain('Nope');
   });
 });
+
+function layerStartTime(comp: MockCompItem, index: number): number {
+  return (comp.layer(index) as MockLayer | null)?.startTime ?? 0;
+}
+
+function seedKeyedComp(
+  ae: MockAE,
+  id: number,
+  name: string,
+  layerCount: number,
+  times: number[],
+): MockCompItem {
+  const comp = new MockCompItem(id, name, 1920, 1080, 25, 10);
+  ae.project.add(comp);
+  ae.project.activeItem = comp;
+  for (let l = 0; l < layerCount; l += 1) {
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+    const position = new MockProperty('Position', 'ADBE Position', [0, 0]);
+    times.forEach((time) => position.key(time, [0, 0]));
+    transform.add(position);
+    layer.add(transform);
+    comp.addLayer(layer);
+  }
+  return comp;
+}
+
+function positionKeys(comp: MockCompItem, index: number): number[] {
+  const layer = comp.layer(index);
+  const group = layer?.property('ADBE Transform Group');
+  const prop = (group as MockPropertyGroup | null)?.property('ADBE Position') as MockProperty | null;
+  if (!prop) {
+    return [];
+  }
+  const out: number[] = [];
+  for (let k = 1; k <= prop.numKeys; k += 1) {
+    out.push(prop.keyTime(k));
+  }
+  return out;
+}
+
+describe('bulk.stagger', () => {
+  it('previews a proportional layer offset by default', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['A', 'B', 'C']);
+
+    const outcome = invoke(ctx, 'bulk.stagger', { comp: 'Main', offset: 1 });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({ dryRun: true, target: 'layers' });
+    expect(outcome.value?.changes).toEqual([
+      { comp: 'Main', index: 2, from: 0, to: 1 },
+      { comp: 'Main', index: 3, from: 0, to: 2 },
+    ]);
+    expect(typeof outcome.value?.fingerprint).toBe('string');
+    expect(layerStartTime(comp, 2)).toBe(0);
+  });
+
+  it('offsets layers proportionally when dryRun is false', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['A', 'B', 'C']);
+
+    const outcome = invoke(ctx, 'bulk.stagger', { comp: 'Main', offset: 2, dryRun: false });
+
+    expect(outcome.value).toMatchObject({ dryRun: false, applied: 2 });
+    expect(layerStartTime(comp, 1)).toBe(0);
+    expect(layerStartTime(comp, 2)).toBe(2);
+    expect(layerStartTime(comp, 3)).toBe(4);
+  });
+
+  it('offsets every layer by the same amount in fixed mode', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['A', 'B', 'C']);
+
+    const outcome = invoke(ctx, 'bulk.stagger', {
+      comp: 'Main',
+      offset: 0.5,
+      mode: 'fixed',
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ applied: 3 });
+    expect(layerStartTime(comp, 1)).toBe(0.5);
+    expect(layerStartTime(comp, 2)).toBe(0.5);
+    expect(layerStartTime(comp, 3)).toBe(0.5);
+  });
+
+  it('follows the order of the requested layers', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['A', 'B', 'C']);
+
+    const outcome = invoke(ctx, 'bulk.stagger', {
+      comp: 'Main',
+      layers: [3, 1],
+      offset: 1,
+      dryRun: false,
+    });
+
+    expect(outcome.value?.changes).toEqual([{ comp: 'Main', index: 1, from: 0, to: 1 }]);
+    expect(layerStartTime(comp, 1)).toBe(1);
+    expect(layerStartTime(comp, 3)).toBe(0);
+  });
+
+  it('previews a proportional keyframe offset', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedKeyedComp(ae, 1, 'Main', 2, [0, 1]);
+
+    const outcome = invoke(ctx, 'bulk.stagger', {
+      comp: 'Main',
+      target: 'keyframes',
+      property: 'Position',
+      offset: 0.5,
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({ dryRun: true, target: 'keyframes' });
+    expect(outcome.value?.changes).toEqual([
+      { comp: 'Main', index: 2, from: [0, 1], to: [0.5, 1.5] },
+    ]);
+  });
+
+  it('shifts the keyframes of each layer when dryRun is false', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedKeyedComp(ae, 1, 'Main', 2, [0, 1]);
+
+    const outcome = invoke(ctx, 'bulk.stagger', {
+      comp: 'Main',
+      target: 'keyframes',
+      property: 'Position',
+      offset: 0.5,
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ dryRun: false, applied: 1 });
+    expect(positionKeys(comp, 1)).toEqual([0, 1]);
+    expect(positionKeys(comp, 2)).toEqual([0.5, 1.5]);
+  });
+
+  it('skips layers without the keyframed property', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['A']);
+
+    const outcome = invoke(ctx, 'bulk.stagger', {
+      comp: 'Main',
+      target: 'keyframes',
+      property: 'Position',
+      offset: 1,
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.changes).toEqual([]);
+    expect(outcome.value?.skipped).toEqual([{ comp: 'Main', index: 1, reason: 'no property' }]);
+  });
+
+  it('skips a property that has no keyframes', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedPositionComp(ae, 1, 'Main', [[0, 0]]);
+
+    const outcome = invoke(ctx, 'bulk.stagger', {
+      comp: 'Main',
+      target: 'keyframes',
+      property: 'Position',
+      offset: 1,
+    });
+
+    expect(outcome.value?.changes).toEqual([]);
+    expect(outcome.value?.skipped).toEqual([{ comp: 'Main', index: 1, reason: 'no keyframes' }]);
+  });
+
+  it('requires a property when staggering keyframes', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedKeyedComp(ae, 1, 'Main', 1, [0]);
+
+    const outcome = invoke(ctx, 'bulk.stagger', { comp: 'Main', target: 'keyframes', offset: 1 });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('requires an offset', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['A']);
+
+    const outcome = invoke(ctx, 'bulk.stagger', { comp: 'Main' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('reports a composition that does not exist', async () => {
+    const { ctx } = await payloadContext();
+
+    const outcome = invoke(ctx, 'bulk.stagger', { comp: 'Nope', offset: 1 });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+    expect(outcome.issue?.message).toContain('Nope');
+  });
+});

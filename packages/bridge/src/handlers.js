@@ -2297,3 +2297,112 @@ AEMCP.register('bulk.replace_text', function (args) {
     };
 });
 
+// Offset the start time of the selected layers (or the keyframe times of a
+// property on them) by a fixed step, or a step that grows with the target's
+// position in the selection.
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerstarttime
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeytime
+AEMCP.register('bulk.stagger', function (args) {
+    var offset = args && typeof args.offset === 'number' ? args.offset : null;
+    if (offset === null || offset !== offset) {
+        aemcpAbortArgs('offset is required');
+    }
+    var target = args && typeof args.target === 'string' ? args.target : 'layers';
+    if (target !== 'layers' && target !== 'keyframes') {
+        aemcpAbortArgs('target must be layers or keyframes');
+    }
+    var mode = args && typeof args.mode === 'string' ? args.mode : 'proportional';
+    if (mode !== 'proportional' && mode !== 'fixed') {
+        aemcpAbortArgs('mode must be proportional or fixed');
+    }
+    var propertyName = null;
+    if (target === 'keyframes') {
+        propertyName = args && typeof args.property === 'string' ? args.property : '';
+        if (propertyName === '') {
+            aemcpAbortArgs('property is required when target is keyframes');
+        }
+    }
+    var comp = aemcpResolveComp(args ? args.comp : null);
+    if (!comp) {
+        if (!args || args.comp === undefined || args.comp === null || args.comp === '') {
+            aemcpAbortArgs('no active composition');
+        }
+        aemcpAbortArgs('composition not found: ' + args.comp);
+    }
+    var indices = aemcpLayerIndices(args, comp);
+    var dryRun = !(args && args.dryRun === false);
+    var changes = [];
+    var skipped = [];
+    var parts = [];
+    var i, layer, delta;
+    for (i = 0; i < indices.length; i++) {
+        layer = comp.layer(indices[i]);
+        delta = mode === 'fixed' ? offset : offset * i;
+        if (target === 'keyframes') {
+            var prop = aemcpResolveProperty(layer, propertyName);
+            if (!prop || typeof prop.numKeys !== 'number' || typeof prop.keyTime !== 'function') {
+                skipped.push({ comp: comp.name, index: indices[i], reason: 'no property' });
+                parts.push(comp.name + ':' + indices[i] + '=none');
+                continue;
+            }
+            var n = prop.numKeys;
+            if (n === 0) {
+                skipped.push({ comp: comp.name, index: indices[i], reason: 'no keyframes' });
+                parts.push(comp.name + ':' + indices[i] + '=0');
+                continue;
+            }
+            var fromTimes = [];
+            var values = [];
+            var toTimes = [];
+            var k;
+            for (k = 1; k <= n; k++) {
+                fromTimes.push(prop.keyTime(k));
+                values.push(prop.keyValue(k));
+            }
+            for (k = 0; k < fromTimes.length; k++) {
+                toTimes.push(fromTimes[k] + delta);
+            }
+            parts.push(comp.name + ':' + indices[i] + '=' + JSON.stringify(fromTimes));
+            if (JSON.stringify(toTimes) !== JSON.stringify(fromTimes)) {
+                changes.push({ comp: comp.name, index: indices[i], from: fromTimes, to: toTimes });
+                if (!dryRun) {
+                    for (k = n; k >= 1; k--) {
+                        prop.removeKey(k);
+                    }
+                    for (k = 0; k < toTimes.length; k++) {
+                        prop.setValueAtTime(toTimes[k], values[k]);
+                    }
+                }
+            }
+        } else {
+            var fromStart = layer.startTime;
+            var toStart = fromStart + delta;
+            parts.push(comp.name + ':' + indices[i] + '=' + fromStart);
+            if (toStart !== fromStart) {
+                changes.push({ comp: comp.name, index: indices[i], from: fromStart, to: toStart });
+                if (!dryRun) {
+                    layer.startTime = toStart;
+                }
+            }
+        }
+    }
+    var fingerprint = 'stagger:' + target + ':' + mode + ':' + offset + '#' + parts.join(',');
+    if (dryRun) {
+        return {
+            dryRun: true,
+            target: target,
+            changes: changes,
+            skipped: skipped,
+            fingerprint: fingerprint
+        };
+    }
+    return {
+        dryRun: false,
+        target: target,
+        applied: changes.length,
+        changes: changes,
+        skipped: skipped,
+        fingerprint: fingerprint
+    };
+});
+
