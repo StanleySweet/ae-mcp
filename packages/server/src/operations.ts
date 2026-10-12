@@ -480,6 +480,17 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(
+    operation('bulk.set_label', 'bulk', 'Set the label colour (0-16) on every selected layer.', {
+      schema: {
+        comp,
+        comps: { type: 'array' },
+        layers: { type: 'array' },
+        label: { type: 'number' },
+        dryRun: { type: 'boolean' },
+      },
+    }),
+  );
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(

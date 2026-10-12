@@ -75,6 +75,7 @@ const BRIDGE_OPS = [
   'bulk.apply_preset',
   'bulk.replace_text',
   'bulk.stagger',
+  'bulk.set_label',
   'batch.run',
 ];
 

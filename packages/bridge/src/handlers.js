@@ -2406,3 +2406,49 @@ AEMCP.register('bulk.stagger', function (args) {
     };
 });
 
+// Set the label colour on every selected layer.
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerlabel
+AEMCP.register('bulk.set_label', function (args) {
+    var label = args && typeof args.label === 'number' ? args.label : null;
+    if (label === null || label !== Math.floor(label) || label < 0 || label > 16) {
+        aemcpAbortArgs('label must be an integer from 0 to 16');
+    }
+    var comps = aemcpBulkComps(args);
+    var dryRun = !(args && args.dryRun === false);
+    var changes = [];
+    var parts = [];
+    var c, t;
+    for (c = 0; c < comps.length; c++) {
+        var comp = comps[c];
+        var indices = aemcpLayerIndices(args, comp);
+        for (t = 0; t < indices.length; t++) {
+            var layer = comp.layer(indices[t]);
+            var from = layer.label;
+            parts.push(comp.name + ':' + indices[t] + '=' + from);
+            if (from !== label) {
+                changes.push({ comp: comp.name, index: indices[t], from: from, to: label });
+                if (!dryRun) {
+                    layer.label = label;
+                }
+            }
+        }
+    }
+    var fingerprint = 'label:' + label + '#' + parts.join(',');
+    if (dryRun) {
+        return {
+            dryRun: true,
+            label: label,
+            changes: changes,
+            fingerprint: fingerprint
+        };
+    }
+    return {
+        dryRun: false,
+        label: label,
+        applied: changes.length,
+        changes: changes,
+        fingerprint: fingerprint
+    };
+});
+
+

@@ -1025,3 +1025,118 @@ describe('bulk.stagger', () => {
     expect(outcome.issue?.message).toContain('Nope');
   });
 });
+
+function labelAt(comp: MockCompItem, index: number): number {
+  return (comp.layer(index) as MockLayer | null)?.label ?? -1;
+}
+
+describe('bulk.set_label', () => {
+  it('previews the label change by default and leaves the layers untouched', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer 1', 'Layer 2']);
+
+    const outcome = invoke(ctx, 'bulk.set_label', { comp: 'Main', label: 5 });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({ dryRun: true, label: 5 });
+    expect(outcome.value?.changes).toEqual([
+      { comp: 'Main', index: 1, from: 0, to: 5 },
+      { comp: 'Main', index: 2, from: 0, to: 5 },
+    ]);
+    expect(typeof outcome.value?.fingerprint).toBe('string');
+    expect(labelAt(comp, 1)).toBe(0);
+    expect(labelAt(comp, 2)).toBe(0);
+  });
+
+  it('sets the label when dryRun is false', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer 1', 'Layer 2']);
+
+    const outcome = invoke(ctx, 'bulk.set_label', { comp: 'Main', label: 3, dryRun: false });
+
+    expect(outcome.value).toMatchObject({ dryRun: false, applied: 2 });
+    expect(labelAt(comp, 1)).toBe(3);
+    expect(labelAt(comp, 2)).toBe(3);
+  });
+
+  it('accepts label 0 (none) and omits layers that already have it', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer 1', 'Layer 2']);
+    invoke(ctx, 'bulk.set_label', { comp: 'Main', layers: [1], label: 9, dryRun: false });
+
+    const outcome = invoke(ctx, 'bulk.set_label', { comp: 'Main', label: 9, dryRun: false });
+
+    expect(outcome.value).toMatchObject({ applied: 1 });
+    expect(outcome.value?.changes).toEqual([{ comp: 'Main', index: 2, from: 0, to: 9 }]);
+  });
+
+  it('sets the label across several comps', async () => {
+    const { ctx, ae } = await payloadContext();
+    const compA = seedComp(ae, ['Layer 1']);
+    const compB = seedTextComp(ae, 2, 'Text', ['hello']);
+
+    const outcome = invoke(ctx, 'bulk.set_label', {
+      comps: ['Main', 'Text'],
+      label: 2,
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ applied: 2 });
+    expect(labelAt(compA, 1)).toBe(2);
+    expect(labelAt(compB, 1)).toBe(2);
+    expect(outcome.value?.changes).toEqual([
+      { comp: 'Main', index: 1, from: 0, to: 2 },
+      { comp: 'Text', index: 1, from: 0, to: 2 },
+    ]);
+  });
+
+  it('limits the change to the requested layers', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Layer 1', 'Layer 2']);
+
+    invoke(ctx, 'bulk.set_label', { comp: 'Main', layers: [2], label: 7, dryRun: false });
+
+    expect(labelAt(comp, 1)).toBe(0);
+    expect(labelAt(comp, 2)).toBe(7);
+  });
+
+  it('rejects a label outside 0 to 16', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer 1']);
+
+    const outcome = invoke(ctx, 'bulk.set_label', { comp: 'Main', label: 17 });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('rejects a non-integer label', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer 1']);
+
+    const outcome = invoke(ctx, 'bulk.set_label', { comp: 'Main', label: 2.5 });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('requires a label', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, ['Layer 1']);
+
+    const outcome = invoke(ctx, 'bulk.set_label', { comp: 'Main' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('reports a composition that does not exist', async () => {
+    const { ctx } = await payloadContext();
+
+    const outcome = invoke(ctx, 'bulk.set_label', { comp: 'Nope', label: 1 });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+    expect(outcome.issue?.message).toContain('Nope');
+  });
+});
