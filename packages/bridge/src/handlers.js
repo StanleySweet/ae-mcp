@@ -259,6 +259,119 @@ AEMCP.register('render.frame', function (args) {
     };
 });
 
+// Render queue helpers.
+// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueue/
+// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueueitem/
+// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/outputmodule/
+
+// Map an RQItemStatus value back to its name for readable results.
+function aemcpRqStatusName(status) {
+    var names = ['QUEUED', 'UNQUEUED', 'RENDERING', 'DONE', 'ERR_STOPPED', 'USER_STOPPED', 'NEEDS_OUTPUT', 'WILL_CONTINUE'];
+    var i;
+    if (typeof RQItemStatus !== 'undefined') {
+        for (i = 0; i < names.length; i++) {
+            if (RQItemStatus[names[i]] === status) {
+                return names[i];
+            }
+        }
+    }
+    return 'UNKNOWN';
+}
+
+// Fetch a render queue item by 1-based index (default: the first item).
+function aemcpRequireRqItem(args) {
+    var queue = app.project.renderQueue;
+    var index = args && typeof args.item === 'number' ? args.item : 1;
+    var item = queue.item(index);
+    if (!item) {
+        aemcpAbortArgs('render queue item not found: ' + index);
+    }
+    return item;
+}
+
+// Serialize one render queue item for the client.
+function aemcpRenderItemInfo(item, index) {
+    var output = item.outputModule(1);
+    var file = output && output.file ? output.file.fsName : null;
+    return {
+        index: index,
+        comp: item.comp ? item.comp.name : null,
+        status: aemcpRqStatusName(item.status),
+        render: item.render,
+        timeSpanStart: item.timeSpanStart,
+        timeSpanDuration: item.timeSpanDuration,
+        outputFile: file,
+        numOutputModules: item.numOutputModules
+    };
+}
+
+function aemcpRenderQueueItems() {
+    var queue = app.project.renderQueue;
+    var items = [];
+    var i;
+    for (i = 1; i <= queue.numItems; i++) {
+        items.push(aemcpRenderItemInfo(queue.item(i), i));
+    }
+    return items;
+}
+
+// Add a composition to the render queue, optionally with a time span.
+// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/rqitemcollection/#rqitemcollectionadd
+AEMCP.register('render.queue_add', function (args) {
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var queue = app.project.renderQueue;
+    var item = queue.items.add(comp);
+    if (args && typeof args.timeSpanStart === 'number') {
+        item.timeSpanStart = args.timeSpanStart;
+    }
+    if (args && typeof args.timeSpanDuration === 'number') {
+        item.timeSpanDuration = args.timeSpanDuration;
+    }
+    return aemcpRenderItemInfo(item, queue.numItems);
+});
+
+// Point an item's output module at a file and/or apply an output template.
+// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/outputmodule/
+AEMCP.register('render.queue_set_output', function (args) {
+    var item = aemcpRequireRqItem(args);
+    var output = item.outputModule(1);
+    if (!output) {
+        aemcpAbortArgs('render queue item has no output module');
+    }
+    if (args && args.template) {
+        output.applyTemplate(args.template);
+        // AE invalidates the output module object after applying a template;
+        // re-fetch it before touching the file.
+        output = item.outputModule(1);
+    }
+    if (args && args.file) {
+        output.file = new File(args.file);
+    }
+    return aemcpRenderItemInfo(item, args && typeof args.item === 'number' ? args.item : 1);
+});
+
+// Start the render queue. AE renders synchronously and returns when complete.
+// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueue/#renderqueuerender
+AEMCP.register('render.queue_start', function () {
+    var queue = app.project.renderQueue;
+    queue.render();
+    return {
+        rendered: true,
+        numItems: queue.numItems,
+        items: aemcpRenderQueueItems()
+    };
+});
+
+// Report the render queue and every item's status.
+AEMCP.register('render.status', function () {
+    var queue = app.project.renderQueue;
+    return {
+        numItems: queue.numItems,
+        rendering: queue.rendering,
+        items: aemcpRenderQueueItems()
+    };
+});
+
 function aemcpFindComp(key) {
     var project = app.project;
     var i, item;

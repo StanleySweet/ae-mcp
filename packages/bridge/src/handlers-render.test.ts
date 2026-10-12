@@ -106,3 +106,77 @@ describe('render.frame', () => {
     expect(missing.issue?.message).toContain('Nope');
   });
 });
+
+describe('render queue operations', () => {
+  it('adds a composition with a time span and reports the item', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae);
+    const outcome = invoke(ctx, 'render.queue_add', {
+      comp: 'Main',
+      timeSpanStart: 1,
+      timeSpanDuration: 2,
+    });
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({
+      index: 1,
+      comp: 'Main',
+      status: 'QUEUED',
+      render: true,
+      timeSpanStart: 1,
+      timeSpanDuration: 2,
+      numOutputModules: 1,
+    });
+    expect(ae.project.renderQueue.numItems).toBe(1);
+  });
+
+  it('defaults to the active comp and rejects an unknown comp', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae);
+    expect(invoke(ctx, 'render.queue_add', {}).value).toMatchObject({ comp: 'Main' });
+    const missing = invoke(ctx, 'render.queue_add', { comp: 'Nope' });
+    expect(missing.ok).toBe(false);
+    expect(missing.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('sets the output file and applies a template', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae);
+    invoke(ctx, 'render.queue_add', { comp: 'Main' });
+    const outcome = invoke(ctx, 'render.queue_set_output', {
+      item: 1,
+      file: '/tmp/out.mov',
+      template: 'Lossless',
+    });
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({ index: 1, outputFile: '/tmp/out.mov' });
+    expect(ae.project.renderQueue.item(1)?.outputModule(1)?.template).toBe('Lossless');
+  });
+
+  it('reports an unknown item index as INVALID_ARGS', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae);
+    const outcome = invoke(ctx, 'render.queue_set_output', { item: 3, file: '/tmp/x.mov' });
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+    expect(outcome.issue?.message).toContain('render queue item not found: 3');
+  });
+
+  it('reports queue status, then renders and marks items done', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae);
+    invoke(ctx, 'render.queue_add', { comp: 'Main' });
+    invoke(ctx, 'render.queue_set_output', { item: 1, file: '/tmp/out.png' });
+
+    const before = invoke(ctx, 'render.status', {});
+    expect(before.value).toMatchObject({ numItems: 1, rendering: false });
+    expect((before.value?.items as { status: string }[])[0]?.status).toBe('QUEUED');
+
+    const started = invoke(ctx, 'render.queue_start', {});
+    expect(started.value).toMatchObject({ rendered: true, numItems: 1 });
+    expect((started.value?.items as { status: string }[])[0]?.status).toBe('DONE');
+    expect(ae.fs.get('/tmp/out.png')).toBe('PNG:Main:0');
+
+    const after = invoke(ctx, 'render.status', {});
+    expect((after.value?.items as { status: string }[])[0]?.status).toBe('DONE');
+  });
+});

@@ -500,14 +500,33 @@ export class MockItemCollection {
   }
 }
 
+// Render queue item status enum, mirroring AE's RQItemStatus global.
+// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueueitem/#renderqueueitemstatus
+export const RQItemStatus = {
+  QUEUED: 1,
+  UNQUEUED: 2,
+  RENDERING: 3,
+  DONE: 4,
+  ERR_STOPPED: 5,
+  USER_STOPPED: 6,
+  NEEDS_OUTPUT: 7,
+  WILL_CONTINUE: 8,
+};
+
 export class MockOutputModule {
   file: MockFile | null = null;
   template: string | null = null;
+  removed = false;
+  readonly name = 'Lossless';
   readonly templates = ['PNG Sequence', 'Lossless'];
 
   // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/outputmodule/
   applyTemplate(name: string): void {
     this.template = name;
+  }
+
+  remove(): void {
+    this.removed = true;
   }
 }
 
@@ -515,11 +534,36 @@ export class MockRenderQueueItem {
   timeSpanStart = 0;
   timeSpanDuration = 0;
   removed = false;
+  render = true;
+  rendered = false;
+  startTime: Date | null = null;
+  elapsedSeconds: number | null = null;
+  renderTemplate: string | null = null;
+  readonly templates: string[] = [];
   private readonly first: MockOutputModule = new MockOutputModule();
 
   constructor(readonly comp: MockItem) {}
 
   // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueueitem/
+  get status(): number {
+    if (this.rendered) {
+      return RQItemStatus.DONE;
+    }
+    return this.render ? RQItemStatus.QUEUED : RQItemStatus.UNQUEUED;
+  }
+
+  get numOutputModules(): number {
+    return 1;
+  }
+
+  get statusName(): string {
+    return this.rendered ? 'DONE' : this.render ? 'QUEUED' : 'UNQUEUED';
+  }
+
+  applyTemplate(name: string): void {
+    this.renderTemplate = name;
+  }
+
   outputModule(index: number): MockOutputModule | null {
     return index === 1 ? this.first : null;
   }
@@ -535,6 +579,7 @@ export class MockRenderQueueItem {
 
 export class MockRenderQueue {
   private readonly list: MockRenderQueueItem[] = [];
+  rendering = false;
 
   // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/rqitemcollection/
   readonly items = {
@@ -555,8 +600,9 @@ export class MockRenderQueue {
 
   // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueue/
   render(): void {
+    this.rendering = true;
     for (const item of this.list) {
-      if (item.removed) {
+      if (item.removed || !item.render) {
         continue;
       }
       const file = item.outputModule(1)?.file;
@@ -565,7 +611,11 @@ export class MockRenderQueue {
         file.write(`PNG:${item.comp.name}:${item.timeSpanStart}`);
         file.close();
       }
+      item.rendered = true;
+      item.startTime = new Date(0);
+      item.elapsedSeconds = 0;
     }
+    this.rendering = false;
   }
 }
 
@@ -720,6 +770,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     CameraLayer: MockCameraLayer,
     LightLayer: MockLightLayer,
     MarkerValue: MockMarkerValue,
+    RQItemStatus,
     File: function (path: string): MockFile {
       return new MockFile(ae, path);
     },

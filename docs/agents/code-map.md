@@ -18,7 +18,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 ## Operations registry
 
 - Type: `packages/protocol/src/operations.ts` — `operationCategories` :3, `operationDefinitionSchema` :26 `{name, category, description, readOnly, destructive, schema}` (`schema` is free-form JSON-Schema-shaped record, never converted to zod; `destructive` is a required flag, E13-1). Exported `protocol/src/index.ts:21`.
-- Registry: `packages/server/src/operations.ts` — `OperationRegistry` :3 (`register/get/names/list`), `defaultOperationRegistry()` :138 registers every bridge operation (E6-16, ~60 ops: project/comp/layer/property/keyframe/expression/effect/preset/marker/mask/shape/text/audio/render/font/command/batch) with category, description, `readOnly`, `destructive` (§E13: delete/remove + `command.execute`) and per-handler arg schemas.
+- Registry: `packages/server/src/operations.ts` — `OperationRegistry` :3 (`register/get/names/list`), `defaultOperationRegistry()` :138 registers every bridge operation (E6-16, ~64 ops: project/comp/layer/property/keyframe/expression/effect/preset/marker/mask/shape/text/audio/render/font/command/batch) with category, description, `readOnly`, `destructive` (§E13: delete/remove, `command.execute` and `render.queue_start`) and per-handler arg schemas.
 - `ae_do` validation/recall helpers in `operations.ts`: `validateOperationArgs(schema, args)` :43 (JSON-Schema-shaped property map: type + enum, rejects unknown keys) and `closestNames(names, query)` :88 (Levenshtein). `ae_do` runs op via `callRaw(definition.name, args)`, then appends `get_selection` as `context`; unknown op → `UNKNOWN_TOOL` with closest names, bad args → `INVALID_ARGS`, both without touching AE.
 - `ae_catalog` returns `operations.list(category?)`; policy filtering arrives in E7-2.
 
@@ -31,7 +31,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 ## Bridge runtime (`packages/bridge`, ES3 `.js`, concatenated)
 
 - `job-runner.js`: `aemcpInvoke(tool,args,deadline)` :30 (handler lookup :34, `UNKNOWN_TOOL` :36, one undo group `'Claude: '+tool` :38, `SCRIPT_ERROR` :51), `aemcpProcessJob` :59, `aemcpRegister` :111, `AEMCP.capabilities()` :124.
-- Handlers: `handlers.js` `AEMCP.register(...)` :3,22,56,84,92,151; active-comp resolve `aemcpResolveComp` :47. E7-5 `project.export_json` uses `AEMCP.serialize.projectSnapshot` (item tree + comp layers snapshot, `format: 'aemcp-project/v1'`). E8-1 `render.frame` saves one PNG via `CompItem.saveFrameToPng`, falling back to the render queue + PNG output module; output defaults to `<queue root>/render/<comp>-<frame>.png`.
+- Handlers: `handlers.js` `AEMCP.register(...)` :3,22,56,84,92,151; active-comp resolve `aemcpResolveComp` :47. E7-5 `project.export_json` uses `AEMCP.serialize.projectSnapshot` (item tree + comp layers snapshot, `format: 'aemcp-project/v1'`). E8-1 `render.frame` saves one PNG via `CompItem.saveFrameToPng`, falling back to the render queue + PNG output module; output defaults to `<queue root>/render/<comp>-<frame>.png`. E8-3 render-queue ops: `render.queue_add` (`RQueue.items.add` + time span), `render.queue_set_output` (`OutputModule.file`/`applyTemplate`), `render.queue_start` (`RenderQueue.render()`, destructive) and `render.status`; helpers `aemcpRequireRqItem`, `aemcpRenderItemInfo`, `aemcpRqStatusName`.
 - Build: `bridge/src/build.ts` prepends polyfills + `job-runner.js` + `serializers.js` + `handlers.js`.
 
 ## Settings (`packages/server/src/settings.ts`)

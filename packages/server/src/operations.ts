@@ -352,6 +352,29 @@ export function defaultOperationRegistry(): OperationRegistry {
       schema: { comp, time: { type: 'number' }, file: comp },
     }),
   );
+  register(
+    operation('render.queue_add', 'render', 'Add a composition to the render queue.', {
+      schema: {
+        comp,
+        name: comp,
+        timeSpanStart: { type: 'number' },
+        timeSpanDuration: { type: 'number' },
+      },
+    }),
+  );
+  register(
+    operation('render.queue_set_output', 'render', 'Set a render queue item output file and/or template.', {
+      schema: { item: layerIndex, file: comp, template: comp },
+    }),
+  );
+  register(
+    operation('render.queue_start', 'render', 'Start the render queue and wait for it to finish.', {
+      destructive: true,
+    }),
+  );
+  register(operation('render.status', 'render', 'Report the render queue and item statuses.', {
+    readOnly: true,
+  }));
 
   // Font and command.
   register(operation('font.list', 'font', 'List installed fonts.', { readOnly: true }));
