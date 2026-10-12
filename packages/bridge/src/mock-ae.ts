@@ -265,6 +265,10 @@ export class MockProperty {
     this.keys.push({ time, value });
     return this;
   }
+
+  setValue(value: unknown): void {
+    this.value = value;
+  }
 }
 
 export class MockPropertyGroup {

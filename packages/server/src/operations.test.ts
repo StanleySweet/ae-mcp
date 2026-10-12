@@ -69,6 +69,7 @@ const BRIDGE_OPS = [
   'command.list',
   'command.execute',
   'bulk.rename',
+  'bulk.set_property',
   'batch.run',
 ];
 

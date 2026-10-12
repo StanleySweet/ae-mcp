@@ -1905,9 +1905,138 @@ AEMCP.register('bulk.rename', function (args) {
     };
 });
 
+// Resolve the target comps for a bulk handler: an explicit `comps` array, else
+// the single `comp` argument, else the active comp.
+function aemcpBulkComps(args) {
+    var keys = [];
+    var i;
+    if (args && args.comps !== undefined && args.comps !== null) {
+        if (args.comps.length === 0) {
+            aemcpAbortArgs('comps must be a non-empty array of comp names');
+        }
+        for (i = 0; i < args.comps.length; i++) {
+            keys.push(args.comps[i]);
+        }
+    } else {
+        keys.push(args ? args.comp : null);
+    }
+    var comps = [];
+    for (i = 0; i < keys.length; i++) {
+        var comp = aemcpResolveComp(keys[i]);
+        if (!comp) {
+            if (keys[i] === undefined || keys[i] === null || keys[i] === '') {
+                aemcpAbortArgs('no active composition');
+            }
+            aemcpAbortArgs('composition not found: ' + keys[i]);
+        }
+        comps.push(comp);
+    }
+    return comps;
+}
 
+// Find a child property of `group` whose name or match name equals `query`, at
+// any depth, so callers can name a nested property without the full path.
+function aemcpSearchProperty(group, query) {
+    if (!aemcpIsGroup(group)) {
+        return null;
+    }
+    var i, child;
+    for (i = 1; i <= group.numProperties; i++) {
+        child = group.property(i);
+        if (child && (child.name === query || child.matchName === query)) {
+            return child;
+        }
+    }
+    for (i = 1; i <= group.numProperties; i++) {
+        child = group.property(i);
+        if (aemcpIsGroup(child)) {
+            var found = aemcpSearchProperty(child, query);
+            if (found) {
+                return found;
+            }
+        }
+    }
+    return null;
+}
 
+// Resolve a property from a '/'-separated name path, falling back to a deep
+// search by name or match name. Returns null when nothing matches.
+function aemcpResolveProperty(group, path) {
+    var segments = String(path).split('/');
+    var current = group;
+    var i, next;
+    for (i = 0; i < segments.length; i++) {
+        if (segments[i] === '' || !aemcpIsGroup(current)) {
+            break;
+        }
+        next = current.property(segments[i]);
+        if (!next) {
+            current = null;
+            break;
+        }
+        current = next;
+    }
+    if (current !== null && current !== group && !aemcpIsGroup(current)) {
+        return current;
+    }
+    return aemcpSearchProperty(group, path);
+}
 
+AEMCP.register('bulk.set_property', function (args) {
+    var propertyName = args && typeof args.property === 'string' ? args.property : '';
+    if (propertyName === '') {
+        aemcpAbortArgs('property is required');
+    }
+    if (!args || args.value === undefined) {
+        aemcpAbortArgs('value is required');
+    }
+    var comps = aemcpBulkComps(args);
+    var targetValue = args.value;
+    var dryRun = !(args && args.dryRun === false);
+    var changes = [];
+    var skipped = [];
+    var parts = [];
+    var c, t;
+    for (c = 0; c < comps.length; c++) {
+        var comp = comps[c];
+        var indices = aemcpLayerIndices(args, comp);
+        for (t = 0; t < indices.length; t++) {
+            var layer = comp.layer(indices[t]);
+            var prop = aemcpResolveProperty(layer, propertyName);
+            if (!prop || prop.setValue === undefined) {
+                skipped.push({ comp: comp.name, index: indices[t] });
+                parts.push(comp.name + ':' + indices[t] + '=missing');
+                continue;
+            }
+            var from = prop.value;
+            parts.push(comp.name + ':' + indices[t] + '=' + JSON.stringify(from));
+            if (JSON.stringify(from) !== JSON.stringify(targetValue)) {
+                changes.push({ comp: comp.name, index: indices[t], from: from, to: targetValue });
+                if (!dryRun) {
+                    prop.setValue(targetValue);
+                }
+            }
+        }
+    }
+    var fingerprint = propertyName + '#' + parts.join(',');
+    if (dryRun) {
+        return {
+            dryRun: true,
+            property: propertyName,
+            changes: changes,
+            skipped: skipped,
+            fingerprint: fingerprint
+        };
+    }
+    return {
+        dryRun: false,
+        property: propertyName,
+        applied: changes.length,
+        changes: changes,
+        skipped: skipped,
+        fingerprint: fingerprint
+    };
+});
 
 
 

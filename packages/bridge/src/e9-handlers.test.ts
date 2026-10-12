@@ -5,7 +5,14 @@ import { join } from 'node:path';
 import vm from 'node:vm';
 import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
-import { MockAE, MockAVLayer, MockCompItem, runInMockAE } from './mock-ae.js';
+import {
+  MockAE,
+  MockAVLayer,
+  MockCompItem,
+  MockProperty,
+  MockPropertyGroup,
+  runInMockAE,
+} from './mock-ae.js';
 
 interface Outcome {
   ok: boolean;
@@ -188,6 +195,216 @@ describe('bulk.rename', () => {
     const { ctx } = await payloadContext();
 
     const outcome = invoke(ctx, 'bulk.rename', { comp: 'Nope', prefix: 'x' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+    expect(outcome.issue?.message).toContain('Nope');
+  });
+});
+
+function seedPositionComp(
+  ae: MockAE,
+  id: number,
+  name: string,
+  positions: unknown[][],
+): MockCompItem {
+  const comp = new MockCompItem(id, name, 1920, 1080, 25, 10);
+  ae.project.add(comp);
+  positions.forEach((position) => {
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+    transform.add(new MockProperty('Position', 'ADBE Position', position));
+    layer.add(transform);
+    comp.addLayer(layer);
+  });
+  return comp;
+}
+
+function positionAt(comp: MockCompItem, index: number): unknown {
+  const layer = comp.layer(index);
+  const group = layer?.property('ADBE Transform Group');
+  const prop = (group as MockPropertyGroup | null)?.property('ADBE Position');
+  return (prop as MockProperty | null)?.value;
+}
+
+describe('bulk.set_property', () => {
+  it('previews changes by default and leaves the values untouched', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedPositionComp(ae, 1, 'Main', [
+      [0, 0],
+      [10, 10],
+    ]);
+    ae.project.activeItem = comp;
+
+    const outcome = invoke(ctx, 'bulk.set_property', {
+      comp: 'Main',
+      property: 'ADBE Transform Group/ADBE Position',
+      value: [100, 200],
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({
+      dryRun: true,
+      property: 'ADBE Transform Group/ADBE Position',
+    });
+    expect(outcome.value?.changes).toEqual([
+      { comp: 'Main', index: 1, from: [0, 0], to: [100, 200] },
+      { comp: 'Main', index: 2, from: [10, 10], to: [100, 200] },
+    ]);
+    expect(typeof outcome.value?.fingerprint).toBe('string');
+    expect(positionAt(comp, 1)).toEqual([0, 0]);
+    expect(positionAt(comp, 2)).toEqual([10, 10]);
+  });
+
+  it('sets the property when dryRun is false', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedPositionComp(ae, 1, 'Main', [
+      [0, 0],
+      [10, 10],
+    ]);
+    ae.project.activeItem = comp;
+
+    const outcome = invoke(ctx, 'bulk.set_property', {
+      comp: 'Main',
+      property: 'Position',
+      value: [5, 6],
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ dryRun: false, applied: 2 });
+    expect(positionAt(comp, 1)).toEqual([5, 6]);
+    expect(positionAt(comp, 2)).toEqual([5, 6]);
+  });
+
+  it('omits targets that already hold the value', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedPositionComp(ae, 1, 'Main', [
+      [1, 1],
+      [2, 2],
+    ]);
+    ae.project.activeItem = comp;
+
+    const outcome = invoke(ctx, 'bulk.set_property', {
+      comp: 'Main',
+      property: 'Position',
+      value: [1, 1],
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ applied: 1 });
+    expect(outcome.value?.changes).toEqual([
+      { comp: 'Main', index: 2, from: [2, 2], to: [1, 1] },
+    ]);
+  });
+
+  it('skips layers that have no such property', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, ['Plain']);
+
+    const outcome = invoke(ctx, 'bulk.set_property', {
+      comp: 'Main',
+      property: 'Position',
+      value: [1, 1],
+    });
+
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value?.changes).toEqual([]);
+    expect(outcome.value?.skipped).toEqual([{ comp: 'Main', index: 1 }]);
+    expect(comp.layer(1)!.name).toBe('Plain');
+  });
+
+  it('applies across several comps', async () => {
+    const { ctx, ae } = await payloadContext();
+    const main = seedPositionComp(ae, 1, 'Main', [[0, 0]]);
+    const second = seedPositionComp(ae, 2, 'Second', [[0, 0]]);
+    ae.project.activeItem = main;
+
+    const outcome = invoke(ctx, 'bulk.set_property', {
+      comps: ['Main', 'Second'],
+      property: 'Position',
+      value: [9, 9],
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ applied: 2 });
+    expect(positionAt(main, 1)).toEqual([9, 9]);
+    expect(positionAt(second, 1)).toEqual([9, 9]);
+  });
+
+  it('limits the change to the requested layers', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedPositionComp(ae, 1, 'Main', [
+      [0, 0],
+      [0, 0],
+    ]);
+    ae.project.activeItem = comp;
+
+    const outcome = invoke(ctx, 'bulk.set_property', {
+      comp: 'Main',
+      layers: [2],
+      property: 'Position',
+      value: [7, 7],
+      dryRun: false,
+    });
+
+    expect(outcome.value).toMatchObject({ applied: 1 });
+    expect(positionAt(comp, 1)).toEqual([0, 0]);
+    expect(positionAt(comp, 2)).toEqual([7, 7]);
+  });
+
+  it('changes the fingerprint when a target value changes', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedPositionComp(ae, 1, 'Main', [[0, 0]]);
+    ae.project.activeItem = comp;
+
+    const before = invoke(ctx, 'bulk.set_property', {
+      comp: 'Main',
+      property: 'Position',
+      value: [3, 3],
+    }).value?.fingerprint;
+    invoke(ctx, 'bulk.set_property', {
+      comp: 'Main',
+      property: 'Position',
+      value: [3, 3],
+      dryRun: false,
+    });
+    const after = invoke(ctx, 'bulk.set_property', {
+      comp: 'Main',
+      property: 'Position',
+      value: [3, 3],
+    }).value?.fingerprint;
+
+    expect(after).not.toBe(before);
+  });
+
+  it('requires a property name', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedPositionComp(ae, 1, 'Main', [[0, 0]]);
+
+    const outcome = invoke(ctx, 'bulk.set_property', { comp: 'Main', value: [1, 1] });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('requires a value', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedPositionComp(ae, 1, 'Main', [[0, 0]]);
+
+    const outcome = invoke(ctx, 'bulk.set_property', { comp: 'Main', property: 'Position' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('reports a composition that does not exist', async () => {
+    const { ctx } = await payloadContext();
+
+    const outcome = invoke(ctx, 'bulk.set_property', {
+      comp: 'Nope',
+      property: 'Position',
+      value: [1, 1],
+    });
 
     expect(outcome.ok).toBe(false);
     expect(outcome.issue?.code).toBe('INVALID_ARGS');

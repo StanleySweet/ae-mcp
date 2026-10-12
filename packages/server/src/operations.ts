@@ -405,6 +405,23 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(
+    operation(
+      'bulk.set_property',
+      'bulk',
+      'Set a property to the same value on many layers, optionally across several comps.',
+      {
+        schema: {
+          comp,
+          comps: { type: 'array' },
+          layers: { type: 'array' },
+          property: { type: 'string' },
+          value: {},
+          dryRun: { type: 'boolean' },
+        },
+      },
+    ),
+  );
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(
