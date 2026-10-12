@@ -69,7 +69,7 @@ async function connectServer(
   await mkdir(root, { recursive: true, mode: 0o700 });
   await chmod(root, 0o700);
 
-  const handlers: Record<string, any> = {
+  const handlers: Record<string, (args?: unknown) => unknown> = {
     ...observeHandlers(project),
     'project.increment_save': () => {
       calls.push('project.increment_save');
@@ -389,7 +389,7 @@ describe('E13-3 destructive guard', () => {
     await mkdir(root, { recursive: true, mode: 0o700 });
     await chmod(root, 0o700);
 
-    const handlers: Record<string, any> = {
+    const handlers: Record<string, (args?: unknown) => unknown> = {
       ...observeHandlers(proj),
       'project.increment_save': () => {
         calls.push('project.increment_save');
