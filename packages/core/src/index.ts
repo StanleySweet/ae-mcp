@@ -22,7 +22,27 @@ export {
   loaderStartupDir,
   osascriptElevatedWrite,
 } from './install-loader.js';
-export type { ElevatedWrite, InstallLoaderOptions, InstallLoaderResult } from './install-loader.js';
+export type {
+  ElevatedWrite,
+  InstallLoaderOptions,
+  InstallLoaderResult,
+} from './install-loader.js';
+export {
+  MAIN_PREF_SECTION,
+  SCRIPTING_PREF_KEY,
+  aePrefsRoot,
+  discoverPrefsDirs,
+  enableScriptingPref,
+  findPrefsFile,
+  readScriptingPref,
+  setScriptingPref,
+} from './scripting-pref.js';
+export type {
+  AEPrefsDir,
+  EnableScriptingPrefOptions,
+  EnableScriptingPrefResult,
+  ScriptingPrefEdit,
+} from './scripting-pref.js';
 export { discoverAerender, discoverAerenders } from './aerender-discovery.js';
 export type { AerenderInstall } from './aerender-discovery.js';
 export { parseAerenderLine } from './aerender-progress.js';
