@@ -56,6 +56,7 @@ function settings(overrides: Partial<Settings> = {}): Settings {
 interface HarnessOptions {
   incrementResult?: unknown;
   settings?: Settings;
+  operations?: OperationRegistry;
 }
 
 async function connectServer(
@@ -68,7 +69,7 @@ async function connectServer(
   await mkdir(root, { recursive: true, mode: 0o700 });
   await chmod(root, 0o700);
 
-  const handlers = {
+  const handlers: Record<string, any> = {
     ...observeHandlers(project),
     'project.increment_save': () => {
       calls.push('project.increment_save');
@@ -95,7 +96,7 @@ async function connectServer(
   const server = createServer({
     root,
     client: aeClient,
-    operations: registry(),
+    operations: options.operations ?? registry(),
     settings: options.settings ?? settings(),
   });
   await server.connect(serverTransport);
@@ -236,6 +237,202 @@ describe('E13-3 destructive guard', () => {
     const result = await call(client, 'batch.run', {
       ops: [{ op: 'layer.delete', args: { index: 1 } }],
     });
+    expect(result.isError).toBe(true);
+    const error = errorSchema.parse(JSON.parse(result.text));
+    expect(error.code).toBe('UNSAVED_PROJECT');
+    expect(calls).toEqual(['project.increment_save']);
+  });
+
+  it('increments before applying a destructive bulk plan', async () => {
+    const calls: string[] = [];
+    const registryWithBulk = registry();
+    registryWithBulk.register({
+      name: 'bulk.remove_unused',
+      category: 'bulk',
+      description: 'Remove unused items.',
+      readOnly: false,
+      destructive: true,
+      schema: { dryRun: { type: 'boolean' } },
+    });
+    const home = await mkdtemp(join(tmpdir(), 'ae-mcp-guard-bulk-'));
+    const root = join(home, '.ae-mcp');
+    await mkdir(root, { recursive: true, mode: 0o700 });
+    await chmod(root, 0o700);
+
+    const handlers = {
+      ...observeHandlers(project()),
+      'project.increment_save': () => {
+        calls.push('project.increment_save');
+        return { success: true, file: '/projects/P_v008.aep' };
+      },
+      'bulk.remove_unused': (args: unknown) => {
+        calls.push('bulk.remove_unused');
+        const dry = (args as { dryRun?: boolean })?.dryRun;
+        if (dry) {
+          return { changes: [], fingerprint: 'fp-bulk' };
+        }
+        return { removed: 0 };
+      },
+    };
+    const consumer = createQueueConsumer(root, handlers);
+    await consumer.start();
+
+    const aeClient = createAEClient({ transport: new FileQueueTransport(root, 10), root });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createServer({
+      root,
+      client: aeClient,
+      operations: registryWithBulk,
+      settings: settings(),
+    });
+    await server.connect(serverTransport);
+    const client = new Client({ name: 'test-client', version: '0.0.0' });
+    await client.connect(clientTransport);
+
+    const plan = await client.callTool({ name: 'ae_plan', arguments: { op: 'bulk.remove_unused', args: {} } });
+    const planText = (plan.content as Array<{ type: string; text: string }>)[0]!.text;
+    const planId = JSON.parse(planText).planId;
+    expect(plan.isError).toBe(false);
+
+    const applied = await client.callTool({ name: 'ae_apply', arguments: { planId } });
+    const appliedText = (applied.content as Array<{ type: string; text: string }>)[0]!.text;
+    const appliedPayload = JSON.parse(appliedText);
+    expect(applied.isError).toBe(false);
+    expect(calls).toEqual([
+      'bulk.remove_unused',
+      'bulk.remove_unused',
+      'project.increment_save',
+      'bulk.remove_unused',
+    ]);
+    expect(appliedPayload.increment).toEqual({ incrementedFile: '/projects/P_v008.aep' });
+
+    await client.close();
+    await server.close();
+    await consumer.stop();
+  });
+
+  it('refuses a bulk apply with a destructive plan when the project has never been saved', async () => {
+    const calls: string[] = [];
+    const registryWithBulk = registry();
+    registryWithBulk.register({
+      name: 'bulk.remove_unused',
+      category: 'bulk',
+      description: 'Remove unused items.',
+      readOnly: false,
+      destructive: true,
+      schema: { dryRun: { type: 'boolean' } },
+    });
+    const home = await mkdtemp(join(tmpdir(), 'ae-mcp-guard-bulk2-'));
+    const root = join(home, '.ae-mcp');
+    await mkdir(root, { recursive: true, mode: 0o700 });
+    await chmod(root, 0o700);
+
+    const handlers = {
+      ...observeHandlers(project()),
+      'project.increment_save': () => {
+        calls.push('project.increment_save');
+        return { success: false, error: 'project has never been saved' };
+      },
+      'bulk.remove_unused': (args: unknown) => {
+        calls.push('bulk.remove_unused');
+        const dry = (args as { dryRun?: boolean })?.dryRun;
+        if (dry) {
+          return { changes: [], fingerprint: 'fp-bulk2' };
+        }
+        return { removed: 0 };
+      },
+    };
+    const consumer = createQueueConsumer(root, handlers);
+    await consumer.start();
+
+    const aeClient = createAEClient({ transport: new FileQueueTransport(root, 10), root });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createServer({
+      root,
+      client: aeClient,
+      operations: registryWithBulk,
+      settings: settings(),
+    });
+    await server.connect(serverTransport);
+    const client = new Client({ name: 'test-client', version: '0.0.0' });
+    await client.connect(clientTransport);
+
+    const plan = await client.callTool({ name: 'ae_plan', arguments: { op: 'bulk.remove_unused', args: {} } });
+    const planText = (plan.content as Array<{ type: string; text: string }>)[0]!.text;
+    const planId = JSON.parse(planText).planId;
+
+    const applied = await client.callTool({ name: 'ae_apply', arguments: { planId } });
+    expect(applied.isError).toBe(true);
+    const error = errorSchema.parse(JSON.parse((applied.content as Array<{ type: string; text: string }>)[0]!.text));
+    expect(error.code).toBe('UNSAVED_PROJECT');
+    expect(calls).toEqual(['bulk.remove_unused', 'bulk.remove_unused', 'project.increment_save']);
+
+    await client.close();
+    await server.close();
+    await consumer.stop();
+  });
+
+  it('cannot bypass the guard through eval.run', async () => {
+    const calls: string[] = [];
+    const registryWithEval = registry();
+    registryWithEval.register({
+      name: 'eval.run',
+      category: 'eval',
+      description: 'Run arbitrary ExtendScript.',
+      readOnly: false,
+      destructive: true,
+      schema: { code: { type: 'string' } },
+    });
+    const proj = project();
+    const home = await mkdtemp(join(tmpdir(), 'ae-mcp-guard-eval-'));
+    const root = join(home, '.ae-mcp');
+    await mkdir(root, { recursive: true, mode: 0o700 });
+    await chmod(root, 0o700);
+
+    const handlers: Record<string, any> = {
+      ...observeHandlers(proj),
+      'project.increment_save': () => {
+        calls.push('project.increment_save');
+        return { success: false, error: 'project has never been saved' };
+      },
+      'layer.rename': (args: unknown) => {
+        calls.push('layer.rename');
+        return args;
+      },
+      'layer.delete': (args: unknown) => {
+        calls.push('layer.delete');
+        return { deleted: (args as { index: number }).index };
+      },
+      'batch.run': () => {
+        calls.push('batch.run');
+        return { results: [] };
+      },
+      'eval.run': () => {
+        calls.push('eval.run');
+        return { ok: true };
+      },
+    };
+    const consumer = createQueueConsumer(root, handlers);
+    await consumer.start();
+
+    const aeClient = createAEClient({ transport: new FileQueueTransport(root, 10), root });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createServer({
+      root,
+      client: aeClient,
+      operations: registryWithEval,
+      settings: settings({ evalEnabled: true }),
+    });
+    await server.connect(serverTransport);
+    const client = new Client({ name: 'test-client', version: '0.0.0' });
+    await client.connect(clientTransport);
+    closes.push(async () => {
+      await client.close();
+      await server.close();
+      await consumer.stop();
+    });
+
+    const result = await call(client, 'eval.run', { code: '1+1' });
     expect(result.isError).toBe(true);
     const error = errorSchema.parse(JSON.parse(result.text));
     expect(error.code).toBe('UNSAVED_PROJECT');

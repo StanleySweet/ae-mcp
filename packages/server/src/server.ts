@@ -586,12 +586,13 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const needsIncrement =
         definition.destructive ||
         (definition.name === 'batch.run' && batchHasDestructive(operations, validation.args.ops));
+      let incrementInfo: Record<string, unknown> | null = null;
       if (needsIncrement && settings.incrementBeforeDestructive) {
         const increment = await callRaw('project.increment_save');
         if (!increment.ok) {
           return toResult(increment);
         }
-        const saved = increment.result as { success?: boolean } | null;
+        const saved = increment.result as { success?: boolean; file?: unknown } | null;
         if (!saved || saved.success !== true) {
           return text(
             makeError(
@@ -601,16 +602,23 @@ export function createServer(options: ServerOptions = {}): McpServer {
             true,
           );
         }
+        if (typeof saved.file === 'string') {
+          incrementInfo = { incrementedFile: saved.file };
+        }
       }
       const result = await callRaw(definition.name, validation.args);
       if (!result.ok) {
         return toResult(result);
       }
       const selection = await callRaw('get_selection');
-      return text({
+      const payload: Record<string, unknown> = {
         result: result.result,
         context: selection.ok ? selection.result : null,
-      });
+      };
+      if (incrementInfo) {
+        payload.increment = incrementInfo;
+      }
+      return text(payload);
     },
   );
 
@@ -709,11 +717,41 @@ export function createServer(options: ServerOptions = {}): McpServer {
         }
         return text(makeError('UNKNOWN_PLAN', `no plan with id '${toolArgs.planId}'`), true);
       }
+
+      const stepDefinition = operations.get(step.op);
+      const settings = await getSettings();
+      const needsIncrement =
+        stepDefinition?.destructive === true && settings.incrementBeforeDestructive;
+      let incrementInfo: Record<string, unknown> | null = null;
+      if (needsIncrement) {
+        const increment = await callRaw('project.increment_save');
+        if (!increment.ok) {
+          return toResult(increment);
+        }
+        const saved = increment.result as { success?: boolean; file?: unknown } | null;
+        if (!saved || saved.success !== true) {
+          return text(
+            makeError(
+              'UNSAVED_PROJECT',
+              `operation '${step.op}' is destructive and the project has never been saved`,
+            ),
+            true,
+          );
+        }
+        if (typeof saved.file === 'string') {
+          incrementInfo = { incrementedFile: saved.file };
+        }
+      }
+
       const result = await callRaw(step.op, { ...step.args, dryRun: false });
       if (!result.ok) {
         return toResult(result);
       }
-      return text({ planId: toolArgs.planId, op: step.op, result: result.result });
+      const payload: Record<string, unknown> = { planId: toolArgs.planId, op: step.op, result: result.result };
+      if (incrementInfo) {
+        payload.increment = incrementInfo;
+      }
+      return text(payload);
     },
   );
 
