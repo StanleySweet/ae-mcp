@@ -17,6 +17,26 @@
         margin: 0 auto;
         padding: 2rem 1.5rem;
       }
+      .controls {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+        margin-top: 1rem;
+      }
+      button {
+        padding: 0.5rem 0.9rem;
+        border-radius: 6px;
+        border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+        background: color-mix(in srgb, currentColor 5%, transparent);
+        font: inherit;
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      .progress {
+        font-size: 0.9rem;
+        opacity: 0.8;
+      }
       .checklist {
         list-style: none;
         margin: 1.5rem 0;
@@ -46,6 +66,11 @@
   <body>
     <main class="setup">
       <h1>AE-MCP Setup</h1>
+      <div class="controls">
+        <button id="install" type="button">Install</button>
+        <button id="uninstall" type="button">Uninstall</button>
+        <span id="progress" class="progress" aria-live="polite"></span>
+      </div>
       <ul id="checklist" class="checklist"></ul>
     </main>
     <script type="module" src="./dist/renderer.js"></script>
