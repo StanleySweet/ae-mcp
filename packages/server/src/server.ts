@@ -22,6 +22,7 @@ import {
 } from './operations.js';
 import { selectTransport, type Runner } from './osascript-transport.js';
 import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
+import { cleanupPartialOutput } from './render-output.js';
 import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks } from './setup-checks.js';
 
@@ -135,6 +136,9 @@ export function createServer(options: ServerOptions = {}): McpServer {
 
   const jobStore = options.jobStore ?? new JobStore();
 
+  /** Running render jobs, keyed by job id, so they can be cancelled. */
+  const runs = new Map<string, { cancel: () => void; done: Promise<void> }>();
+
   const findAerender = async (): Promise<string | null> => {
     if (options.aerender !== undefined) {
       return options.aerender;
@@ -170,8 +174,15 @@ export function createServer(options: ServerOptions = {}): McpServer {
     return { ok: true, file };
   };
 
-  const finishRenderJob = (jobId: string, result: AerenderResult): void => {
+  const finishRenderJob = async (
+    jobId: string,
+    result: AerenderResult,
+    cleanup: { output: string | undefined; startedAt: number },
+  ): Promise<void> => {
     if (result.cancelled) {
+      if (cleanup.output !== undefined) {
+        await cleanupPartialOutput(cleanup.output, cleanup.startedAt).catch(() => undefined);
+      }
       jobStore.cancel(jobId);
       return;
     }
@@ -416,6 +427,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         return project.result;
       }
       const jobId = jobStore.start('render');
+      const startedAt = jobStore.get(jobId)?.createdAt ?? Date.now();
       let handle: AerenderRunHandle;
       try {
         handle = runAerender({
@@ -445,7 +457,11 @@ export function createServer(options: ServerOptions = {}): McpServer {
         jobStore.fail(jobId, message);
         return text(makeError('SCRIPT_ERROR', `could not start aerender: ${message}`), true);
       }
-      void handle.result.then((result) => finishRenderJob(jobId, result));
+      const done = handle.result.then((result) =>
+        finishRenderJob(jobId, result, { output: args.output, startedAt }),
+      );
+      runs.set(jobId, { cancel: handle.cancel, done });
+      void done.finally(() => runs.delete(jobId));
       return text({ jobId });
     },
   );
@@ -465,6 +481,30 @@ export function createServer(options: ServerOptions = {}): McpServer {
         return text(makeError('UNKNOWN_JOB', `no job with id '${args.jobId}'`), true);
       }
       return text(record);
+    },
+  );
+
+  server.registerTool(
+    'job_cancel',
+    {
+      description:
+        'Cancel a running background job, stop its aerender process and remove any partial output. Returns the final job record.',
+      inputSchema: {
+        jobId: z.string(),
+      },
+    },
+    async (args) => {
+      const record = jobStore.get(args.jobId);
+      if (record === undefined) {
+        return text(makeError('UNKNOWN_JOB', `no job with id '${args.jobId}'`), true);
+      }
+      const run = runs.get(args.jobId);
+      if (run === undefined) {
+        return text(record);
+      }
+      run.cancel();
+      await run.done;
+      return text(jobStore.get(args.jobId) ?? record);
     },
   );
 

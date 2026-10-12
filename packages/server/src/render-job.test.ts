@@ -1,5 +1,7 @@
 import { EventEmitter } from 'node:events';
+import { mkdtemp, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { AerenderProcess, SpawnAerender } from '@ae-mcp/core';
 import { PROTOCOL_VERSION, errorSchema, makeError, type ResultMessage } from '@ae-mcp/protocol';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -18,8 +20,11 @@ class FakeStream extends EventEmitter {
 class FakeProcess extends EventEmitter implements AerenderProcess {
   stdout = new FakeStream();
   stderr = new FakeStream();
+  killed: NodeJS.Signals | null = null;
 
-  kill(): boolean {
+  kill(signal?: NodeJS.Signals): boolean {
+    this.killed = signal ?? 'SIGTERM';
+    setTimeout(() => this.close(null, this.killed), 0);
     return true;
   }
 
@@ -263,5 +268,55 @@ describe('ae_render / job_status', () => {
     expect(result.isError).toBe(true);
     expect(errorCode(result)).toBe('SCRIPT_ERROR');
     expect(harness.store.list().some((job) => job.status === 'running')).toBe(false);
+  });
+
+  it('cancels a running job and removes its partial output', async () => {
+    const harness = await start({ aerender: '/fake/aerender' });
+    const dir = await mkdtemp(join(tmpdir(), 'ae-mcp-cancel-'));
+    const output = join(dir, 'movie.mp4');
+    const started = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main', output },
+    })) as { content: unknown[] };
+    const { jobId } = textContent(started);
+
+    await writeFile(output, 'partial');
+
+    const process = harness.processes[0]!;
+    const cancelled = (await harness.client.callTool({
+      name: 'job_cancel',
+      arguments: { jobId },
+    })) as { content: unknown[]; isError?: boolean };
+
+    expect(process.killed).toBe('SIGTERM');
+    expect(textContent(cancelled)).toMatchObject({ status: 'cancelled' });
+    await expect(stat(output)).rejects.toThrow();
+  });
+
+  it('leaves an already-finished job untouched when cancelled', async () => {
+    const harness = await start({ aerender: '/fake/aerender' });
+    const started = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main' },
+    })) as { content: unknown[] };
+    const { jobId } = textContent(started);
+    harness.processes[0]!.close(0);
+    await waitForStatus(harness.client, jobId, 'succeeded');
+
+    const result = (await harness.client.callTool({
+      name: 'job_cancel',
+      arguments: { jobId },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(textContent(result)).toMatchObject({ status: 'succeeded' });
+  });
+
+  it('returns UNKNOWN_JOB when cancelling an unknown job', async () => {
+    const harness = await start({ aerender: '/fake/aerender' });
+    const result = (await harness.client.callTool({
+      name: 'job_cancel',
+      arguments: { jobId: 'job-nope' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe('UNKNOWN_JOB');
   });
 });
