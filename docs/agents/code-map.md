@@ -81,3 +81,8 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - Full-stack tool test pattern: `layer-info.test.ts:13-54` — start consumer, `createAEClient` over `FileQueueTransport`, `createServer({client})`, connect via `InMemoryTransport.createLinkedPair`, call, `JSON.parse(content[0].text)`, zod-parse.
 - Registry-only test pattern: `catalog.test.ts:22-38` — `createServer({operations})`, no bridge.
 - Contract suite (any bridge): `protocol/src/contract-suite.ts:25-83`.
+
+## Bundle (`bundle/`)
+
+- `manifest.json` (mcpb spec `0.3`) + `icon.png` (E11-1); `manifest.test.ts` guards required fields, icon, and version == root `package.json`.
+- `pack.ts` (E11-2) — `packBundle(outDir)` esbuilds `packages/server/src/index.ts` to a self-contained `server/index.js`, copies the manifest+icon, `zip`s them into `<outDir>/ae-mcp.mcpb`. `npm run bundle:pack` → `bundle/out/ae-mcp.mcpb` (git/eslint-ignored via `out`). `pack.test.ts` asserts the archive entries.
