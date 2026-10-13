@@ -35,6 +35,17 @@
     line("== " + text + " ==");
   }
 
+  // File.name is percent-encoded on macOS (e.g. "Adobe%20After%20Effects");
+  // decode it for display. Matching is done on fsName, which is not encoded.
+  function displayName(entry) {
+    var name = entry.name;
+    try {
+      return decodeURI(name);
+    } catch (error) {
+      return name;
+    }
+  }
+
   function listFolder(title, path) {
     heading(title);
     line("path: " + path);
@@ -45,7 +56,7 @@
     }
     var entries = folder.getFiles();
     for (var i = 0; i < entries.length; i++) {
-      line((entries[i] instanceof Folder ? "[dir]  " : "[file] ") + entries[i].name);
+      line((entries[i] instanceof Folder ? "[dir]  " : "[file] ") + displayName(entries[i]));
     }
   }
 
@@ -53,7 +64,7 @@
     heading("After Effects application presets");
     var apps = new Folder("/Applications").getFiles();
     for (var i = 0; i < apps.length; i++) {
-      if (!(apps[i] instanceof Folder) || apps[i].name.indexOf("Adobe After Effects") !== 0) {
+      if (!(apps[i] instanceof Folder) || apps[i].fsName.indexOf("Adobe After Effects") === -1) {
         continue;
       }
       line("app: " + apps[i].fsName);
@@ -64,7 +75,7 @@
       }
       var groups = presets.getFiles();
       for (var j = 0; j < groups.length; j++) {
-        line("  " + groups[j].name);
+        line("  " + displayName(groups[j]));
       }
     }
   }
@@ -85,7 +96,7 @@
       }
       var children = root.getFiles();
       for (var i = 0; i < children.length; i++) {
-        var lower = children[i].name.toLowerCase();
+        var lower = displayName(children[i]).toLowerCase();
         for (var k = 0; k < keywords.length; k++) {
           if (lower.indexOf(keywords[k]) !== -1) {
             line(children[i].fsName);
@@ -200,5 +211,4 @@
     out.write(lines.join("\n"));
     out.close();
   }
-  alert("ae-mcp third-party report written to\n" + out.fsName);
 })();
