@@ -40,6 +40,17 @@ function triggerSource(payloadPath: string, jobPath: string): string {
   return `$.evalFile(${JSON.stringify(payloadPath)});\nAEMCP.processJob(${JSON.stringify(jobPath)});\n`;
 }
 
+// After Effects runs one script at a time; when a third-party panel (or the
+// startup loader) is mid-script, `DoScriptFile` is refused. The wording is not
+// documented in the scripting guide, so this is a text heuristic: E14-5 (HUMAN)
+// confirms the exact phrasing on real AE and this list is trimmed to it.
+// ponytail: message match only; switch to a typed signal if AE ever exposes one.
+const SCRIPT_RUNNING = /already running|currently running|another script|second script|script is running/i;
+
+function isScriptRunning(error: unknown): boolean {
+  return SCRIPT_RUNNING.test(String(error));
+}
+
 /**
  * Transport B: runs one job in the open After Effects per call via osascript
  * `DoScriptFile`. The DoScript result on macOS is `app.exitCode`, not the
@@ -102,6 +113,13 @@ export class OsaScriptTransport implements Transport {
       await this.doScript(triggerFile);
     } catch (error) {
       await unlink(jobFile).catch(() => undefined);
+      if (isScriptRunning(error)) {
+        return {
+          protocolVersion: PROTOCOL_VERSION,
+          ok: false,
+          error: makeError('AE_BUSY', `After Effects is running another script: ${String(error)}`),
+        };
+      }
       return {
         protocolVersion: PROTOCOL_VERSION,
         ok: false,

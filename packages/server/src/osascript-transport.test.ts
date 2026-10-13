@@ -73,6 +73,21 @@ describe('osascript transport', () => {
     expect(result.error.code).toBe('BRIDGE_NOT_LOADED');
   });
 
+  it('maps a "script is already running" refusal to AE_BUSY', async () => {
+    const root = await queueRoot();
+    const runner: Runner = async () => {
+      throw new Error('After Effects got an error: a script is already running.');
+    };
+    const transport = new OsaScriptTransport(root, APP, runner);
+
+    const result = await transport.call(job('o-busy', {}));
+
+    if (result.ok) {
+      throw new Error(`expected a failure, got ${JSON.stringify(result)}`);
+    }
+    expect(result.error.code).toBe('AE_BUSY');
+  });
+
   it('probes availability and selects osascript when reachable', async () => {
     const root = await queueRoot();
     const transport = await selectTransport({ root, appName: APP, runner: aeRunner(root, []) });

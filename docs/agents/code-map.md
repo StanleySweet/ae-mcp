@@ -26,8 +26,8 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 
 ## Bridge call path
 
-- `AEClient.call(tool, args)` `ae-client.ts:26`; builds job `{protocolVersion:1, id, tool, args, deadline}` :72 (30s timeout :57). Transport failure → `BRIDGE_NOT_LOADED` :103; stall detection rewrites timeouts into a modal-dialog hint.
-- `ResultMessage` `protocol/src/messages.ts:24-41`: `{ok:true,result}` | `{ok:false,error:{code,message,hint?}}`. Codes+hints `protocol/src/errors.ts` (`makeError`); E8-5 added `UNKNOWN_JOB`/`AERENDER_NOT_FOUND`, E9-2 added `UNKNOWN_PLAN`/`PLAN_EXPIRED`/`PLAN_CHANGED`.
+- `AEClient.call(tool, args)` `ae-client.ts:26`; builds job `{protocolVersion:1, id, tool, args, deadline}` :72 (30s timeout :57). Transport failure → `BRIDGE_NOT_LOADED` :103; stall detection rewrites timeouts into a modal-dialog hint. (E14-3) an `AE_BUSY` result (another script running) is retried with exponential backoff (`retry` option, default 4 attempts, 200ms base, 2s cap; `sleep` injectable, `false` disables) before it is returned.
+- `ResultMessage` `protocol/src/messages.ts:24-41`: `{ok:true,result}` | `{ok:false,error:{code,message,hint?}}`. Codes+hints `protocol/src/errors.ts` (`makeError`); E8-5 added `UNKNOWN_JOB`/`AERENDER_NOT_FOUND`, E9-2 added `UNKNOWN_PLAN`/`PLAN_EXPIRED`/`PLAN_CHANGED`, E14-3 added `AE_BUSY`.
 - **`job.tool` IS the operation name** — bridge treats observe tools and `category.action` op names identically.
 
 ## Bridge runtime (`packages/bridge`, ES3 `.js`, concatenated)

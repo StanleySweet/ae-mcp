@@ -44,6 +44,10 @@ function ok(result: unknown): ResultMessage {
   return { protocolVersion: PROTOCOL_VERSION, ok: true, result };
 }
 
+function busy(message = 'a script is already running'): ResultMessage {
+  return { protocolVersion: PROTOCOL_VERSION, ok: false, error: makeError('AE_BUSY', message) };
+}
+
 describe('ae client', () => {
   it('assigns a unique id and a deadline offset by the timeout', async () => {
     const transport = new RecordingTransport();
@@ -126,6 +130,47 @@ describe('ae client', () => {
     await expect(stat(freshInbox)).resolves.toBeDefined();
     await expect(stat(oldInbox)).rejects.toThrow();
     await expect(stat(oldOutbox)).rejects.toThrow();
+  });
+
+  it('retries AE_BUSY with exponential backoff until it succeeds', async () => {
+    const transport = new RecordingTransport();
+    transport.enqueue(busy());
+    transport.enqueue(busy());
+    transport.enqueue(ok('done'));
+    const sleeps: number[] = [];
+    const client = createAEClient({
+      transport,
+      root: '/unused',
+      retry: { attempts: 4, baseDelayMs: 100, maxDelayMs: 1000, sleep: async (ms) => void sleeps.push(ms) },
+    });
+
+    const result = await client.call('echo');
+
+    expect(result).toMatchObject({ ok: true, result: 'done' });
+    expect(transport.jobs).toHaveLength(3);
+    expect(sleeps).toEqual([100, 200]);
+  });
+
+  it('gives up after the retry budget and returns the AE_BUSY error', async () => {
+    const transport = new RecordingTransport();
+    transport.enqueue(busy());
+    transport.enqueue(busy());
+    transport.enqueue(busy());
+    const sleeps: number[] = [];
+    const client = createAEClient({
+      transport,
+      root: '/unused',
+      retry: { attempts: 3, baseDelayMs: 50, maxDelayMs: 1000, sleep: async (ms) => void sleeps.push(ms) },
+    });
+
+    const result = await client.call('echo');
+
+    if (result.ok) {
+      throw new Error(`expected a failure, got ${JSON.stringify(result)}`);
+    }
+    expect(result.error.code).toBe('AE_BUSY');
+    expect(transport.jobs).toHaveLength(3);
+    expect(sleeps).toEqual([50, 100]);
   });
 
   it('reports a modal-dialog stall instead of a bare timeout', async () => {

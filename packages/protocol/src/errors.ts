@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const errorCodes = [
   'AE_NOT_RUNNING',
+  'AE_BUSY',
   'BRIDGE_NOT_LOADED',
   'UNKNOWN_TOOL',
   'INVALID_MESSAGE',
@@ -23,6 +24,8 @@ export const errorCodeSchema = z.enum(errorCodes);
 
 export const errorHints: Record<ErrorCode, string> = {
   AE_NOT_RUNNING: 'Launch After Effects, then retry.',
+  AE_BUSY:
+    'After Effects is running another script (a panel or the bridge); the bridge retries with backoff. If it persists, close the panel that is running a script.',
   BRIDGE_NOT_LOADED: 'Restart After Effects so the startup loader runs, then retry.',
   UNKNOWN_TOOL: 'Call ae_catalog to list the available tools.',
   INVALID_MESSAGE: 'Client and server protocol versions differ; restart the client after upgrading.',
