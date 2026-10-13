@@ -86,3 +86,4 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 
 - `manifest.json` (mcpb spec `0.3`) + `icon.png` (E11-1); `manifest.test.ts` guards required fields, icon, and version == root `package.json`.
 - `pack.ts` (E11-2) — `packBundle(outDir)` esbuilds `packages/server/src/index.ts` to a self-contained `server/index.js`, copies the manifest+icon, `zip`s them into `<outDir>/ae-mcp.mcpb`. `npm run bundle:pack` → `bundle/out/ae-mcp.mcpb` (git/eslint-ignored via `out`). `pack.test.ts` asserts the archive entries.
+- `smoke.ts` (E11-3) — `runSmoke()` packs, unzips the `.mcpb`, starts the packaged `server/index.js` (`AE_MCP_ROOT` = temp root) with a fake-bridge consumer on that root, connects over MCP stdio and returns `tools/list`. `npm run bundle:smoke` runs it; `smoke.test.ts` asserts `check_setup`/`ae_catalog`/`ae_do` are listed.

@@ -41,6 +41,6 @@
     "test": "vitest run",
     "bridge:build": "tsx packages/bridge/src/build.ts",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
-    "bundle:smoke": "echo 'bundle smoke stub'"
+    "bundle:smoke": "tsx bundle/smoke.ts"
   }
 }
