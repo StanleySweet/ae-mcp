@@ -749,7 +749,10 @@ export class MockAE {
     findMenuCommandId: (name: string): number => this.menuCommandIds[name] ?? 0,
     executeCommand: (id: number): void => {
       this.executedCommands.push(id);
-      if (id === this.menuCommandIds['Increment and Save'] && this.project.file) {
+      const isIncrement = Object.entries(this.menuCommandIds).some(
+        ([k, v]) => v === id && /incr|inkr/i.test(k),
+      );
+      if (isIncrement && this.project.file) {
         this.project.file = new MockFile(this, incrementProjectName(this.project.file.path));
       }
     },
