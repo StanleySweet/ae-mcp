@@ -65,6 +65,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 
 - `createInstallerService({root, payload, loader, environment?, fileName?, prefsRoot?, isRunning?})` `apps/installer/src/service.ts` (E10-8) — the typed glue between the Setup UI and `packages/core`: `detect()` → `DetectedEnvironment`, `repair(install?)` → `RepairResult` (resolves the newest detected AE install when none is passed, runs `repairAeMcp` then `ensureScriptingPref` and appends the `scripting_pref` row), `uninstall(install?)` → `UninstallResult`, `diagnostics()` → writes `formatDiagnostics` to `<home>/Desktop/ae-mcp-diagnostics.txt` and returns the path (E10-13). Idempotent.
 - `IPC_CHANNELS` (`installer:detect|repair|uninstall`) + `InstallerApi` `apps/installer/src/ipc.ts` (E10-8) — the contract shared by main and preload. `main.ts` (E10-8) registers one `ipcMain.handle` per channel and opens the `BrowserWindow`; `preload.ts` (E10-8) exposes the API as `window.installer` via `contextBridge`; `global.d.ts` types it. `renderer.ts` (E10-9..12) renders the checklist, install/uninstall progress and a quit-AE prompt (`#quit-prompt` + `#retry`) shown when a repair check reports `needsQuit`.
+- Packaging (E11-4): `apps/installer/build.ts` esbuilds `src/{main,preload,renderer}.ts` → `dist/*.js` (inlines `@ae-mcp/core`, which exports TS source; `electron` stays external). `electron-builder.json` targets unsigned mac dmg+zip for arm64+x64 (`mac.identity: null`) and embeds `resources/**` (the `.mcpb`) via `extraResources`. `npm run installer:build` = bundle + `electron-builder --projectDir apps/installer`. `package.json` `main` = `dist/main.js`.
 
 ## Settings (`packages/server/src/settings.ts`)
 
@@ -85,5 +86,5 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 ## Bundle (`bundle/`)
 
 - `manifest.json` (mcpb spec `0.3`) + `icon.png` (E11-1); `manifest.test.ts` guards required fields, icon, and version == root `package.json`.
-- `pack.ts` (E11-2) — `packBundle(outDir)` esbuilds `packages/server/src/index.ts` to a self-contained `server/index.js`, copies the manifest+icon, `zip`s them into `<outDir>/ae-mcp.mcpb`. `npm run bundle:pack` → `bundle/out/ae-mcp.mcpb` (git/eslint-ignored via `out`). `pack.test.ts` asserts the archive entries.
+- `pack.ts` (E11-2) — `packBundle(outDir)` esbuilds `packages/server/src/index.ts` to a self-contained `server/index.js`, copies the manifest+icon, `zip`s them into `<outDir>/ae-mcp.mcpb`. `npm run bundle:pack` → `dist/ae-mcp.mcpb` (gitignored via `dist`). `pack.test.ts` asserts the archive entries.
 - `smoke.ts` (E11-3) — `runSmoke()` packs, unzips the `.mcpb`, starts the packaged `server/index.js` (`AE_MCP_ROOT` = temp root) with a fake-bridge consumer on that root, connects over MCP stdio and returns `tools/list`. `npm run bundle:smoke` runs it; `smoke.test.ts` asserts `check_setup`/`ae_catalog`/`ae_do` are listed.

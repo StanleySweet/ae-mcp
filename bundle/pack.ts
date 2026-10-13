@@ -36,6 +36,6 @@ export async function packBundle(outDir: string): Promise<string> {
 
 const invokedPath = process.argv[1] ? realpathSync(process.argv[1]) : '';
 if (invokedPath === fileURLToPath(import.meta.url)) {
-  const artifact = await packBundle(join(here, 'out'));
+  const artifact = await packBundle(join(root, 'dist'));
   process.stdout.write(`packed ${artifact}\n`);
 }
