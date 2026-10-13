@@ -492,6 +492,8 @@ Run the sprint's rows on a real AE with a throwaway project. Record results in `
 | 11  | Clean-Mac install from the .dmg in under 5 minutes, ends with a green live test              | S7 |
 | 12  | AE modal dialog open: server reports the stall instead of a bare timeout                     | S7 |
 | 13  | Install a newer AE version: Fix button re-installs the loader                                | S7 |
+| 14  | Delete a layer through Claude, then confirm a new `_v###` file exists and still contains the layer | S5 |
+| 15  | An unsaved project is refused with a hint                                                    | S5 |
 
 ## 10. Risks
 
