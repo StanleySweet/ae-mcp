@@ -115,6 +115,35 @@ export function observeHandlers(project: FakeProject): HandlerMap {
       }
       return { comp: comp.name, layers, missing };
     },
+    ae_expression_report: (args) => {
+      const parsed = (args ?? {}) as { comp?: unknown; layers?: unknown };
+      const comp = findComp(project, parsed.comp);
+      if (!comp) {
+        return { comp: null, layers: [], missing: [] };
+      }
+      const report = (layer: CompLayer, index: number) => ({
+        index,
+        name: layer.name,
+        expressions: layer.expressions,
+      });
+      if (!Array.isArray(parsed.layers)) {
+        return {
+          comp: comp.name,
+          layers: comp.layers.map((layer, i) => report(layer, i + 1)),
+          missing: [],
+        };
+      }
+      const layers: Record<string, unknown>[] = [];
+      const missing: number[] = [];
+      for (const index of parsed.layers as number[]) {
+        if (index >= 1 && index <= comp.layers.length) {
+          layers.push(report(comp.layers[index - 1]!, index));
+        } else {
+          missing.push(index);
+        }
+      }
+      return { comp: comp.name, layers, missing };
+    },
   };
   handlers.ae_version_info = () => ({
     aeVersion: '24.6.0',

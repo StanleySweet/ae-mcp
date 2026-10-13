@@ -130,6 +130,25 @@ export const layerInfoResultSchema = z.object({
   truncated: z.boolean(),
 });
 
+export const expressionEntrySchema = z.object({
+  path: z.string(),
+  matchName: z.string(),
+  expression: z.string(),
+});
+
+export const expressionReportLayerSchema = z.object({
+  index: z.number(),
+  name: z.string(),
+  expressions: z.array(expressionEntrySchema),
+});
+
+export const expressionReportResultSchema = z.object({
+  comp: z.string().nullable(),
+  layers: z.array(expressionReportLayerSchema),
+  missing: z.array(z.number()),
+  truncated: z.boolean(),
+});
+
 export const versionInfoSchema = z.object({
   aeVersion: z.string(),
   bridgeVersion: z.string(),
@@ -170,6 +189,7 @@ export type TextNode = z.infer<typeof textSchema>;
 export type LayerNode = z.infer<typeof layerSchema>;
 export type CompInfoResult = z.infer<typeof compInfoResultSchema>;
 export type LayerInfoResult = z.infer<typeof layerInfoResultSchema>;
+export type ExpressionReportResult = z.infer<typeof expressionReportResultSchema>;
 export type VersionInfo = z.infer<typeof versionInfoSchema>;
 export type Selection = z.infer<typeof selectionSchema>;
 export type FindLayer = z.infer<typeof findLayerSchema>;

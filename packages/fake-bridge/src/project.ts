@@ -4,12 +4,19 @@ export interface CompMarker {
   comment: string;
 }
 
+export interface CompExpression {
+  path: string;
+  matchName: string;
+  expression: string;
+}
+
 export interface CompLayer {
   id: number;
   name: string;
   inPoint: number;
   outPoint: number;
   markers: CompMarker[];
+  expressions: CompExpression[];
 }
 
 export interface Comp {
@@ -70,6 +77,7 @@ export class FakeProject {
       inPoint: 0,
       outPoint: comp.duration,
       markers: [],
+      expressions: [],
     };
     comp.layers.push(layer);
     return layer;
@@ -79,5 +87,16 @@ export class FakeProject {
     const marker: CompMarker = { time, duration, comment };
     layer.markers.push(marker);
     return marker;
+  }
+
+  addExpression(
+    layer: CompLayer,
+    path: string,
+    matchName: string,
+    expression: string,
+  ): CompExpression {
+    const entry: CompExpression = { path, matchName, expression };
+    layer.expressions.push(entry);
+    return entry;
   }
 }

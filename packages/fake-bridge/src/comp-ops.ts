@@ -147,6 +147,7 @@ export function compOperationHandlers(project: FakeProject): HandlerMap {
         inPoint: 0,
         outPoint: comp.duration,
         markers: [],
+        expressions: [],
       };
       comp.layers = comp.layers.filter((layer) => !moved.includes(layer));
       comp.layers.splice(sorted[0]! - 1, 0, holder);

@@ -512,6 +512,62 @@ AEMCP.register('ae_layer_info', function (args) {
     return { comp: comp.name, layers: layers, missing: missing };
 });
 
+// Walk a property tree and collect every property carrying an enabled
+// expression, keyed by its slash-joined property path.
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpressionenabled
+function aemcpCollectExpressions(group, prefix, out) {
+    var i, child, path;
+    for (i = 1; i <= group.numProperties; i++) {
+        child = group.property(i);
+        if (!child) {
+            continue;
+        }
+        path = prefix ? prefix + '/' + child.name : child.name;
+        if (aemcpIsGroup(child)) {
+            aemcpCollectExpressions(child, path, out);
+        } else if (child.expressionEnabled && child.expression) {
+            out.push({ path: path, matchName: child.matchName, expression: child.expression });
+        }
+    }
+    return out;
+}
+
+AEMCP.register('ae_expression_report', function (args) {
+    var comp = aemcpResolveComp(args ? args.comp : null);
+    var layers = [];
+    var missing = [];
+    var requested, i, index, layer;
+    if (!comp) {
+        return { comp: null, layers: layers, missing: missing };
+    }
+    requested = args && args.layers ? args.layers : null;
+    if (!requested) {
+        for (i = 1; i <= comp.numLayers; i++) {
+            layer = comp.layer(i);
+            layers.push({
+                index: layer.index,
+                name: layer.name,
+                expressions: aemcpCollectExpressions(layer, '', [])
+            });
+        }
+    } else {
+        for (i = 0; i < requested.length; i++) {
+            index = requested[i];
+            if (index >= 1 && index <= comp.numLayers) {
+                layer = comp.layer(index);
+                layers.push({
+                    index: layer.index,
+                    name: layer.name,
+                    expressions: aemcpCollectExpressions(layer, '', [])
+                });
+            } else {
+                missing.push(index);
+            }
+        }
+    }
+    return { comp: comp.name, layers: layers, missing: missing };
+});
+
 // Live capability probe: executes inside AE, so a successful reply proves the
 // bridge is loaded and responsive, not merely that a heartbeat file exists.
 AEMCP.register('ae_version_info', function () {

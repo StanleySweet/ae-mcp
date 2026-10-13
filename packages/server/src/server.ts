@@ -307,6 +307,39 @@ export function createServer(options: ServerOptions = {}): McpServer {
   );
 
   server.registerTool(
+    'ae_expression_report',
+    {
+      description:
+        'List every expression-driven property on the layers of a composition (default: the active comp). Pass layer indices to select a subset, or omit to report every layer.',
+      inputSchema: {
+        comp: z.union([z.string(), z.number()]).optional(),
+        layers: z.array(z.number()).optional(),
+      },
+    },
+    async (args) => {
+      const result = await callRaw('ae_expression_report', {
+        comp: args.comp,
+        layers: args.layers,
+      });
+      if (!result.ok) {
+        return toResult(result);
+      }
+      const value = result.result as {
+        comp?: string | null;
+        layers?: unknown[];
+        missing?: unknown[];
+      };
+      const capped = capArray(value.layers ?? [], maxResultBytes);
+      return text({
+        comp: value.comp ?? null,
+        layers: capped.items,
+        missing: value.missing ?? [],
+        truncated: capped.truncated,
+      });
+    },
+  );
+
+  server.registerTool(
     'ae_version_info',
     {
       description:

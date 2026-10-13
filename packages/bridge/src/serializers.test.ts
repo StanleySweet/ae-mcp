@@ -227,6 +227,29 @@ describe('bridge serializers', () => {
     expect(unknown.comp).toBeNull();
   });
 
+  it('collects expression-driven properties across a layer property tree', async () => {
+    const { ctx, ae } = await payloadContext();
+    seed(ae);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer 1', 'Layer');
+    const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+    const position = new MockProperty('Position', 'ADBE Position', [100, 200]);
+    position.expressionEnabled = true;
+    position.expression = 'wiggle(2, 30)';
+    transform.add(position);
+    layer.add(transform);
+    comp.addLayer(layer);
+
+    const report = vm.runInContext(
+      "AEMCP.invoke('ae_expression_report', { comp: 'Main' }, null).value",
+      ctx,
+    );
+    expect(report.comp).toBe('Main');
+    expect(report.layers[0].expressions).toEqual([
+      { path: 'Transform/Position', matchName: 'ADBE Position', expression: 'wiggle(2, 30)' },
+    ]);
+  });
+
   it('probes the live AE and bridge versions with the registered capabilities', async () => {
     const { ctx } = await payloadContext();
     const probe = vm.runInContext("AEMCP.invoke('ae_version_info', null, null).value", ctx);
