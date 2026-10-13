@@ -6,6 +6,7 @@ user has open. macOS only, After Effects 2025 and later.
 - Canonical spec and backlog: [`docs/BACKLOG.md`](docs/BACKLOG.md)
 - User guide: [`docs/user-guide.md`](docs/user-guide.md)
 - Troubleshooting: [`docs/troubleshooting.md`](docs/troubleshooting.md)
+- Tested After Effects versions: [`docs/tested-versions.md`](docs/tested-versions.md)
 - Contribution rules: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Agent instructions: [`AGENTS.md`](AGENTS.md)
 

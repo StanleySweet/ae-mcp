@@ -1,7 +1,9 @@
 # User Guide
 
 ae-mcp connects Claude Desktop to the After Effects project you have open, so
-Claude can read and edit it. macOS only, After Effects 2025 and later.
+Claude can read and edit it. macOS only, After Effects 2025 and later. The
+versions that have been run against are listed in
+[`tested-versions.md`](tested-versions.md).
 
 ## Install
 
