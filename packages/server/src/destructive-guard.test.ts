@@ -63,7 +63,7 @@ async function connectServer(
   project: FakeProject,
   calls: string[],
   options: HarnessOptions = {},
-): Promise<{ client: Client; close: () => Promise<void> }> {
+): Promise<{ client: Client; close: () => Promise<void>; home: string }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-guard-'));
   const root = join(home, '.ae-mcp');
   await mkdir(root, { recursive: true, mode: 0o700 });

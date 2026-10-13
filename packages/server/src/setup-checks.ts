@@ -1,4 +1,5 @@
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { discoverAEVersions } from '@ae-mcp/core';
 import { readHeartbeat } from './heartbeat.js';
 
@@ -64,33 +65,32 @@ async function queueDirCheck(root: string): Promise<SetupCheck> {
 
 async function projectSavedVersionCheck(root: string): Promise<SetupCheck> {
   const file = join(root, 'bridge', 'last-saved-version');
+  const neverSaved = fail(
+    'project_saved_version',
+    'The project has never been saved; run a destructive operation or File > Save once.',
+  );
+  let savedPath: string;
   try {
-    const content = await readFile(file, 'utf8');
-    const savedPath = content.trim();
-    if (!savedPath) {
-      return fail(
-        'project_saved_version',
-        'The project has never been saved; run a destructive operation or File > Save once.',
-      );
-    }
+    savedPath = (await readFile(file, 'utf8')).trim();
+  } catch {
+    return neverSaved;
+  }
+  if (!savedPath) {
+    return neverSaved;
+  }
+  try {
     const info = await stat(savedPath);
     if (!info.isFile()) {
-      return fail(
-        'project_saved_version',
-        `The saved version no longer exists on disk: ${savedPath}.`,
-      );
+      return fail('project_saved_version', `The saved version is not a file: ${savedPath}.`);
     }
-    return {
-      check: 'project_saved_version',
-      status: 'ok',
-      fix: `The saved project version is: ${savedPath}`,
-    };
   } catch {
-    return fail(
-      'project_saved_version',
-      'The project has never been saved; run a destructive operation or File > Save once.',
-    );
+    return fail('project_saved_version', `The saved version no longer exists on disk: ${savedPath}.`);
   }
+  return {
+    check: 'project_saved_version',
+    status: 'ok',
+    fix: `The saved project version is: ${savedPath}`,
+  };
 }
 
 export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {

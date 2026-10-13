@@ -52,7 +52,9 @@ describe('runSetupChecks', () => {
   it('reports every check ok when AE and the bridge are ready', async () => {
     const root = await queueRoot();
     await writeHeartbeat(root);
-    await writeSavedVersion(root, '/projects/P_v008.aep');
+    const savedFile = join(await mkdtemp(join(tmpdir(), 'ae-mcp-saved-')), 'P_v008.aep');
+    await writeFile(savedFile, '');
+    await writeSavedVersion(root, savedFile);
     const checks = await runSetupChecks({
       root,
       applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
