@@ -1,5 +1,72 @@
 # User Guide
 
+ae-mcp connects Claude Desktop to the After Effects project you have open, so
+Claude can read and edit it. macOS only, After Effects 2025 and later.
+
+## Install
+
+### 1. Open the Setup app past Gatekeeper
+
+The ae-mcp builds are unsigned, so macOS blocks the first launch. Open the
+`.dmg`, drag **AE-MCP Setup** into Applications, then right-click (or
+Control-click) the app and choose **Open**, and click **Open** again in the
+warning dialog. You only do this once; afterwards it opens normally with a
+double-click.
+
+### 2. Run Setup
+
+AE-MCP Setup shows six checks. It detects After Effects and Claude Desktop, then
+installs the rest:
+
+- **After Effects found** — an AE 2025 or newer install was detected.
+- **Claude Desktop found** — `/Applications/Claude.app` is present.
+- **Bridge installed** — the ExtendScript payload is in `~/.ae-mcp/bridge` and
+  the startup loader is in the AE `Scripts/Startup` folder.
+- **Scripting permission** — the AE preference that allows scripts to run is on.
+- **Claude extension** — the `ae-mcp.mcpb` bundle is handed to Claude Desktop,
+  which shows its install prompt.
+- **Test** — a live round-trip through the bridge.
+
+Click **Install**. Any row that still shows **Fix** explains what to do; click
+**Retry** after you have done it.
+
+### 3. Restart After Effects
+
+The startup loader only runs when AE starts, so quit and reopen After Effects
+once. The bridge then sends a heartbeat every 30 seconds for as long as AE is
+open — AE must be open for Claude to reach your project.
+
+### 4. Add the Claude extension
+
+Setup hands `ae-mcp.mcpb` to Claude Desktop, which shows an install prompt;
+accept it. If nothing appears, open Claude Desktop, go to
+**Settings > Extensions > Advanced > Install extension** and pick `ae-mcp.mcpb`.
+
+## First run
+
+With AE open, ask Claude to run the `check_setup` tool. It reports four checks:
+
+- `after_effects` — an AE 2025+ install was found.
+- `bridge_heartbeat` — the bridge reported in recently (AE is open and loaded).
+- `queue_permissions` — `~/.ae-mcp` is `chmod 700`.
+- `project_saved_version` — the project has been saved at least once (see
+  [Destructive operations](#destructive-operations)).
+
+Any failing check carries a `fix` hint. When all four are green, ask Claude to
+list the tools it can see.
+
+## Uninstall
+
+Open AE-MCP Setup and click **Uninstall**. It removes the bridge payload, the
+startup loader and the saved-version marker. Remove the extension itself in
+Claude Desktop under **Settings > Extensions**.
+
+## Diagnostics
+
+Click **Export diagnostics** in Setup to write a report to
+`~/Desktop/ae-mcp-diagnostics.txt`. It lists the detected AE and Claude
+installs and the paths ae-mcp uses, which is what to attach to a bug report.
+
 ## Destructive operations
 
 Some operations delete, replace or overwrite project data, or make a change that a single
