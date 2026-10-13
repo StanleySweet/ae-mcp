@@ -94,3 +94,13 @@ once per operation inside a batch. When an increment happens, the result carries
 `check_setup` also names it through the `project_saved_version` check. If the project has
 never been saved, the operation is refused with the error code `UNSAVED_PROJECT` and a hint
 to save once first.
+
+## Expression-driven properties
+
+A property whose value comes from an expression (for example one added by a preset, or a
+`wiggle`) ignores a direct value or keyframe edit: the expression is the real driver. When
+`ae_do` runs `property.set`, `keyframe.add`, `keyframe.remove`, `keyframe.set_easing`,
+`effect.set_property` or `effect.set_keyframe` against such a property, the result carries a
+`warning` naming the property and the expression, so Claude can edit the driving control
+instead. `ae_expression_report` lists every expression-driven property on a comp's layers.
+

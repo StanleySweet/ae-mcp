@@ -929,6 +929,17 @@ AEMCP.register('layer.bounds', function (args) {
     return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
 });
 
+// A property carrying an expression ignores direct value or keyframe edits: the
+// expression is the real driver, so surface it and point at editing the control.
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpressionenabled
+function aemcpWithExpressionWarning(prop, result) {
+    if (prop && prop.expressionEnabled && prop.expression) {
+        result.warning = 'property "' + prop.name + '" is driven by an expression (' +
+            prop.expression + '); edit the driving control instead of setting its value';
+    }
+    return result;
+}
+
 // Property operation handlers (mutating, run via ae_do).
 AEMCP.register('property.get', function (args) {
     var compName = args && args.comp ? args.comp : null;
@@ -1002,7 +1013,7 @@ AEMCP.register('property.set', function (args) {
     var prop = layer.property(propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
     prop.setValue(value);
-    return { success: true };
+    return aemcpWithExpressionWarning(prop, { success: true });
 });
 
 // Keyframe operation handlers (mutating, run via ae_do).
@@ -1029,7 +1040,7 @@ AEMCP.register('keyframe.add', function (args) {
     var prop = layer.property(propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
     prop.setValueAtTime(time, value);
-    return { success: true };
+    return aemcpWithExpressionWarning(prop, { success: true });
 });
 
 AEMCP.register('keyframe.remove', function (args) {
@@ -1054,7 +1065,7 @@ AEMCP.register('keyframe.remove', function (args) {
     var prop = layer.property(propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
     prop.setValueAtTime(time, undefined);
-    return { success: true };
+    return aemcpWithExpressionWarning(prop, { success: true });
 });
 
 AEMCP.register('keyframe.set_easing', function (args) {
@@ -1080,7 +1091,7 @@ AEMCP.register('keyframe.set_easing', function (args) {
     var prop = layer.property(propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
     prop.setEasingAtTime(time, easing);
-    return { success: true };
+    return aemcpWithExpressionWarning(prop, { success: true });
 });
 
 // Expression operation handlers (mutating, run via ae_do).
@@ -1249,7 +1260,7 @@ AEMCP.register('effect.set_property', function (args) {
     var prop = layer.property(propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
     prop.setValue(value);
-    return { success: true };
+    return aemcpWithExpressionWarning(prop, { success: true });
 });
 
 AEMCP.register('effect.set_keyframe', function (args) {
@@ -1275,7 +1286,7 @@ AEMCP.register('effect.set_keyframe', function (args) {
     var prop = layer.property(propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
     prop.setValueAtTime(time, value);
-    return { success: true };
+    return aemcpWithExpressionWarning(prop, { success: true });
 });
 
 AEMCP.register('effect.remove', function (args) {

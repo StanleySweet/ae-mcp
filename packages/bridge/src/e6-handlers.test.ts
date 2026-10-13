@@ -12,6 +12,7 @@ import {
   MockTextLayer,
   MockShapeLayer,
   MockAVLayer,
+  MockProperty,
   runInMockAE,
 } from './mock-ae.js';
 
@@ -153,6 +154,38 @@ describe('layer handlers', () => {
     const out = invoke(ctx, 'layer.add_footage', { comp: 'Main', name: 'Nope.mov' });
 
     expect(out.value).toEqual({ success: false, error: 'Footage item not found' });
+  });
+});
+
+describe('expression-driver warnings', () => {
+  it('warns when an edit targets an expression-driven property', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const position = new MockProperty('Position', 'ADBE Position', [0, 0]);
+    position.expressionEnabled = true;
+    position.expression = 'wiggle(2, 30)';
+    layer.add(position);
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'property.set', { comp: 'Main', name: 'Position', value: [10, 20] });
+
+    expect(out.value).toMatchObject({ success: true });
+    expect((out.value as { warning: string }).warning).toContain('wiggle(2, 30)');
+  });
+
+  it('does not warn for a property without an expression', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    layer.add(new MockProperty('Position', 'ADBE Position', [0, 0]));
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'property.set', { comp: 'Main', name: 'Position', value: [10, 20] });
+
+    expect(out.value).toEqual({ success: true });
   });
 });
 
