@@ -64,8 +64,27 @@ describe('runSetupChecks', () => {
       'bridge_heartbeat',
       'queue_permissions',
       'project_saved_version',
+      'third_party_extensions',
     ]);
     expect(checks.every((c) => c.status === 'ok')).toBe(true);
+  });
+
+  it('lists detected CEP extensions from the user folder', async () => {
+    const root = await queueRoot();
+    await writeHeartbeat(root);
+    const home = await mkdtemp(join(tmpdir(), 'ae-mcp-home-'));
+    const extDir = join(home, 'Library/Application Support/Adobe/CEP/extensions');
+    await mkdir(join(extDir, 'com.misterhorse.animationcomposer'), { recursive: true });
+    await mkdir(join(extDir, 'com.mtmograph.motion'), { recursive: true });
+    const checks = await runSetupChecks({
+      root,
+      applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
+      homeDir: home,
+    });
+    expect(statusOf(checks, 'third_party_extensions')).toBe('ok');
+    const detail = checks.find((c) => c.check === 'third_party_extensions')?.detail ?? '';
+    expect(detail).toContain('com.misterhorse.animationcomposer');
+    expect(detail).toContain('com.mtmograph.motion');
   });
 
   it('fails after_effects with a fix when no supported AE is installed', async () => {

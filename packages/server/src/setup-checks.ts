@@ -1,6 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { discoverAEVersions } from '@ae-mcp/core';
+import { discoverAEVersions, discoverAeExtensions } from '@ae-mcp/core';
 import { readHeartbeat } from './heartbeat.js';
 
 export type CheckStatus = 'ok' | 'fail';
@@ -9,11 +9,14 @@ export interface SetupCheck {
   check: string;
   status: CheckStatus;
   fix?: string;
+  /** Informational value (e.g. the detected extensions); ignored by the installer UI. */
+  detail?: string;
 }
 
 export interface SetupDeps {
   root: string;
   applicationsDir?: string;
+  homeDir?: string;
   now?: () => number;
   heartbeatMaxAgeMs?: number;
 }
@@ -93,6 +96,15 @@ async function projectSavedVersionCheck(root: string): Promise<SetupCheck> {
   };
 }
 
+async function extensionsCheck(homeDir?: string): Promise<SetupCheck> {
+  const extensions = await discoverAeExtensions({ homeDir });
+  if (extensions.length === 0) {
+    return { check: 'third_party_extensions', status: 'ok', detail: 'none detected' };
+  }
+  const names = extensions.map((e) => (e.scope === 'system' ? `${e.name} (system)` : e.name));
+  return { check: 'third_party_extensions', status: 'ok', detail: names.join(', ') };
+}
+
 export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {
   const now = deps.now ?? Date.now;
   const heartbeatMaxAgeMs = deps.heartbeatMaxAgeMs ?? 90_000;
@@ -101,5 +113,6 @@ export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {
     await heartbeatCheck(deps.root, heartbeatMaxAgeMs, now),
     await queueDirCheck(deps.root),
     await projectSavedVersionCheck(deps.root),
+    await extensionsCheck(deps.homeDir),
   ];
 }

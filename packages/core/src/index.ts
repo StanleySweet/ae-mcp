@@ -1,5 +1,7 @@
 export { MIN_SUPPORTED_AE_YEAR, discoverAEVersions } from './ae-discovery.js';
 export type { AEInstall } from './ae-discovery.js';
+export { CEP_SYSTEM_DIR, CEP_USER_SUBDIR, discoverAeExtensions } from './ae-extensions.js';
+export type { AeExtension, DiscoverExtensionsOptions } from './ae-extensions.js';
 export {
   CLAUDE_APP_NAME,
   claudeConfigDir,

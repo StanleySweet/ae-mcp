@@ -54,6 +54,7 @@ describe('mcp server skeleton', () => {
       'bridge_heartbeat',
       'queue_permissions',
       'project_saved_version',
+      'third_party_extensions',
     ]);
     expect(checks.every((row) => row.status === 'ok' || row.status === 'fail')).toBe(true);
 
