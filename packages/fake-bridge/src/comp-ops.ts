@@ -141,7 +141,13 @@ export function compOperationHandlers(project: FakeProject): HandlerMap {
         duration: comp.duration,
       });
       precomp.layers = moved;
-      const holder = { id: project.newId(), name, inPoint: 0, outPoint: comp.duration };
+      const holder = {
+        id: project.newId(),
+        name,
+        inPoint: 0,
+        outPoint: comp.duration,
+        markers: [],
+      };
       comp.layers = comp.layers.filter((layer) => !moved.includes(layer));
       comp.layers.splice(sorted[0]! - 1, 0, holder);
       return { comp: comp.name, numLayers: comp.layers.length, precomp: compInfo(precomp) };

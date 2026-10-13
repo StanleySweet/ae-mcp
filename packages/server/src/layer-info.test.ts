@@ -44,7 +44,11 @@ async function call(
   args: Record<string, unknown>,
 ): Promise<{
   comp: string | null;
-  layers: { index: number; name: string }[];
+  layers: {
+    index: number;
+    name: string;
+    markers?: { time: number; duration: number; comment: string }[];
+  }[];
   missing: number[];
   truncated: boolean;
 }> {
@@ -78,6 +82,18 @@ describe('ae_layer_info', () => {
     const subset = await call(client, { comp: 'Main', layers: [2, 9] });
     expect(subset.layers.map((layer) => layer.name)).toEqual(['Layer 2']);
     expect(subset.missing).toEqual([9]);
+  });
+
+  it('lists layer markers with comments and durations', async () => {
+    const project = new FakeProject();
+    const comp = project.addComp('Main', 1920, 1080);
+    const layer = project.addLayer(comp, 'Layer 1');
+    project.addMarker(layer, 1.5, 'Cut', 0.5);
+    const { client, close } = await connectServer(project);
+    closes.push(close);
+
+    const info = await call(client, { comp: 'Main' });
+    expect(info.layers[0]!.markers).toEqual([{ time: 1.5, duration: 0.5, comment: 'Cut' }]);
   });
 
   it('reports a null comp when the requested comp is unknown', async () => {

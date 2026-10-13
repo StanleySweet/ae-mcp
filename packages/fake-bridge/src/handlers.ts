@@ -53,6 +53,7 @@ function layerInfo(layer: CompLayer, index: number): Record<string, unknown> {
     stretch: 1,
     parentIndex: null,
     label: 0,
+    markers: layer.markers,
   };
 }
 

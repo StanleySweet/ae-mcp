@@ -171,6 +171,25 @@ function aemcpSerializeMasks(layer) {
     return masks;
 }
 
+function aemcpSerializeMarkers(layer) {
+    var markers = [];
+    var group = layer.property('Marker');
+    var i, value;
+    // Marker properties expose numKeys; a group's numProperties is not reliable here.
+    if (group === null || group === undefined || typeof group.numKeys !== 'number') {
+        return markers;
+    }
+    for (i = 1; i <= group.numKeys; i++) {
+        value = group.keyValue(i);
+        markers.push({
+            time: aemcpRound(group.keyTime(i)),
+            duration: aemcpRound(value.duration),
+            comment: value.comment
+        });
+    }
+    return markers;
+}
+
 function aemcpSerializeText(layer) {
     var text = layer.property('ADBE Text Properties');
     if (!aemcpIsGroup(text)) {
@@ -244,6 +263,7 @@ function aemcpSerializeLayer(layer) {
     }
     out.effects = aemcpSerializeEffects(layer);
     out.masks = aemcpSerializeMasks(layer);
+    out.markers = aemcpSerializeMarkers(layer);
     if (layer instanceof TextLayer) {
         var text = aemcpSerializeText(layer);
         if (text) {

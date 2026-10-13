@@ -1,8 +1,15 @@
+export interface CompMarker {
+  time: number;
+  duration: number;
+  comment: string;
+}
+
 export interface CompLayer {
   id: number;
   name: string;
   inPoint: number;
   outPoint: number;
+  markers: CompMarker[];
 }
 
 export interface Comp {
@@ -57,8 +64,20 @@ export class FakeProject {
   }
 
   addLayer(comp: Comp, name: string): CompLayer {
-    const layer: CompLayer = { id: this.newId(), name, inPoint: 0, outPoint: comp.duration };
+    const layer: CompLayer = {
+      id: this.newId(),
+      name,
+      inPoint: 0,
+      outPoint: comp.duration,
+      markers: [],
+    };
     comp.layers.push(layer);
     return layer;
+  }
+
+  addMarker(layer: CompLayer, time: number, comment: string, duration = 0): CompMarker {
+    const marker: CompMarker = { time, duration, comment };
+    layer.markers.push(marker);
+    return marker;
   }
 }

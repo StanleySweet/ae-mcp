@@ -82,6 +82,12 @@ export const textSchema = z.object({
   fillColor: z.array(z.number()).length(3),
 });
 
+export const markerSchema = z.object({
+  time: z.number(),
+  duration: z.number(),
+  comment: z.string(),
+});
+
 export const layerSchema = z.object({
   index: z.number(),
   id: z.number().nullable(),
@@ -107,6 +113,7 @@ export const layerSchema = z.object({
   transform: propertyGroupSchema.optional(),
   effects: z.array(effectSchema).optional(),
   masks: z.array(propertyGroupSchema).optional(),
+  markers: z.array(markerSchema).optional(),
   text: textSchema.optional(),
 });
 

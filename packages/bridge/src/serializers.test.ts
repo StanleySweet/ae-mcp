@@ -19,6 +19,8 @@ import {
   MockFolderItem,
   MockFootageItem,
   MockFile,
+  MockMarkerPropertyGroup,
+  MockMarkerValue,
   MockProperty,
   MockPropertyGroup,
   MockTextLayer,
@@ -195,6 +197,9 @@ describe('bridge serializers', () => {
     const comp = ae.project.item(1) as MockCompItem;
     const first = new MockAVLayer('Layer 1', 'Layer');
     first.id = 7;
+    const marker = new MockMarkerValue('Fade Up');
+    marker.duration = 0.5;
+    (first.property('Marker') as MockMarkerPropertyGroup).setValueAtTime(2, marker);
     const second = new MockAVLayer('Layer 2', 'Layer');
     second.id = 8;
     comp.addLayer(first);
@@ -206,6 +211,7 @@ describe('bridge serializers', () => {
       'Layer 1',
       'Layer 2',
     ]);
+    expect(all.layers[0].markers).toEqual([{ time: 2, duration: 0.5, comment: 'Fade Up' }]);
 
     const subset = vm.runInContext(
       "AEMCP.invoke('ae_layer_info', { comp: 'Main', layers: [2, 9] }, null).value",
