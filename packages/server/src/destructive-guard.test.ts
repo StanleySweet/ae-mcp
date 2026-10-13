@@ -57,6 +57,7 @@ interface HarnessOptions {
   incrementResult?: unknown;
   settings?: Settings;
   operations?: OperationRegistry;
+  extraHandlers?: Record<string, (args?: unknown) => unknown>;
 }
 
 async function connectServer(
@@ -87,6 +88,7 @@ async function connectServer(
       calls.push('batch.run');
       return { results: [] };
     },
+    ...options.extraHandlers,
   };
   const consumer = createQueueConsumer(root, handlers);
   await consumer.start();
@@ -462,5 +464,87 @@ describe('E13-5 saved version path reporting', () => {
 
     const savedVersion = await readFile(join(home, '.ae-mcp', 'bridge', 'last-saved-version'), 'utf8');
     expect(savedVersion.trim()).toBe('/projects/P_v008.aep');
+  });
+});
+
+describe('E13-6 guard cannot be bypassed', () => {
+  const closes: (() => Promise<void>)[] = [];
+
+  afterEach(async () => {
+    for (const close of closes.splice(0)) {
+      await close();
+    }
+  });
+
+  function registryWithEval(): OperationRegistry {
+    const registryWithEvalOp = registry();
+    registryWithEvalOp.register({
+      name: 'eval.run',
+      category: 'eval',
+      description: 'Run arbitrary ExtendScript.',
+      readOnly: false,
+      destructive: true,
+      schema: { code: { type: 'string' } },
+    });
+    return registryWithEvalOp;
+  }
+
+  function evalHandlers(calls: string[]): Record<string, (args?: unknown) => unknown> {
+    return {
+      'eval.run': () => {
+        calls.push('eval.run');
+        return { ok: true };
+      },
+    };
+  }
+
+  it('increments before eval.run when the project is saved', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      operations: registryWithEval(),
+      settings: settings({ evalEnabled: true }),
+      extraHandlers: evalHandlers(calls),
+    });
+    closes.push(close);
+
+    const result = await call(client, 'eval.run', { code: '1+1' });
+    expect(result.isError).toBe(false);
+    expect(calls).toEqual(['project.increment_save', 'eval.run']);
+    expect(JSON.parse(result.text).increment).toEqual({ incrementedFile: '/projects/P_v008.aep' });
+  });
+
+  it('cannot smuggle a destructive eval.run through batch.run', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      operations: registryWithEval(),
+      settings: settings({ evalEnabled: true }),
+      extraHandlers: evalHandlers(calls),
+    });
+    closes.push(close);
+
+    const result = await call(client, 'batch.run', {
+      ops: [{ op: 'eval.run', args: { code: '1+1' } }],
+    });
+    expect(result.isError).toBe(false);
+    expect(calls).toEqual(['project.increment_save', 'batch.run']);
+  });
+
+  it('cannot smuggle a destructive eval.run through batch.run when the project is unsaved', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      operations: registryWithEval(),
+      settings: settings({ evalEnabled: true }),
+      incrementResult: { success: false, error: 'project has never been saved' },
+      extraHandlers: evalHandlers(calls),
+    });
+    closes.push(close);
+
+    const result = await call(client, 'batch.run', {
+      ops: [{ op: 'eval.run', args: { code: '1+1' } }],
+    });
+    expect(result.isError).toBe(true);
+    const error = errorSchema.parse(JSON.parse(result.text));
+    expect(error.code).toBe('UNSAVED_PROJECT');
+    expect(calls).toEqual(['project.increment_save']);
   });
 });
