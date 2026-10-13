@@ -2,15 +2,26 @@
 
 ## Destructive operations
 
-The following operations trigger an automatic incremental save before execution (when `incrementBeforeDestructive` is enabled, which is the default):
+Some operations delete, replace or overwrite project data, or make a change that a single
+undo cannot reverse. Before any of them runs, ae-mcp saves a checkpoint with File > Increment
+and Save, so the file on disk keeps the state from just before the change
+(`MyProject_v007.aep` becomes `MyProject_v008.aep`).
 
-- Delete/remove operations and any operation that cannot be reversed with a single undo
-- `layer.delete`
-- `project.import_json` with `clearFirst`
-- `project.save_as` onto an existing path
-- Renders or exports onto an existing file
-- Bulk plans that remove or replace items (e.g. `bulk.remove_unused`)
-- `command.execute`
-- `eval.run` (always destructive)
+The guard is on when `incrementBeforeDestructive` is enabled, which is the default. The
+setting is owned by the Setup app and Claude cannot change it; the environment variable
+`AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE` overrides it.
 
-The guard makes one incremental save per call, per `batch.run`, and per bulk plan. The result includes `increment.incrementedFile` when an increment occurred. The saved project path is also surfaced by the next `check_setup` run (`project_saved_version` check).
+Operations flagged destructive:
+
+- `layer.delete`, `keyframe.remove`, `effect.remove` — deletes and removals
+- `command.execute` — runs an arbitrary menu command
+- `render.queue_start` — renders onto files that may already exist
+- `bulk.remove_unused` — a bulk plan that removes or replaces items
+- `eval.run` — arbitrary ExtendScript, always destructive and off unless explicitly enabled
+
+The guard makes one incremental save per call, per `batch.run`, and per bulk plan — never
+once per operation inside a batch. When an increment happens, the result carries
+`increment.incrementedFile`, the path of the new versioned project file. The next
+`check_setup` also names it through the `project_saved_version` check. If the project has
+never been saved, the operation is refused with the error code `UNSAVED_PROJECT` and a hint
+to save once first.
