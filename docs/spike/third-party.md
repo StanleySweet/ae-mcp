@@ -101,6 +101,11 @@ Fill one block per Mac.
    `AE_BUSY` needs a **timeout** on the osascript call (and/or `with override`). Decision
    needed: timeout-and-retry vs. `override`-interrupt. (Observed on Mac 1; the reverse
    direction — panel open while a bridge job runs — is not yet exercised.)
+   - **Reverse direction (partly exercised, Mac 1):** with the Motion 2 workflow just used
+     (its panel open), a bridge job — `ae_project_info` run through the osascript
+     `DoScriptFile` transport — completed normally. So our job does not obviously collide with
+     an open third-party panel. Repeated/edge cases and the reverse (their tool running while
+     our job starts) remain untested.
 5. License terms on automating or reading libraries: Mister Horse EULA
    (misterhorse.com/terms-of-use) — non-transferable; end user "cannot extract or use the
    Product, Software and/or Content separate from the Work". Mt. Mograph EULA
