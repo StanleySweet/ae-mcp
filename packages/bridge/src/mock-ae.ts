@@ -18,22 +18,6 @@ function homeOf(ae: MockAE): string {
   return ae.env.HOME ?? '';
 }
 
-// Mirrors File > Increment and Save: MyProject_v007.aep -> MyProject_v008.aep,
-// and MyProject.aep -> MyProject_v001.aep when there is no version suffix.
-function incrementProjectName(path: string): string {
-  const slash = path.lastIndexOf('/');
-  const dir = slash >= 0 ? path.slice(0, slash + 1) : '';
-  const name = slash >= 0 ? path.slice(slash + 1) : path;
-  const dot = name.lastIndexOf('.');
-  const base = dot >= 0 ? name.slice(0, dot) : name;
-  const ext = dot >= 0 ? name.slice(dot) : '';
-  const match = /^(.*)_v(\d+)$/.exec(base);
-  const next = match
-    ? `${match[1]}_v${String(Number(match[2]) + 1).padStart(match[2].length, '0')}`
-    : `${base}_v001`;
-  return `${dir}${next}${ext}`;
-}
-
 export class MockFile {
   private opened: 'r' | 'w' | null = null;
   private buffer = '';
@@ -696,6 +680,14 @@ export class MockProject {
     return item;
   }
 
+  // app.project.save([file]) — "Pass a File object to save a project to a new
+  // file without prompting." https://ae-scripting.docsforadobe.dev/general/project/#projectsave
+  save(file?: MockFile): void {
+    if (file) {
+      this.file = file;
+    }
+  }
+
   removeItem(item: MockItem): void {
     const index = this.all.indexOf(item);
     if (index >= 0) {
@@ -749,12 +741,6 @@ export class MockAE {
     findMenuCommandId: (name: string): number => this.menuCommandIds[name] ?? 0,
     executeCommand: (id: number): void => {
       this.executedCommands.push(id);
-      const isIncrement = Object.entries(this.menuCommandIds).some(
-        ([k, v]) => v === id && /incr|inkr/i.test(k),
-      );
-      if (isIncrement && this.project.file) {
-        this.project.file = new MockFile(this, incrementProjectName(this.project.file.path));
-      }
     },
     // Real AE only accepts a string of code, evaluated later in the global scope.
     scheduleTask: (code: string, delay: number, repeat: boolean): number => {

@@ -22,19 +22,23 @@ function invoke(ctx: vm.Context, tool: string, args: unknown): { value?: unknown
 }
 
 describe('project.increment_save', () => {
-  it('runs the Increment and Save menu command found by name, trying multiple languages', async () => {
+  it('saves to the next versioned filename without prompting', async () => {
     const { ctx, ae } = await payloadContext();
     ae.project.file = new MockFile(ae, '/projects/MyProject_v007.aep');
 
-    // French AE: clear existing entries and add only the French name.
-    for (const key of Object.keys(ae.menuCommandIds)) {
-      delete ae.menuCommandIds[key];
-    }
-    ae.menuCommandIds['Incrémentation et enregistrement'] = 3000;
     const outcome = invoke(ctx, 'project.increment_save', null);
 
-    expect(ae.executedCommands).toEqual([3000]);
+    expect(ae.executedCommands).toEqual([]);
     expect(outcome.value).toEqual({ success: true, file: '/projects/MyProject_v008.aep' });
+  });
+
+  it('starts at _v001 when the project has no version suffix', async () => {
+    const { ctx, ae } = await payloadContext();
+    ae.project.file = new MockFile(ae, '/projects/MyProject.aep');
+
+    const outcome = invoke(ctx, 'project.increment_save', null);
+
+    expect(outcome.value).toEqual({ success: true, file: '/projects/MyProject_v001.aep' });
   });
 
   it('refuses to increment a project that has never been saved', async () => {

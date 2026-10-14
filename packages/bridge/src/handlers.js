@@ -22,26 +22,39 @@ AEMCP.register('project.undo', function () {
     return { success: true };
 });
 
-// File > Increment and Save. Found by name because the command ID differs per
-// AE version and language package. We try English first, then French.
-// Ref: https://ae-scripting.docsforadobe.dev/general/application/#appfindmenucommandid
+// File > Increment and Save, done natively so it does not depend on the
+// localized menu name (app.findMenuCommandId only takes a localized string).
+// app.project.save(file) saves to a new file without prompting.
+// Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectsave
 AEMCP.register('project.increment_save', function () {
     if (!app.project.file) {
         return { success: false, error: 'project has never been saved' };
     }
-    var names = ['Increment and Save', 'Incr\u00e9mentation et enregistrement', 'Incrementar y guardar', 'Inkrementieren und speichern'];
-    var id = null;
-    var i;
-    for (i = 0; i < names.length; i++) {
-        id = app.findMenuCommandId(names[i]);
-        if (id) { break; }
-    }
-    if (!id) {
-        return { success: false, error: 'Increment and Save command not found' };
-    }
-    app.executeCommand(id);
+    app.project.save(new File(aemcpNextIncrementPath(app.project.file.fsName)));
     return { success: true, file: app.project.file ? app.project.file.fsName : null };
 });
+
+// MyProject_v007.aep -> MyProject_v008.aep; MyProject.aep -> MyProject_v001.aep.
+function aemcpNextIncrementPath(path) {
+    var slash = path.lastIndexOf('/');
+    var dir = slash >= 0 ? path.substring(0, slash + 1) : '';
+    var name = slash >= 0 ? path.substring(slash + 1) : path;
+    var dot = name.lastIndexOf('.');
+    var base = dot >= 0 ? name.substring(0, dot) : name;
+    var ext = dot >= 0 ? name.substring(dot) : '';
+    var match = /^(.*)_v(\d+)$/.exec(base);
+    var next;
+    if (match) {
+        var digits = String(Number(match[2]) + 1);
+        while (digits.length < match[2].length) {
+            digits = '0' + digits;
+        }
+        next = match[1] + '_v' + digits;
+    } else {
+        next = base + '_v001';
+    }
+    return dir + next + ext;
+}
 
 // The set of project item ids that some composition places as a layer source.
 function aemcpUsedItemIds(project) {
