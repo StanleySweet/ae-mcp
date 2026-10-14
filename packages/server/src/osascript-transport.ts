@@ -57,18 +57,6 @@ function triggerSource(payloadPath: string, jobPath: string): string {
   return `$.evalFile(${JSON.stringify(payloadPath)});\nAEMCP.processJob(${JSON.stringify(jobPath)});\n`;
 }
 
-// After Effects runs one script at a time. On a collision it refuses via a
-// modal dialog and the osascript call blocks — the primary signal is the call
-// timeout (see `isTimeout`). If the dialog is dismissed first, AE may return an
-// error whose text names the collision; this regex is the fallback for that.
-// Observed (French) on Mac 1: "tentative d'exécuter un second script pendant
-// l'exécution d'un script" — https://github.com/StanleySweet/ae-mcp/issues/157
-const SCRIPT_RUNNING = /already running|currently running|another script|second script|script is running/i;
-
-function isScriptRunning(error: unknown): boolean {
-  return SCRIPT_RUNNING.test(String(error));
-}
-
 // execFile kills the child on timeout; the rejection carries `killed`/`signal`.
 function isTimeout(error: unknown): boolean {
   const e = error as { killed?: boolean; signal?: string | null } | null;
@@ -151,13 +139,6 @@ export class OsaScriptTransport implements Transport {
             'AE_BUSY',
             `After Effects did not answer within ${this.timeoutMs}ms; another script is probably running.`,
           ),
-        };
-      }
-      if (isScriptRunning(error)) {
-        return {
-          protocolVersion: PROTOCOL_VERSION,
-          ok: false,
-          error: makeError('AE_BUSY', `After Effects is running another script: ${String(error)}`),
         };
       }
       return {

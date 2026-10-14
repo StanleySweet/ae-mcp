@@ -73,7 +73,7 @@ describe('osascript transport', () => {
     expect(result.error.code).toBe('BRIDGE_NOT_LOADED');
   });
 
-  it('maps a "script is already running" refusal to AE_BUSY', async () => {
+  it('does not guess AE_BUSY from error text; only the timeout does', async () => {
     const root = await queueRoot();
     const runner: Runner = async () => {
       throw new Error('After Effects got an error: a script is already running.');
@@ -85,7 +85,7 @@ describe('osascript transport', () => {
     if (result.ok) {
       throw new Error(`expected a failure, got ${JSON.stringify(result)}`);
     }
-    expect(result.error.code).toBe('AE_BUSY');
+    expect(result.error.code).toBe('BRIDGE_NOT_LOADED');
   });
 
   it('bounds the DoScriptFile call with the configured timeout', async () => {
