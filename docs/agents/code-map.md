@@ -27,6 +27,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 ## Bridge call path
 
 - `AEClient.call(tool, args)` `ae-client.ts:26`; builds job `{protocolVersion:1, id, tool, args, deadline}` :72 (30s timeout :57). Transport failure → `BRIDGE_NOT_LOADED` :103; stall detection rewrites timeouts into a modal-dialog hint. (E14-3) an `AE_BUSY` result (another script running) is retried with exponential backoff (`retry` option, default 4 attempts, 200ms base, 2s cap; `sleep` injectable, `false` disables) before it is returned.
+- (E14-16 / #157) `OsaScriptTransport` (`osascript-transport.ts`) bounds `DoScriptFile` with `timeoutMs` (env `AE_MCP_SCRIPT_TIMEOUT_MS`, default 120s); a killed call → `AE_BUSY` so the backoff retry runs. `with override` (sdef) is opt-in via env `AE_MCP_SCRIPT_OVERRIDE=1`, off by default. The `SCRIPT_RUNNING` regex is a fallback only (AE refuses with a modal dialog, not a returned error).
 - `ResultMessage` `protocol/src/messages.ts:24-41`: `{ok:true,result}` | `{ok:false,error:{code,message,hint?}}`. Codes+hints `protocol/src/errors.ts` (`makeError`); E8-5 added `UNKNOWN_JOB`/`AERENDER_NOT_FOUND`, E9-2 added `UNKNOWN_PLAN`/`PLAN_EXPIRED`/`PLAN_CHANGED`, E14-3 added `AE_BUSY`.
 - **`job.tool` IS the operation name** — bridge treats observe tools and `category.action` op names identically.
 

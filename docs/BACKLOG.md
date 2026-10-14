@@ -320,6 +320,7 @@ Tasks E6-5 to E6-15 are one commit per category, each with the message `feat(ops
 - **E14-3** [GATE ADR 0002] feat(server): retry with backoff when AE reports a script is running
 - **E14-4** feat(core): detect installed After Effects extensions and list them in check_setup
 - **E14-5** [HUMAN] docs(checklist): add rows 16 and 17 (collision test with each panel; Claude explains a preset-built layer correctly)
+- **E14-16** fix(server): timeout the osascript DoScriptFile call so a blocked bridge reports AE_BUSY (E14-3 follow-up; `with override` opt-in, off by default). See #157.
 
 **Story 14.3.** As Claude, I can read and safely edit what these tools create. AC: layer info shows markers with comments and durations, expressions, and effects; Claude can list every expression-driven property on a layer or comp; an edit that targets such a property returns a warning naming the driver, so Claude can choose to edit the control instead.
 

@@ -26,7 +26,7 @@ export interface RunResult {
 export type Runner = (
   command: string,
   args: string[],
-  options: { encoding: 'utf8' },
+  options: { encoding: 'utf8'; timeout?: number },
 ) => Promise<RunResult>;
 
 const defaultRunner: Runner = (command, args, options) =>
@@ -36,19 +36,43 @@ export function aeAppName(): string {
   return process.env.AE_APP_NAME ?? 'Adobe After Effects 2025';
 }
 
+// AE runs one script at a time. When another script (a third-party panel, or
+// the startup loader) is mid-run, AE refuses a second `DoScriptFile` with a
+// modal dialog and the osascript call blocks until it is dismissed. There is no
+// error text to match, so bound the call: a killed call maps to AE_BUSY and the
+// client retries with backoff. Observed on Mac 1 (docs/spike/third-party.md Q4).
+function defaultScriptTimeoutMs(): number {
+  const raw = Number(process.env.AE_MCP_SCRIPT_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 120_000;
+}
+
+// `DoScriptFile`/`DoScript` take an optional `override` (Contents/Resources/
+// ae.sdef): "Allow one script to interrupt and run while another script is
+// running." Off by default — interrupting a panel mid-operation is unsafe.
+function defaultOverride(): boolean {
+  return process.env.AE_MCP_SCRIPT_OVERRIDE === '1';
+}
+
 function triggerSource(payloadPath: string, jobPath: string): string {
   return `$.evalFile(${JSON.stringify(payloadPath)});\nAEMCP.processJob(${JSON.stringify(jobPath)});\n`;
 }
 
-// After Effects runs one script at a time; when a third-party panel (or the
-// startup loader) is mid-script, `DoScriptFile` is refused. The wording is not
-// documented in the scripting guide, so this is a text heuristic: E14-5 (HUMAN)
-// confirms the exact phrasing on real AE and this list is trimmed to it.
-// ponytail: message match only; switch to a typed signal if AE ever exposes one.
+// After Effects runs one script at a time. On a collision it refuses via a
+// modal dialog and the osascript call blocks — the primary signal is the call
+// timeout (see `isTimeout`). If the dialog is dismissed first, AE may return an
+// error whose text names the collision; this regex is the fallback for that.
+// Observed (French) on Mac 1: "tentative d'exécuter un second script pendant
+// l'exécution d'un script" — https://github.com/StanleySweet/ae-mcp/issues/157
 const SCRIPT_RUNNING = /already running|currently running|another script|second script|script is running/i;
 
 function isScriptRunning(error: unknown): boolean {
   return SCRIPT_RUNNING.test(String(error));
+}
+
+// execFile kills the child on timeout; the rejection carries `killed`/`signal`.
+function isTimeout(error: unknown): boolean {
+  const e = error as { killed?: boolean; signal?: string | null } | null;
+  return e?.killed === true || e?.signal === 'SIGTERM';
 }
 
 /**
@@ -67,17 +91,23 @@ export class OsaScriptTransport implements Transport {
     private readonly root: string,
     private readonly appName: string,
     runner?: Runner,
+    private readonly timeoutMs: number = defaultScriptTimeoutMs(),
+    private readonly override: boolean = defaultOverride(),
   ) {
     this.runner = runner ?? defaultRunner;
   }
 
   private async run(tell: string): Promise<string> {
-    const { stdout } = await this.runner('osascript', ['-e', tell], { encoding: 'utf8' });
+    const { stdout } = await this.runner('osascript', ['-e', tell], {
+      encoding: 'utf8',
+      timeout: this.timeoutMs,
+    });
     return stdout.trim();
   }
 
   private doScript(path: string): Promise<string> {
-    return this.run(`tell application "${this.appName}" to DoScriptFile "${path}"`);
+    const override = this.override ? ' with override' : '';
+    return this.run(`tell application "${this.appName}" to DoScriptFile "${path}"${override}`);
   }
 
   private payloadPath(): string {
@@ -113,6 +143,16 @@ export class OsaScriptTransport implements Transport {
       await this.doScript(triggerFile);
     } catch (error) {
       await unlink(jobFile).catch(() => undefined);
+      if (isTimeout(error)) {
+        return {
+          protocolVersion: PROTOCOL_VERSION,
+          ok: false,
+          error: makeError(
+            'AE_BUSY',
+            `After Effects did not answer within ${this.timeoutMs}ms; another script is probably running.`,
+          ),
+        };
+      }
       if (isScriptRunning(error)) {
         return {
           protocolVersion: PROTOCOL_VERSION,

@@ -88,6 +88,57 @@ describe('osascript transport', () => {
     expect(result.error.code).toBe('AE_BUSY');
   });
 
+  it('bounds the DoScriptFile call with the configured timeout', async () => {
+    const root = await queueRoot();
+    const seen: { encoding: 'utf8'; timeout?: number }[] = [];
+    const runner: Runner = async (_command, _args, options) => {
+      seen.push(options);
+      throw new Error('unreachable');
+    };
+    const transport = new OsaScriptTransport(root, APP, runner, 1234);
+
+    await transport.call(job('o-timeout-opt', {}));
+
+    expect(seen[0]?.timeout).toBe(1234);
+  });
+
+  it('reports AE_BUSY when the DoScriptFile call is killed by the timeout', async () => {
+    const root = await queueRoot();
+    const runner: Runner = async () => {
+      const error = new Error('osascript killed') as Error & { killed: boolean };
+      error.killed = true;
+      throw error;
+    };
+    const transport = new OsaScriptTransport(root, APP, runner, 10);
+
+    const result = await transport.call(job('o-killed', {}));
+
+    if (result.ok) {
+      throw new Error(`expected a failure, got ${JSON.stringify(result)}`);
+    }
+    expect(result.error.code).toBe('AE_BUSY');
+  });
+
+  it('does not pass override by default', async () => {
+    const root = await queueRoot();
+    const calls: string[] = [];
+    const transport = new OsaScriptTransport(root, APP, aeRunner(root, calls));
+
+    await transport.call(job('o-no-override', {}));
+
+    expect(calls[0]).not.toContain('with override');
+  });
+
+  it('passes "with override" when enabled', async () => {
+    const root = await queueRoot();
+    const calls: string[] = [];
+    const transport = new OsaScriptTransport(root, APP, aeRunner(root, calls), 30_000, true);
+
+    await transport.call(job('o-override', {}));
+
+    expect(calls[0]).toContain('with override');
+  });
+
   it('probes availability and selects osascript when reachable', async () => {
     const root = await queueRoot();
     const transport = await selectTransport({ root, appName: APP, runner: aeRunner(root, []) });
