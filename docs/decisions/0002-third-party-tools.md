@@ -34,7 +34,8 @@ read what a preset leaves behind, or re-apply a preset by name — the spike
 Interoperate with third-party tools **only through the observable After Effects object
 model** — what an applied preset leaves on a layer (markers, marker parameters, effects,
 expressions). Do **not** read, copy or redistribute their files, and do **not**
-reverse-engineer or deobfuscate their code.
+reverse-engineer or deobfuscate their code (a scope choice, not a legal bar — see
+Alternatives).
 
 From Mac 1 (AE 2026, Animation Composer 4.2.6, Motion 2):
 
@@ -46,8 +47,9 @@ From Mac 1 (AE 2026, Animation Composer 4.2.6, Motion 2):
    and expressions — all visible through the existing markers and expressions tooling
    (E14-6, E14-7). Marker **parameters** are the one unsurfaced part.
 3. Motion exposes no script entry point (obfuscated `Motion 2.jsxbin` panel).
-4. Both vendors' EULAs forbid extraction/reverse engineering, so a library-path feature is
-   out of scope.
+4. Both vendors' EULAs claim to forbid extraction and reverse engineering. Within the EU a
+   clause like that cannot override the interoperability exception in the Software Directive
+   (Art. 6 and 8), so the law is **not** the reason for this decision — see Alternatives.
 
 **Outcome for the gated tasks:** E14-9 (third-party library paths), E14-10
 (`thirdparty.search`) and E14-11 (`thirdparty.apply_preset`) are **not supported** — there
@@ -68,12 +70,21 @@ Accepted or Rejected once both Macs are run.)_
 
 ## Alternatives considered
 
-- **Drive their panels** (UI automation / CEP hooks). Only viable if question 3
-  finds a supported entry point.
-- **Read/apply their preset libraries directly** (`.ffx` or project assets).
-  Only viable if question 1 confirms a stable on-disk format.
-- **Do nothing** — users keep applying presets by hand; ae-mcp stays
-  preset-agnostic. Safe default if licenses (question 5) forbid automation.
+- **Reverse-engineer for interoperability.** In the EU, Directive 2009/24/EC Art. 6 permits
+  decompilation to achieve interoperability of an independently created program, Art. 8
+  voids contract terms to the contrary, and the Trade Secrets Directive (EU) 2016/943
+  Art. 3(1)(b) treats disassembly of a lawfully held product as lawful — so the EULA clauses
+  are not an absolute bar. **Rejected on technical and scope grounds**, not legal: AC needs
+  no decompilation (its preset data lives in AE's own object model), and Motion ships
+  obfuscated JSXBIN whose deobfuscation would target "running their tools", i.e. functional
+  cloning rather than interoperability (outside Art. 6(2)). Revisit only if a lawyer signs
+  off on an apply-by-name feature. Not legal advice — consult counsel before shipping.
+- **Drive their panels** (UI automation / CEP hooks). Rejected: question 3 found no script
+  entry point, and AC's CEP host is minified and fragile to call.
+- **Read/apply their preset libraries directly** (`.ffx` or project assets). Rejected:
+  question 1 found no on-disk library.
+- **Do nothing** — users keep applying presets by hand; ae-mcp stays preset-agnostic. This is
+  what we do for *applying* presets, while still *reading* what they leave.
 
 ## Verification
 
