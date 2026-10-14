@@ -22,13 +22,18 @@ function invoke(ctx: vm.Context, tool: string, args: unknown): { value?: unknown
 }
 
 describe('project.increment_save', () => {
-  it('runs the Increment and Save menu command found by name', async () => {
+  it('runs the Increment and Save menu command found by name, trying multiple languages', async () => {
     const { ctx, ae } = await payloadContext();
     ae.project.file = new MockFile(ae, '/projects/MyProject_v007.aep');
 
+    // French AE: clear existing entries and add only the French name.
+    for (const key of Object.keys(ae.menuCommandIds)) {
+      delete ae.menuCommandIds[key];
+    }
+    ae.menuCommandIds['Incrémentation et enregistrement'] = 3000;
     const outcome = invoke(ctx, 'project.increment_save', null);
 
-    expect(ae.executedCommands).toEqual([ae.menuCommandIds['Increment and Save']]);
+    expect(ae.executedCommands).toEqual([3000]);
     expect(outcome.value).toEqual({ success: true, file: '/projects/MyProject_v008.aep' });
   });
 

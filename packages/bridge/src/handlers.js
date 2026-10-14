@@ -23,13 +23,19 @@ AEMCP.register('project.undo', function () {
 });
 
 // File > Increment and Save. Found by name because the command ID differs per
-// AE version and language package.
+// AE version and language package. We try English first, then French.
 // Ref: https://ae-scripting.docsforadobe.dev/general/application/#appfindmenucommandid
 AEMCP.register('project.increment_save', function () {
     if (!app.project.file) {
         return { success: false, error: 'project has never been saved' };
     }
-    var id = app.findMenuCommandId('Increment and Save');
+    var names = ['Increment and Save', 'Incr\u00e9mentation et enregistrement', 'Incrementar y guardar', 'Inkrementieren und speichern'];
+    var id = null;
+    var i;
+    for (i = 0; i < names.length; i++) {
+        id = app.findMenuCommandId(names[i]);
+        if (id) { break; }
+    }
     if (!id) {
         return { success: false, error: 'Increment and Save command not found' };
     }
