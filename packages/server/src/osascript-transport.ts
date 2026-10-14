@@ -5,7 +5,6 @@ import { promisify } from 'node:util';
 import {
   PROTOCOL_VERSION,
   bridgeDir,
-  inboxDir,
   outboxDir,
   ensureQueue,
   writeAtomic,
@@ -68,6 +67,9 @@ function isTimeout(error: unknown): boolean {
  * `DoScriptFile`. The DoScript result on macOS is `app.exitCode`, not the
  * script's last value, so the job's ResultMessage is delivered through the
  * outbox file and read back here.
+ * Job files live in `jobs/`, not `inbox/`: the startup loader (transport A)
+ * polls `inbox/` on a timer, so writing there would let it steal the job and
+ * delete it before the trigger reads it (observed: "job is not valid JSON").
  *   https://ae-scripting.docsforadobe.dev/introduction/overview/#how-to-include-after-effects-scripting-in-an-applescript-mac-os
  *   https://ae-scripting.docsforadobe.dev/general/application/#appexitcode
  */
@@ -122,7 +124,7 @@ export class OsaScriptTransport implements Transport {
 
   async call(job: JobMessage): Promise<ResultMessage> {
     await ensureQueue(this.root);
-    const jobFile = join(inboxDir(this.root), `${job.id}.json`);
+    const jobFile = join(bridgeDir(this.root), 'jobs', `${job.id}.json`);
     const triggerFile = join(bridgeDir(this.root), 'jobs', `${job.id}.jsx`);
     const resultFile = join(outboxDir(this.root), `${job.id}.json`);
     await writeAtomic(jobFile, JSON.stringify(job));

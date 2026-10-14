@@ -73,6 +73,27 @@ describe('osascript transport', () => {
     expect(result.error.code).toBe('BRIDGE_NOT_LOADED');
   });
 
+  it('keeps the job file in jobs/, out of the loader inbox it would steal from', async () => {
+    const root = await queueRoot();
+    let jobPath = '';
+    const runner: Runner = async (_command, args) => {
+      const source = await readFile(tellArg(args[1] ?? ''), 'utf8');
+      jobPath = /AEMCP\.processJob\("([^"]+)"\)/.exec(source)?.[1] ?? '';
+      const parsed = JSON.parse(await readFile(jobPath, 'utf8')) as JobMessage;
+      await writeFile(
+        join(root, 'bridge', 'outbox', `${parsed.id}.json`),
+        JSON.stringify({ protocolVersion: PROTOCOL_VERSION, ok: true, result: null }),
+      );
+      await rm(jobPath, { force: true });
+      return { stdout: '' };
+    };
+    const transport = new OsaScriptTransport(root, APP, runner);
+
+    await transport.call(job('o-jobs', {}));
+
+    expect(jobPath).toBe(join(root, 'bridge', 'jobs', 'o-jobs.json'));
+  });
+
   it('does not guess AE_BUSY from error text; only the timeout does', async () => {
     const root = await queueRoot();
     const runner: Runner = async () => {
