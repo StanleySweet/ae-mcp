@@ -20,6 +20,32 @@ Single-context: `CONTEXT.md` at the root (created lazily), ADRs in `docs/decisio
 
 Code map: `docs/agents/code-map.md` — file:line map of tool registration, bridge dispatch, registries and test harnesses. Read before exploring; update when code changes.
 
+## Documentation discipline
+
+### Write down what you learn, before you finish
+
+A conversation with an agent ends; the work continues with another agent. Anything
+not written down is lost. Before handing off:
+
+- **a decision was made** (by you or the engineer) → an ADR in `docs/decisions/`;
+- **you found a contradiction or a trap** → a finding in `docs/findings/`;
+- **you made progress** → an entry in `JOURNAL.md`;
+- **the project state changed** → update `CONTEXT.md`.
+
+`CONTEXT.md` is the only file you rewrite. Everything else is **append-only**: you do
+not erase history, you add an entry that supersedes the previous one.
+
+### Decide vs. ask
+
+You decide alone: naming, file split, test structure, local refactor.
+
+You **ask** before acting: functional scope, the exposed API contract, dependency
+choice, anything hard to reverse (push, opening/closing PRs and issues, rewriting
+pushed history).
+
+In an ADR, `Decider:` states who decided. An engineer's decision is not reopened
+without them.
+
 ## Task execution loop (what every executing agent must do)
 
 Backlog rule 1: never start a task whose dependencies are not merged. Merge = the task issue is **closed**.
