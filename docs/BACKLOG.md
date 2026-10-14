@@ -303,6 +303,7 @@ Tasks E6-5 to E6-15 are one commit per category, each with the message `feat(ops
 - **E13-6** test(server): guard cannot be bypassed through batch.run, bulk apply or eval.run
 - **E13-7** docs: list destructive operations in the user guide
 - **E13-8** [HUMAN] docs(checklist): add rows 14 and 15. Row 14: delete a layer through Claude, then confirm a new `_v###` file exists and still contains the layer. Row 15: an unsaved project is refused with a hint.
+- **E13-2 follow-up** (#158): `project.increment_save` now computes the next `_v###` path and calls the documented `app.project.save(file)` instead of the localized menu command, so it works in any AE UI language.
 
 ### E14 Mister Horse and Mt. Mograph support (spike in Sprint 1, rest in Sprint 6)
 
