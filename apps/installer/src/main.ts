@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,11 +8,14 @@ import { createInstallerService } from './service.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+/** Reads a bridge source bundled next to the app's `main.js`. */
+const bundleSource = (name: string): string => readFileSync(join(here, name), 'utf8');
+
 function registerIpc(): void {
   const service = createInstallerService({
     root: join(homedir(), '.ae-mcp'),
-    payload: join(here, 'payload.jsx'),
-    loader: join(here, 'loader.jsx'),
+    payload: bundleSource('payload.jsx'),
+    loader: bundleSource('loader.jsx'),
   });
 
   ipcMain.handle(IPC_CHANNELS.detect, () => service.detect());

@@ -277,8 +277,17 @@ Tasks E6-5 to E6-15 are one commit per category, each with the message `feat(ops
 - **E11-4** build(installer): electron-builder config for unsigned arm64 and x64 builds that embed the mcpb
 - **E11-5** ci: add release workflow: the file from section 7.2.
 - **E11-6** chore: add dependabot config with weekly grouped updates
-- **E11-7** [HUMAN] Clean-Mac install test using the release artifacts and checklist section 9.
+- **E11-9** fix(installer): bundle the bridge payload and loader into Setup
+- **E11-10** feat(installer): install the Claude extension and run the live test
+- **E11-7** [HUMAN] Clean-Mac install test using the release artifacts and checklist section 9. (blocked by E11-9, E11-10)
 - **E11-8** chore(release): v1.0.0
+
+**Why E11-9/E11-10.** The Setup app shipped by E11-4 was a scaffold: it never
+staged `payload.jsx`/`loader.jsx` into the bundle, passed their *paths* where
+`installPayload`/`installLoader` expect *contents*, and never called
+`handMcpbToClaude` (E10-5) or `runLiveTest` (E10-6), so the wizard could show
+only 3 of its 6 rows. E11-9 fixes the payload/loader delivery; E11-10 wires the
+Claude-extension and live-test rows. Both must land before E11-7.
 
 ### E12 Documentation and handoff (Sprint 7)
 

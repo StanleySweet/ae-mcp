@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -8,18 +8,30 @@ import { bundleInstaller } from './build.js';
 
 const dir = dirname(fileURLToPath(import.meta.url));
 const outDir = mkdtempSync(join(tmpdir(), 'ae-mcp-installer-'));
+const sourcesDir = mkdtempSync(join(tmpdir(), 'ae-mcp-bridge-src-'));
+const PAYLOAD = 'var AEMCP_BRIDGE_VERSION = "1.2.3";';
+const LOADER = 'var AEMCP_LOADER = true;';
+writeFileSync(join(sourcesDir, 'payload.jsx'), PAYLOAD);
+writeFileSync(join(sourcesDir, 'loader.jsx'), LOADER);
 
 afterAll(() => rm(outDir, { recursive: true, force: true }));
+afterAll(() => rm(sourcesDir, { recursive: true, force: true }));
 
 describe('installer bundle', () => {
   it('bundles main, preload and renderer with core inlined and electron external', async () => {
-    await bundleInstaller(outDir);
+    await bundleInstaller(outDir, sourcesDir);
     for (const file of ['main.js', 'preload.js', 'renderer.js']) {
       expect(existsSync(join(outDir, file))).toBe(true);
     }
     const main = readFileSync(join(outDir, 'main.js'), 'utf8');
     expect(main).toMatch(/from\s*['"]electron['"]/);
     expect(main).not.toMatch(/from\s*['"]@ae-mcp\/core['"]/);
+  }, 60_000);
+
+  it('copies the bridge payload and loader next to the bundle', async () => {
+    await bundleInstaller(outDir, sourcesDir);
+    expect(readFileSync(join(outDir, 'payload.jsx'), 'utf8')).toBe(PAYLOAD);
+    expect(readFileSync(join(outDir, 'loader.jsx'), 'utf8')).toBe(LOADER);
   }, 60_000);
 });
 
