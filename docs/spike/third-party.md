@@ -67,10 +67,22 @@ Fill one block per Mac.
      parameters; each expression carries a 192-hex preset fingerprint in its header
 3. Motion script entry point: none. Motion 2 is a compiled/obfuscated
    `ScriptUI Panels/Motion 2.jsxbin`; no `.jsx`, CEP host, or documented API.
-4. 'Second script' collisions with the bridge: not tested live. Bridge calls osascript
-   `DoScriptFile`, which AE refuses while another script (a panel) runs → `AE_BUSY`,
-   retried with backoff (E14-3, `packages/server/src/osascript-transport.ts`). Live test
-   with each panel open still pending.
+4. 'Second script' collisions with the bridge (tested live): AE runs one script at a time and
+   `DoScriptFile` **blocks until the script finishes**, returning `app.exitCode` (verified:
+   exit code 42 round-trips; a write script returns 0 and its file appears). A second
+   `DoScriptFile` while one is mid-run is **refused with a modal dialog**, and the osascript
+   call blocks until it is dismissed — observed (French) "tentative d'exécuter un second
+   script pendant l'exécution d'un script, impossible d'exécuter le second script"; if left
+   up it wedges AE until dismissed and AE is restarted. The AppleScript dictionary
+   (`Contents/Resources/ae.sdef`) documents the escape hatch: both `DoScriptFile` and
+   `DoScript` take an optional boolean **`override`** — "Allow one script to interrupt and run
+   while another script is running". So the failure mode is a blocking modal, not a returned
+   error. Consequence for E14-3: the `SCRIPT_RUNNING` text heuristic
+   (`/…second script…/i` in `packages/server/src/osascript-transport.ts`) matches the dialog
+   wording but never sees it — nothing is returned until the dialog is dismissed — so
+   `AE_BUSY` needs a **timeout** on the osascript call (and/or `with override`). Decision
+   needed: timeout-and-retry vs. `override`-interrupt. (Observed on Mac 1; the reverse
+   direction — panel open while a bridge job runs — is not yet exercised.)
 5. License terms on automating or reading libraries: Mister Horse EULA
    (misterhorse.com/terms-of-use) — non-transferable; end user "cannot extract or use the
    Product, Software and/or Content separate from the Work". Mt. Mograph EULA
