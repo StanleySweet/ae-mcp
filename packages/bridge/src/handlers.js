@@ -923,7 +923,8 @@ AEMCP.register('layer.delete', function (args) {
     }
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    comp.removeLayer(layer);
+    // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerremove
+    layer.remove();
     return { success: true };
 });
 

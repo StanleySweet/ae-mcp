@@ -169,6 +169,7 @@ export class MockCompItem extends MockItem {
 
   addLayer<T extends MockLayer>(layer: T): T {
     layer.index = this.layerList.length + 1;
+    layer.containingComp = this;
     this.layerList.push(layer);
     return layer;
   }
@@ -180,6 +181,7 @@ export class MockCompItem extends MockItem {
   }
 
   insertLayerAt(index: number, layer: MockLayer): void {
+    layer.containingComp = this;
     this.layerList.splice(index - 1, 0, layer);
     this.reindexLayers();
   }
@@ -355,6 +357,7 @@ export class MockLayer extends MockPropertyGroup {
   stretch = 1;
   label = 0;
   parent: MockLayer | null = null;
+  containingComp: MockCompItem | null = null;
   adjustmentLayer = false;
   nullLayer = false;
   readonly presets: string[] = [];
@@ -375,6 +378,11 @@ export class MockLayer extends MockPropertyGroup {
 
   applyPreset(file: MockFile): void {
     this.presets.push(file.fsName);
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerremove
+  remove(): void {
+    if (this.containingComp) this.containingComp.removeLayerAt(this.index);
   }
 }
 

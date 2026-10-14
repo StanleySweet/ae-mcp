@@ -155,6 +155,20 @@ describe('layer handlers', () => {
 
     expect(out.value).toEqual({ success: false, error: 'Footage item not found' });
   });
+
+  it('layer.delete removes the layer from the composition', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    comp.addLayer(new MockAVLayer('Keep', 'Layer'));
+    comp.addLayer(new MockAVLayer('Drop', 'Layer'));
+
+    const out = invoke(ctx, 'layer.delete', { comp: 'Main', index: 2 });
+
+    expect(out.value).toEqual({ success: true });
+    expect(comp.numLayers).toBe(1);
+    expect(comp.layer(1)?.name).toBe('Keep');
+  });
 });
 
 describe('expression-driver warnings', () => {
