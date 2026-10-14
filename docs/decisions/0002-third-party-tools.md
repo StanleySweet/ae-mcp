@@ -91,3 +91,13 @@ Accepted or Rejected once both Macs are run.)_
 - `docs/spike/third-party.md` filled on both Macs.
 - Decisions here are consistent with the answers, and E14-3/E14-9/E14-10/E14-11
   are re-read against them.
+
+## Update — Mac 1 Motion result (2026-10-14)
+
+Question 2's Motion half is now answered: applying Motion 2's "Burst" tool does not annotate the
+selected layer — it inserts a **new parametric shape layer** (`Burst`) above it, with 18
+expression-control effects and an expression graph wiring the shape's size/position/copies/
+rotation/colors to them (0 markers, 0 keyframes). Motion output, like Animation Composer's, is
+therefore readable through AE's object model. The decision above is unchanged — read what a tool
+produced; do not apply tools or read their files; E14-9..11 stay unsupported (no readable library
+to apply from). See `docs/spike/third-party.md`, Mac 1, question 2.

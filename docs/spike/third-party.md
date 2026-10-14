@@ -65,6 +65,24 @@ Fill one block per Mac.
    - expressions on `Opacity` and each blur's `Flou` calling a generated
      `getAnimationComposerPresetValue()`, which reads the `zzzzzzzzzzzzzzz_AC*` marker
      parameters; each expression carries a 192-hex preset fingerprint in its header
+   - **Motion 2 (Mt. Mograph) — the "Burst" tool — applied to `MOTION TARGET` in
+     `MOTION TEST`:** does **not** annotate the selected layer (MOTION TARGET is byte-identical
+     after). It inserts a **new shape layer named `Burst` above** the target, holding:
+     - **18 effects, all expression controls** (`ADBE Point Control`, `ADBE Slider Control`,
+       `ADBE Checkbox Control`, `ADBE Color Control`) with user-facing names `Global Position`,
+       `# of Copies`, `Copies Revolution`, `Revolution Offset`, `Burst Offset`,
+       `Distance from Center`, `Link Width & Height`, `Burst Width`, `Burst Height`,
+       `Stroke Width`, `Fill On | Off`, `Fill Color`, `Stroke On | Off`, `Stroke Color`,
+       `Burst Roundness`, `Link Seq. Width & Height`, `Sequential - Width`, `Sequential - Height`
+     - a vector shape tree (Rectangle → Repeater → Stroke → Fill → Wiggle Transform) whose
+       size, position, roundness, copies, scale, rotation and colors are all driven by
+       **expressions** reading those effect controls, e.g.
+       `effect("Burst Width")("ADBE Slider Control-0001")`; layer `Position` is wired to
+       `effect("Global Position")("ADBE Point Control-0001")`
+     - **0 markers, 0 keyframes** — the animation is fully parametric (expressions + effect
+       controls), not baked
+     → Motion tools are observable and reversible through AE's object model: they are a new
+     layer with expression-control effects and a wired expression graph.
 3. Motion script entry point: none. Motion 2 is a compiled/obfuscated
    `ScriptUI Panels/Motion 2.jsxbin`; no `.jsx`, CEP host, or documented API.
 4. 'Second script' collisions with the bridge (tested live): AE runs one script at a time and
@@ -90,8 +108,11 @@ Fill one block per Mac.
    disassemble". → Read only what a preset leaves through AE's object model; do not read or
    extract their files, and do not deobfuscate Motion.
 
-_Note: only Animation Composer was applied for question 2; a Motion tool left nothing
-detectable and still needs a run._
+_Note: question 2 now covers both Animation Composer (a preset) and Motion 2 (the "Burst"
+tool). An earlier Motion attempt left nothing detectable — that was a mis-application (the
+tool was not actually invoked), not a property of Motion: when it really runs it adds a new
+parametric shape layer. E14-2's ADR should treat Motion output as readable through the AE
+object model._
 
 ### Mac 2
 
