@@ -11,11 +11,18 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** Reads a bridge source bundled next to the app's `main.js`. */
 const bundleSource = (name: string): string => readFileSync(join(here, name), 'utf8');
 
+/** Absolute path to the bundled `.mcpb` (`Contents/Resources` when packaged). */
+function mcpbPath(): string {
+  const dir = app.isPackaged ? process.resourcesPath : join(here, '..', 'resources');
+  return join(dir, 'ae-mcp.mcpb');
+}
+
 function registerIpc(): void {
   const service = createInstallerService({
     root: join(homedir(), '.ae-mcp'),
     payload: bundleSource('payload.jsx'),
     loader: bundleSource('loader.jsx'),
+    mcpbPath: mcpbPath(),
   });
 
   ipcMain.handle(IPC_CHANNELS.detect, () => service.detect());

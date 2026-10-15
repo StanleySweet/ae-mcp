@@ -3,6 +3,12 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./bridge": {
+      "types": "./src/bridge.ts",
+      "default": "./src/bridge.ts"
+    }
+  },
   "dependencies": {
     "@ae-mcp/core": "^0.0.0",
     "@modelcontextprotocol/sdk": "^1.32.1"

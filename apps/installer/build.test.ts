@@ -26,6 +26,7 @@ describe('installer bundle', () => {
     const main = readFileSync(join(outDir, 'main.js'), 'utf8');
     expect(main).toMatch(/from\s*['"]electron['"]/);
     expect(main).not.toMatch(/from\s*['"]@ae-mcp\/core['"]/);
+    expect(main).not.toMatch(/from\s*['"]@ae-mcp\/server/);
   }, 60_000);
 
   it('copies the bridge payload and loader next to the bundle', async () => {

@@ -29,6 +29,25 @@ async function fakePrefsRoot(): Promise<string> {
   return root;
 }
 
+/** A temp `.mcpb` for `handMcpbToClaude`. */
+async function fakeMcpb(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), 'ae-mcp-mcpb-'));
+  const path = join(dir, 'ae-mcp.mcpb');
+  await writeFile(path, 'zip');
+  return path;
+}
+
+/** A fake `Claude.app` so `detectEnvironment` reports Claude Desktop. */
+async function fakeClaude(applicationsDir: string): Promise<void> {
+  await mkdir(join(applicationsDir, 'Claude.app'), { recursive: true });
+}
+
+/** A fresh heartbeat so `runLiveTest` skips launching AE. */
+async function freshHeartbeat(root: string): Promise<void> {
+  await mkdir(join(root, 'bridge', 'outbox'), { recursive: true });
+  await writeFile(join(root, 'bridge', 'outbox', 'heartbeat.json'), '{}');
+}
+
 function service(
   options: InstallerServiceOptions,
 ): ReturnType<typeof createInstallerService> {
@@ -54,6 +73,7 @@ describe('createInstallerService', () => {
       root: join(homeDir, '.ae-mcp'),
       payload: 'x',
       loader: 'y',
+      mcpbPath: 'z',
       environment: { applicationsDir, homeDir },
     });
 
@@ -61,16 +81,23 @@ describe('createInstallerService', () => {
     expect(environment.afterEffects.map((entry) => entry.path)).toEqual([install.path]);
   });
 
-  it('repairs an explicit install', async () => {
+  it('repairs an explicit install and smoke-tests the bridge', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ae-mcp-home-'));
-    const install = await fakeInstall();
+    const applicationsDir = await mkdtemp(join(tmpdir(), 'ae-mcp-apps-'));
+    const install = await createApp(applicationsDir);
+    await fakeClaude(applicationsDir);
+    await freshHeartbeat(root);
 
     const result = await service({
       root,
       payload: PAYLOAD,
       loader: LOADER,
+      mcpbPath: await fakeMcpb(),
+      environment: { applicationsDir },
       prefsRoot: await fakePrefsRoot(),
       isRunning: async () => false,
+      openFile: async () => true,
+      call: async () => true,
     }).repair(install);
 
     expect(result.ok).toBe(true);
@@ -78,8 +105,40 @@ describe('createInstallerService', () => {
       'bridge_payload',
       'bridge_loader',
       'scripting_pref',
+      'claude_extension',
+      'live_test',
     ]);
     expect(await exists(join(root, 'bridge', 'current.jsx'))).toBe(true);
+  });
+
+  it('skips the live test when the Claude extension is missing', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ae-mcp-home-'));
+    const applicationsDir = await mkdtemp(join(tmpdir(), 'ae-mcp-apps-'));
+    const install = await createApp(applicationsDir);
+    await freshHeartbeat(root);
+
+    const result = await service({
+      root,
+      payload: PAYLOAD,
+      loader: LOADER,
+      mcpbPath: await fakeMcpb(),
+      environment: { applicationsDir },
+      prefsRoot: await fakePrefsRoot(),
+      isRunning: async () => false,
+      openFile: async () => true,
+      call: async () => true,
+    }).repair(install);
+
+    expect(result.ok).toBe(false);
+    expect(result.checks.map((check) => check.check)).toEqual([
+      'bridge_payload',
+      'bridge_loader',
+      'scripting_pref',
+      'claude_extension',
+    ]);
+    expect(result.checks.find((check) => check.check === 'claude_extension')).toMatchObject({
+      status: 'fail',
+    });
   });
 
   it('asks to quit After Effects when the pref step needs it', async () => {
@@ -90,6 +149,7 @@ describe('createInstallerService', () => {
       root,
       payload: PAYLOAD,
       loader: LOADER,
+      mcpbPath: await fakeMcpb(),
       prefsRoot: await fakePrefsRoot(),
       isRunning: async () => true,
     }).repair(install);
@@ -108,6 +168,7 @@ describe('createInstallerService', () => {
       root,
       payload: PAYLOAD,
       loader: LOADER,
+      mcpbPath: 'z',
       environment: { applicationsDir },
     });
 
@@ -118,14 +179,21 @@ describe('createInstallerService', () => {
 
   it('uninstalls an explicit install', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ae-mcp-home-'));
-    const install = await fakeInstall();
+    const applicationsDir = await mkdtemp(join(tmpdir(), 'ae-mcp-apps-'));
+    const install = await createApp(applicationsDir);
+    await fakeClaude(applicationsDir);
+    await freshHeartbeat(root);
 
     const service = createInstallerService({
       root,
       payload: PAYLOAD,
       loader: LOADER,
+      mcpbPath: await fakeMcpb(),
+      environment: { applicationsDir },
       prefsRoot: await fakePrefsRoot(),
       isRunning: async () => false,
+      openFile: async () => true,
+      call: async () => true,
     });
     await service.repair(install);
 
@@ -141,6 +209,7 @@ describe('createInstallerService', () => {
       root,
       payload: PAYLOAD,
       loader: LOADER,
+      mcpbPath: 'z',
       environment: { applicationsDir },
     });
 
@@ -157,6 +226,7 @@ describe('createInstallerService', () => {
       root: join(homeDir, '.ae-mcp'),
       payload: PAYLOAD,
       loader: LOADER,
+      mcpbPath: 'z',
       environment: { applicationsDir, homeDir },
     });
 
