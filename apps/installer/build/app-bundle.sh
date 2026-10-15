@@ -29,6 +29,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>CFBundleIconFile</key><string>icon</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSAppleEventsUsageDescription</key><string>AE-MCP Setup runs a script in your open After Effects to finish installing.</string>
+  <key>NSDesktopFolderUsageDescription</key><string>AE-MCP Setup writes its diagnostics report to your Desktop.</string>
 </dict>
 </plist>
 PLIST
