@@ -5,6 +5,12 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-15
 
+- Fixed the Setup **scripting-pref** row on a localized AE: `FindPrefsFile` matched
+  the English `Prefs.txt`, but French AE writes `Préfs.txt` and macOS returns it
+  NFD-decomposed, so it never matched (the row looped on "open AE once" /
+  "quit AE"). Now NFC-normalizes the name and accepts both; regression tests use
+  the NFD name. The TS original had the same bug. See
+  `docs/findings/2026-10-15-localized-ae-prefs-filename.md`.
 - Replaced the Electron **AE-MCP Setup** with a **native Avalonia (C#) macOS app**
   (`apps/installer/AeMcpSetup*`, `net10.0`, Avalonia 11.3.11): ported the installer
   logic to `AeMcpSetup.Core`, wrote the xunit suite (74 tests) and the single-column

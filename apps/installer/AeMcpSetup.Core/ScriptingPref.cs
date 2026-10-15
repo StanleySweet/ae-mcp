@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace AeMcpSetup.Core;
@@ -76,7 +77,7 @@ public static partial class ScriptingPref
             .ToArray();
     }
 
-    /// <summary>Finds the single <c>… Prefs.txt</c> file in a version folder, or null.</summary>
+    /// <summary>Finds the single main <c>… Prefs.txt</c> file in a version folder, or null.</summary>
     public static string? FindPrefsFile(string dir)
     {
         string[] entries;
@@ -89,7 +90,17 @@ public static partial class ScriptingPref
             return null;
         }
 
-        var match = entries.FirstOrDefault(path => Path.GetFileName(path).EndsWith("Prefs.txt", StringComparison.Ordinal));
+        // AE names this file after the UI language: `… Prefs.txt` (en) or
+        // `… Préfs.txt` (fr). macOS hands back the name decomposed (NFD), so
+        // compare on the NFC-normalized form; the `Prefs-*.txt` siblings must
+        // not match.
+        // ponytail: only en/fr names are recognized; add more if AE ships others.
+        var match = entries.FirstOrDefault(path =>
+        {
+            var name = Path.GetFileName(path).Normalize(NormalizationForm.FormC);
+            return name.EndsWith("Prefs.txt", StringComparison.Ordinal)
+                || name.EndsWith("Pr\u00e9fs.txt", StringComparison.Ordinal);
+        });
         return match;
     }
 

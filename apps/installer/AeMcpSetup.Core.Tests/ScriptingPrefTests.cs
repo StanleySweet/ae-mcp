@@ -95,6 +95,27 @@ public class ScriptingPrefTests
     }
 
     [Fact]
+    public async Task FindPrefsFileFindsTheAccentedFrenchPrefsTxt()
+    {
+        // macOS stores AE's French prefs name decomposed (NFD é, U+0065 U+0301).
+        var dir = TempDir.Create("ae-mcp-prefs-");
+        var nfdName = "Adobe After Effects 26.5 Pre\u0301fs.txt";
+        await File.WriteAllTextAsync(Path.Combine(dir, nfdName), Prefs);
+
+        Assert.NotNull(ScriptingPref.FindPrefsFile(dir));
+    }
+
+    [Fact]
+    public async Task FindPrefsFileIgnoresThePrefsVariantSiblings()
+    {
+        var dir = TempDir.Create("ae-mcp-prefs-");
+        await File.WriteAllTextAsync(Path.Combine(dir, "Adobe After Effects 26.5 Pre\u0301fs-effects.txt"), Prefs);
+        await File.WriteAllTextAsync(Path.Combine(dir, "Adobe After Effects 26.5 Pre\u0301fs-text.txt"), Prefs);
+
+        Assert.Null(ScriptingPref.FindPrefsFile(dir));
+    }
+
+    [Fact]
     public void FindPrefsFileReturnsNullWhenThereIsNoPrefsFile()
     {
         Assert.Null(ScriptingPref.FindPrefsFile(TempDir.Create("ae-mcp-prefs-")));
