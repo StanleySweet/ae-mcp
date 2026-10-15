@@ -279,7 +279,8 @@ Tasks E6-5 to E6-15 are one commit per category, each with the message `feat(ops
 - **E11-6** chore: add dependabot config with weekly grouped updates
 - **E11-9** fix(installer): bundle the bridge payload and loader into Setup
 - **E11-10** feat(installer): install the Claude extension and run the live test
-- **E11-7** [HUMAN] Clean-Mac install test using the release artifacts and checklist section 9. (blocked by E11-9, E11-10)
+- **E11-11** feat(installer): app icon and dmg drag-to-Applications layout
+- **E11-7** [HUMAN] Clean-Mac install test using the release artifacts and checklist section 9. (blocked by E11-9, E11-10, E11-11)
 - **E11-8** chore(release): v1.0.0
 
 **Why E11-9/E11-10.** The Setup app shipped by E11-4 was a scaffold: it never
@@ -288,6 +289,11 @@ staged `payload.jsx`/`loader.jsx` into the bundle, passed their *paths* where
 `handMcpbToClaude` (E10-5) or `runLiveTest` (E10-6), so the wizard could show
 only 3 of its 6 rows. E11-9 fixes the payload/loader delivery; E11-10 wires the
 Claude-extension and live-test rows. Both must land before E11-7.
+
+**Why E11-11.** The Setup app also shipped with the default Electron icon and a
+bare DMG window, and its first click only focused the window. E11-11 gives it an
+app icon, a drag-to-Applications DMG layout and `acceptFirstMouse`, so E11-7
+tests the artifact the owner actually ships.
 
 ### E12 Documentation and handoff (Sprint 7)
 

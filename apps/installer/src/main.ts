@@ -28,6 +28,7 @@ function createWindow(): void {
   const window = new BrowserWindow({
     width: 720,
     height: 560,
+    acceptFirstMouse: true,
     webPreferences: {
       preload: join(here, 'preload.js'),
       contextIsolation: true,

@@ -51,6 +51,16 @@ describe('electron-builder config', () => {
     expect(config.extraResources).toContainEqual({ from: 'resources', to: '.' });
   });
 
+  it('lays out the dmg with the app and an Applications drop target', () => {
+    const contents = config.dmg.contents;
+    expect(contents).toContainEqual({ x: 400, y: 190, type: 'link', path: '/Applications' });
+    expect(contents.some((e: { path?: string }) => e.path === undefined)).toBe(true);
+  });
+
+  it('ships a custom app icon', () => {
+    expect(existsSync(join(dir, 'build', 'icon.icns'))).toBe(true);
+  });
+
   it('excludes its own build output from the packaged files', () => {
     expect(config.files).toContain('!dist/mac*/**');
     expect(config.directories.output).toBe('dist');
