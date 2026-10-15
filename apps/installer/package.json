@@ -6,11 +6,9 @@
   "description": "AE-MCP Setup — installs and repairs the After Effects bridge and extension.",
   "author": "Stanislas Daniel Claude Dolcini",
   "main": "dist/main.js",
-  "dependencies": {
-    "@ae-mcp/core": "^0.0.0",
-    "@ae-mcp/server": "^0.0.0"
-  },
   "devDependencies": {
+    "@ae-mcp/core": "^0.0.0",
+    "@ae-mcp/server": "^0.0.0",
     "electron": "44.7.0",
     "electron-builder": "^26.15.3"
   }

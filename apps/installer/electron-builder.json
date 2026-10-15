@@ -3,12 +3,13 @@
   "productName": "AE-MCP Setup",
   "directories": { "output": "dist" },
   "files": [
-    "dist/**",
+    "dist/main.js",
+    "dist/preload.js",
+    "dist/renderer.js",
+    "dist/payload.jsx",
+    "dist/loader.jsx",
     "index.html",
-    "package.json",
-    "!dist/mac*/**",
-    "!dist/*.dmg",
-    "!dist/*.zip"
+    "package.json"
   ],
   "extraResources": [{ "from": "resources", "to": "." }],
   "mac": {

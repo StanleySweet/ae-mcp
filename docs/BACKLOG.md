@@ -280,7 +280,8 @@ Tasks E6-5 to E6-15 are one commit per category, each with the message `feat(ops
 - **E11-9** fix(installer): bundle the bridge payload and loader into Setup
 - **E11-10** feat(installer): install the Claude extension and run the live test
 - **E11-11** feat(installer): app icon and dmg drag-to-Applications layout
-- **E11-7** [HUMAN] Clean-Mac install test using the release artifacts and checklist section 9. (blocked by E11-9, E11-10, E11-11)
+- **E11-12** fix(installer): keep the Setup bundle self-contained
+- **E11-7** [HUMAN] Clean-Mac install test using the release artifacts and checklist section 9. (blocked by E11-9, E11-10, E11-11, E11-12)
 - **E11-8** chore(release): v1.0.0
 
 **Why E11-9/E11-10.** The Setup app shipped by E11-4 was a scaffold: it never
@@ -294,6 +295,12 @@ Claude-extension and live-test rows. Both must land before E11-7.
 bare DMG window, and its first click only focused the window. E11-11 gives it an
 app icon, a drag-to-Applications DMG layout and `acceptFirstMouse`, so E11-7
 tests the artifact the owner actually ships.
+
+**Why E11-12.** E11-10 added `@ae-mcp/server` as a production dependency, so
+electron-builder copied its whole dependency tree (the MCP SDK, Express, Hono)
+into `app.asar` — dead weight, since esbuild inlines the code. E11-12 moves the
+inlined workspaces to `devDependencies` so the packaged app ships no
+`node_modules`.
 
 ### E12 Documentation and handoff (Sprint 7)
 

@@ -62,13 +62,26 @@ describe('electron-builder config', () => {
     expect(existsSync(join(dir, 'build', 'icon.icns'))).toBe(true);
   });
 
-  it('excludes its own build output from the packaged files', () => {
-    expect(config.files).toContain('!dist/mac*/**');
+  it('packages only the bundle outputs, not its own build artifacts', () => {
+    expect(config.files).toEqual([
+      'dist/main.js',
+      'dist/preload.js',
+      'dist/renderer.js',
+      'dist/payload.jsx',
+      'dist/loader.jsx',
+      'index.html',
+      'package.json',
+    ]);
     expect(config.directories.output).toBe('dist');
   });
 
   it('points the packaged app at the bundled main', () => {
     const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
     expect(pkg.main).toBe('dist/main.js');
+  });
+
+  it('ships no runtime dependencies (everything is bundled)', () => {
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
+    expect(Object.keys(pkg.dependencies ?? {})).toEqual([]);
   });
 });
