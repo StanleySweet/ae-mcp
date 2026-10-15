@@ -1,6 +1,7 @@
 node_modules/
 dist/
 out/
+.tmp/
 apps/installer/resources/*.mcpb
 coverage/
 .vitest/

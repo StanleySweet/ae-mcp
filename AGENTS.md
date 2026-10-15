@@ -72,4 +72,5 @@ Other rules:
 - If you forgot a `Closes #N` footer on already-committed-but-unpushed work, rewrite those local commits (rebase/cherry-pick replay) to add it; keep a `backup/…` branch first. Never rewrite pushed history.
 - Keep `docs/` current in the same commit when public behavior changes.
 - No TODO without an issue ID.
-
+- Use .tmp/ (.gitignore it if needed) instead of /tmp so you don't need permissions, flush it when needed
+- Create projects and stuff in .tmp/ so you don't need permissions to access it 
