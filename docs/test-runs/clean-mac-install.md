@@ -2,7 +2,7 @@
 
 Backlog task E11-7 — run on a clean Mac by the owner, fill the template below,
 then record the row 11 result in `docs/test-runs/<date>.md`. This exercises the
-release artifacts (`AE-MCP-Setup-<version>.dmg`, `ae-mcp.mcpb`,
+release artifacts (`AE-MCP Setup-<version>-<arch>.dmg`, `ae-mcp.mcpb`,
 `SHA256SUMS.txt`) produced by `.github/workflows/release.yml`, and checklist row
 11 in `docs/BACKLOG.md` §9.
 

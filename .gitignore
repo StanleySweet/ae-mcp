@@ -2,7 +2,9 @@ node_modules/
 dist/
 out/
 .tmp/
-apps/installer/resources/*.mcpb
+apps/installer/AeMcpSetup/Resources/
+apps/installer/**/bin/
+apps/installer/**/obj/
 coverage/
 .vitest/
 *.tsbuildinfo

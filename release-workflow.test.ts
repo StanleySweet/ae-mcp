@@ -19,8 +19,8 @@ describe('release workflow', () => {
       expect(workflow).toContain(job);
     }
     expect(workflow).toContain('path: dist/*.mcpb');
-    expect(workflow).toContain('CSC_IDENTITY_AUTO_DISCOVERY');
-    expect(workflow).toContain('npm run installer:build -- --mac dmg zip --arm64 --x64');
+    expect(workflow).toContain('actions/setup-dotnet');
+    expect(workflow).toContain('npm run installer:build');
     expect(workflow).toMatch(/softprops\/action-gh-release@v\d+/);
   });
 });

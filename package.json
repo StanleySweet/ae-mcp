@@ -6,8 +6,7 @@
   "description": "MCP server that lets Claude Desktop see and edit the After Effects project the user has open.",
   "license": "MIT",
   "workspaces": [
-    "packages/*",
-    "apps/*"
+    "packages/*"
   ],
   "engines": {
     "node": ">=22"
@@ -34,11 +33,12 @@
   },
   "scripts": {
     "bundle:pack": "tsx bundle/pack.ts",
-    "check": "npm run lint && npm run typecheck && npm run test && npm run bridge:lint-es3 && npm run bridge:build && npm run bundle:pack && npm run bundle:smoke",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run bridge:lint-es3 && npm run bridge:build && npm run bundle:pack && npm run bundle:smoke && npm run dotnet:test",
+    "dotnet:test": "dotnet test apps/installer/AeMcpSetup.slnx",
     "spike:bench": "tsx packages/spike/src/benchmark.ts",
     "typecheck": "tsc -b --emitDeclarationOnly",
     "bridge:lint-es3": "eslint --config packages/bridge/es3-lint.config.js \"packages/bridge/src/*.js\"",
-    "installer:build": "npm run bridge:build && tsx apps/installer/build.ts && electron-builder --projectDir apps/installer",
+    "installer:build": "npm run bridge:build && npm run bundle:pack && tsx scripts/build-installer.ts",
     "test": "vitest run",
     "bridge:build": "tsx packages/bridge/src/build.ts",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",

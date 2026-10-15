@@ -5,6 +5,18 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-15
 
+- Replaced the Electron **AE-MCP Setup** with a **native Avalonia (C#) macOS app**
+  (`apps/installer/AeMcpSetup*`, `net10.0`, Avalonia 11.3.11): ported the installer
+  logic to `AeMcpSetup.Core`, wrote the xunit suite (74 tests) and the single-column
+  6-row UI, and added a shared bridge-protocol fixture (`packages/protocol/contract/`)
+  asserted by both a C# and a TS test. Deleted the Electron app and the 10 now-dead
+  `packages/core` installer modules. `installer:build` now publishes a self-contained
+  **trimmed** `AE-MCP Setup.app` + `.dmg` (`scripts/build-installer.ts` +
+  `build/app-bundle.sh`); CI gained `dotnet test` + `setup-dotnet`, `release.yml`'s
+  installer job uses them. `npm run check` green (444 TS tests, 74 C# tests); the
+  trimmed app launches with the three resources (payload/loader/mcpb) in the bundle.
+- Committed the native-installer design spec (`58203a2`,
+  `docs/superpowers/specs/2026-10-15-native-installer-design.md`).
 - Shipped the **AE-MCP Setup** install path end to end: bundled the bridge payload
   and loader (`68a466e`), installed the Claude extension and ran the live test
   (`9609176`), added the app icon + DMG drag-to-Applications layout (`4e82f9b`),

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="AeMcpSetup.Core.Tests/AeMcpSetup.Core.Tests.csproj" />
+  <Project Path="AeMcpSetup.Core/AeMcpSetup.Core.csproj" />
+  <Project Path="AeMcpSetup/AeMcpSetup.csproj" />
+</Solution>

@@ -7,7 +7,16 @@ import unicorn from 'eslint-plugin-unicorn';
 
 export default [
   {
-    ignores: ['**/dist', 'coverage', '**/out', '**/spike/**/*.jsx', 'packages/bridge/src/*.js'],
+    ignores: [
+      '**/dist',
+      'coverage',
+      '**/out',
+      '**/spike/**/*.jsx',
+      'packages/bridge/src/*.js',
+      // Native Setup app: a .NET project. Its only .jsx/.js are generated copies
+      // (staged bridge payload/loader under Resources/, plus bin/obj).
+      'apps/installer/**',
+    ],
   },
   js.configs.recommended,
   {

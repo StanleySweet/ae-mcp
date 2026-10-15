@@ -1,4 +1,3 @@
-import type { LiveCall } from '@ae-mcp/core';
 import { createAEClient } from './ae-client.js';
 import { OsaScriptTransport, aeAppName } from './osascript-transport.js';
 
@@ -6,6 +5,9 @@ export { createAEClient } from './ae-client.js';
 export type { AEClient, AEClientOptions } from './ae-client.js';
 export { OsaScriptTransport, selectTransport, aeAppName } from './osascript-transport.js';
 export type { Transport } from './transport.js';
+
+/** Runs one bridge operation and reports whether it succeeded. */
+export type LiveCall = (tool: string, args: Record<string, unknown>) => Promise<boolean>;
 
 export interface BridgeCallOptions {
   /** Queue root, usually `~/.ae-mcp`. */

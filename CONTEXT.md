@@ -17,9 +17,11 @@ After Effects project the user has open. macOS only.
 - `packages/bridge` — ExtendScript (ES3) that runs inside After Effects. Receives
   operations and mutates the project.
 - `packages/protocol` — shared message and error types.
-- `packages/core` — installer/repair logic (payload + loader install, live test).
-- `apps/installer` — the **AE-MCP Setup** Electron app (detect → repair); ships
-  the `.mcpb` and the bridge inside its own bundle.
+- `packages/core` — macOS AE discovery (installs, CEP extensions) and the
+  `aerender` process helpers.
+- `apps/installer` — the **AE-MCP Setup** native macOS app (Avalonia / C#):
+  detect → repair. Ships the `.mcpb` and the bridge inside its own bundle; no
+  Node runs inside the app.
 
 ## Vocabulary
 

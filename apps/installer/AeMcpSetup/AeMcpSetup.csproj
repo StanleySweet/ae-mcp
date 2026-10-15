@@ -1,0 +1,47 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <AssemblyName>AE-MCP Setup</AssemblyName>
+    <RootNamespace>AeMcpSetup</RootNamespace>
+    <!-- The bridge job/trigger JSON is written with System.Text.Json reflection
+         over only string and Dictionary<string, object?> of primitives, which
+         trimming cannot strip; keep the reflection path enabled so it works in
+         the trimmed bundle. IL2026 is the conservative generic-Serialize warning
+         for exactly that call site. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <!-- NU1903: Tmds.DBus.Protocol is a transitive Linux-only backend pulled by
+         Avalonia.Desktop; it never loads on macOS and this app ships only macOS. -->
+    <NoWarn>$(NoWarn);NU1903;IL2026</NoWarn>
+  </PropertyGroup>
+
+  <!-- Built by the node build (bridge:build, bundle:pack) and copied here before
+       publish by scripts/build-installer.ts. Absent during a plain dev build.
+       Flattened to the app root (Link) where SetupService reads them, and copied
+       to the publish output so a released bundle ships them. -->
+  <ItemGroup>
+    <None Include="Resources/payload.jsx" Link="payload.jsx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('Resources/payload.jsx')" />
+    <None Include="Resources/loader.jsx" Link="loader.jsx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('Resources/loader.jsx')" />
+    <None Include="Resources/ae-mcp.mcpb" Link="ae-mcp.mcpb" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('Resources/ae-mcp.mcpb')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.11" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.11" />
+    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.11">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AeMcpSetup.Core\AeMcpSetup.Core.csproj" />
+  </ItemGroup>
+</Project>

@@ -6,7 +6,6 @@
     { "path": "packages/server" },
     { "path": "packages/bridge" },
     { "path": "packages/spike" },
-    { "path": "packages/fake-bridge" },
-    { "path": "apps/installer" }
+    { "path": "packages/fake-bridge" }
   ]
 }

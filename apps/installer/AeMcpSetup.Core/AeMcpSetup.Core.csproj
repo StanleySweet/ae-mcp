@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- IL2026: BridgeCall/InstallLoader serialize only string and
+         Dictionary<string, object?> of primitives (see the app csproj); the
+         generic-Serialize warning is conservative here. -->
+    <NoWarn>$(NoWarn);IL2026</NoWarn>
+  </PropertyGroup>
+
+</Project>
