@@ -27,8 +27,9 @@ After Effects project the user has open. macOS only.
 
 - **payload** — the bridge implementation, `~/.ae-mcp/bridge/current.jsx`.
 - **loader** — the Startup script (`…/Scripts/Startup/ae-mcp-loader.jsx`) that
-  evals the payload into AE. Optional (ADR 0004): transport B works without it;
-  it adds the startup heartbeat and the transport-A fallback.
+  evals the payload into AE. Optional for the running MCP (transport B works
+  without it, ADR 0004) but the gating step of a complete, verified Setup install:
+  Setup writes it first and aborts rather than half-installing (ADR 0005).
 - **transport** — how the server reaches AE: `osascript` (ADR 0001 option B,
   primary) or the file-queue (option A, fallback).
 - **operation** — a named action (`comp.create`, `keyframe.add`, …) in the bridge

@@ -54,7 +54,17 @@ public static class Checklist
 
     private static (string Status, string? Fix)? CheckState(IReadOnlyList<InstallerCheck> checks, string id)
     {
-        var check = checks.FirstOrDefault(entry => entry.Check == id);
-        return check is null ? null : (check.Status, check.Fix);
+        // The "Bridge installed" row reflects both the payload and the privileged
+        // loader step, so a loader failure shows here rather than hiding behind a
+        // green row while result.Ok is false.
+        var ids = id == "bridge_payload" ? new[] { "bridge_payload", "bridge_loader" } : [id];
+        var related = checks.Where(entry => ids.Contains(entry.Check)).ToList();
+        if (related.Count == 0)
+        {
+            return null;
+        }
+
+        var failed = related.FirstOrDefault(entry => !entry.IsOk);
+        return failed is null ? (Ok, null) : (Fail, failed.Fix);
     }
 }

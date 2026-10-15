@@ -43,18 +43,24 @@ public sealed class SetupService
 
         var payload = await ReadResourceAsync(PayloadPath);
         var loader = await ReadResourceAsync(LoaderPath);
-        var result = await RepairUninstall.RepairAsync(_root, resolved, payload, loader);
+
+        // The core install is all-or-nothing: the privileged loader runs first, and
+        // a failure means nothing else is written (no half install).
+        var core = await RepairUninstall.RepairAsync(_root, resolved, payload, loader);
+        if (!core.Ok)
+        {
+            return new RepairResult(false, core.Checks);
+        }
+
         var scriptingPref = await ScriptingPref.EnsureScriptingPrefAsync(resolved.AppName);
         var extension = await InstallMcpb.HandToClaudeAsync(McpbPath, environment.ClaudeDesktop);
+        var checks = new List<InstallerCheck>(core.Checks) { scriptingPref, extension };
 
-        var checks = new List<InstallerCheck>(result.Checks) { scriptingPref, extension };
-        // Only smoke-test the bridge when every install step above passed.
-        if (checks.All(check => check.IsOk))
-        {
-            var bridge = new BridgeCall(_root, resolved.AppName);
-            LiveCall call = (tool, args) => bridge.CallAsync(tool, args);
-            checks.Add(await LiveTest.RunAsync(_root, resolved.AppName, call));
-        }
+        // The bridge is installed, so prove it works even if the pref or extension
+        // step reported a problem. The test needs a fresh heartbeat (the loader).
+        var bridge = new BridgeCall(_root, resolved.AppName);
+        LiveCall call = (tool, args) => bridge.CallAsync(tool, args);
+        checks.Add(await LiveTest.RunAsync(_root, resolved.AppName, call));
 
         return new RepairResult(checks.All(check => check.IsOk), checks);
     }

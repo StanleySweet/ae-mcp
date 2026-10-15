@@ -14,7 +14,9 @@ public static class RepairUninstall
 {
     /// <summary>
     /// Repairs an install by re-running the bridge install steps. Every step is
-    /// idempotent, so this is also the first-install path.
+    /// idempotent, so this is also the first-install path. The privileged loader
+    /// runs first: if it cannot be installed, nothing else is written, so a failed
+    /// install is never a half install.
     /// </summary>
     public static async Task<RepairResult> RepairAsync(
         string root,
@@ -23,10 +25,14 @@ public static class RepairUninstall
         string loader,
         string? fileName = null)
     {
-        var payloadCheck = await InstallPayload.InstallAsync(root, payload);
         var loaderCheck = await InstallLoader.InstallAsync(install, loader, fileName);
-        var checks = new List<InstallerCheck> { payloadCheck, loaderCheck };
-        return new RepairResult(checks.All(check => check.IsOk), checks);
+        if (!loaderCheck.IsOk)
+        {
+            return new RepairResult(false, [loaderCheck]);
+        }
+
+        var payloadCheck = await InstallPayload.InstallAsync(root, payload);
+        return new RepairResult(payloadCheck.IsOk, [loaderCheck, payloadCheck]);
     }
 
     /// <summary>

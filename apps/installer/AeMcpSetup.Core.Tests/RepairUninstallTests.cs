@@ -26,14 +26,14 @@ public class RepairUninstallTests
 
         Assert.True(result.Ok);
         Assert.Equal(
-            [("bridge_payload", "ok"), ("bridge_loader", "ok")],
+            [("bridge_loader", "ok"), ("bridge_payload", "ok")],
             result.Checks.Select(c => (c.Check, c.Status)));
         Assert.Equal(Payload, await File.ReadAllTextAsync(Path.Combine(root, "bridge", "current.jsx")));
         Assert.Equal(Loader, await File.ReadAllTextAsync(Path.Combine(folder, "Scripts", "Startup", "ae-mcp-loader.jsx")));
     }
 
     [Fact]
-    public async Task RepairReportsNotOkWhenAStepFails()
+    public async Task RepairDoesNotInstallThePayloadWhenTheLoaderFails()
     {
         var root = TempDir.Create("ae-mcp-home-");
         var (install, folder) = FakeInstall();
@@ -41,8 +41,12 @@ public class RepairUninstallTests
 
         var result = await RepairUninstall.RepairAsync(root, install, Payload, Loader);
 
+        // No half install: the privileged loader failed, so nothing else was written.
         Assert.False(result.Ok);
-        Assert.Equal("fail", result.Checks.First(c => c.Check == "bridge_loader").Status);
+        Assert.Equal(
+            [("bridge_loader", "fail")],
+            result.Checks.Select(c => (c.Check, c.Status)));
+        Assert.False(Directory.Exists(Path.Combine(root, "bridge")));
     }
 
     [Fact]

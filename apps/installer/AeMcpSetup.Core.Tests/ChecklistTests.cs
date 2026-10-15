@@ -60,8 +60,25 @@ public class ChecklistTests
     }
 
     [Fact]
-    public void ExposesStableLabels()
+    public void SurfacesALoaderFailureInTheBridgeInstalledRow()
     {
+        var checks = new List<InstallerCheck>
+        {
+            new("bridge_payload", "ok"),
+            new("bridge_loader", "fail", "Grant admin to install the loader."),
+        };
+
+        var rows = Checklist.Build(Everything, checks);
+
+        // The loader is part of "Bridge installed", so its failure must show there
+        // instead of setting result.Ok=false behind an all-green checklist.
+        var bridge = rows.First(row => row.Id == "bridge_payload");
+        Assert.Equal("fail", bridge.Status);
+        Assert.Equal("Grant admin to install the loader.", bridge.Fix);
+    }
+
+    [Fact]
+    public void ExposesStableLabels()    {
         foreach (var item in Checklist.Build(Everything))
         {
             Assert.False(string.IsNullOrEmpty(item.Label));

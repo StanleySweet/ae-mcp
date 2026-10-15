@@ -74,7 +74,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private async Task InstallAsync()
     {
         Busy = true;
-        Progress = "Installing…";
+        Progress = "Installing… approve the macOS admin prompt to install the After Effects helper.";
         try
         {
             var result = await _service.RepairAsync();

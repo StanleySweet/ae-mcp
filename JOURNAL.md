@@ -5,6 +5,12 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-15
 
+- Setup install made **atomic and verified** (ADR 0005): the privileged loader
+  runs first and a failure aborts before anything else is written (no more half
+  installs); the `bridge_loader` result is folded into the visible "Bridge
+  installed" row (its failure used to be invisible); the live test now runs
+  whenever the bridge is installed, not only when every check passed; the window
+  explains the admin prompt.
 - Fixed two Setup bugs found by exercising the MCP: (1) the installer created
   `~/.ae-mcp` at 755 so `check_setup` reported `queue_permissions: fail` until the
   first bridge call lazily chmod'd it — now `InstallPayload` chmods it 0700; (2) the
