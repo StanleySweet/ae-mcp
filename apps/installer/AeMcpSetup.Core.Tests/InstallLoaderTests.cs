@@ -36,6 +36,25 @@ public class InstallLoaderTests
     }
 
     [Fact]
+    public void ElevationScriptLeavesShellQuotesAndAmpersandsIntact()
+    {
+        // Regression: System.Text.Json's default encoder HTML-escapes ' and & to
+        // \u0027 / \u0026, which AppleScript rejects (-2741), so the prompt never showed.
+        var script = InstallLoader.ElevationScript(InstallLoader.ElevatedCopyCommand("/tmp/a.jsx", "/d/b.jsx"));
+
+        Assert.Equal(
+            "do shell script \"mkdir -p '/d' && cp '/tmp/a.jsx' '/d/b.jsx'\" with administrator privileges",
+            script);
+        Assert.DoesNotContain("\\u00", script);
+    }
+
+    [Fact]
+    public void QuoteAppleScriptEscapesBackslashesAndDoubleQuotes()
+    {
+        Assert.Equal("\"a \\\"b\\\" c \\\\ d\"", InstallLoader.QuoteAppleScript("a \"b\" c \\ d"));
+    }
+
+    [Fact]
     public async Task WritesTheLoaderIntoScriptsStartup()
     {
         var (install, folder) = FakeInstall();

@@ -5,6 +5,12 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-15
 
+- Root-caused why Setup never prompted for admin and never installed the loader:
+  `InstallLoader` built the AppleScript with `JsonSerializer.Serialize`, whose
+  HTML-safe encoder turns `'`/`&` into `\u0027`/`\u0026` — invalid in AppleScript
+  → osascript error `-2741` **before** the prompt. Fixed with proper AppleScript
+  quoting (`ElevationScript`/`QuoteAppleScript`); the manual Node install had
+  hidden it. Finding: `docs/findings/2026-10-15-json-serialize-breaks-applescript.md`.
 - Setup install made **atomic and verified** (ADR 0005): the privileged loader
   runs first and a failure aborts before anything else is written (no more half
   installs); the `bridge_loader` result is folded into the visible "Bridge

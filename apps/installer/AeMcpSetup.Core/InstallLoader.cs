@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 namespace AeMcpSetup.Core;
 
 public sealed record InstallLoaderResult(
@@ -29,6 +27,19 @@ public static class InstallLoader
     public static string ElevatedCopyCommand(string source, string dest)
         => $"mkdir -p {ShellQuote(Path.GetDirectoryName(dest)!)} && cp {ShellQuote(source)} {ShellQuote(dest)}";
 
+    /// <summary>Wraps a value as an AppleScript string literal, escaping <c>\</c> and <c>"</c>.</summary>
+    public static string QuoteAppleScript(string value)
+        => $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
+
+    /// <summary>
+    /// The AppleScript that runs <paramref name="shellCommand"/> with admin rights.
+    /// Must not go through <c>System.Text.Json</c>: its default encoder HTML-escapes
+    /// <c>'</c> and <c>&amp;</c> to <c>\u0027</c>/<c>\u0026</c>, which AppleScript rejects
+    /// with a syntax error (-2741) before the prompt ever appears.
+    /// </summary>
+    public static string ElevationScript(string shellCommand)
+        => $"do shell script {QuoteAppleScript(shellCommand)} with administrator privileges";
+
     /// <summary>
     /// Default <see cref="ElevatedWrite"/>: stages the file in a temp dir, then
     /// copies it into place with <c>osascript ... with administrator privileges</c>.
@@ -39,8 +50,7 @@ public static class InstallLoader
         Directory.CreateDirectory(staging);
         var source = Path.Combine(staging, "ae-mcp-loader.jsx");
         await File.WriteAllTextAsync(source, contents);
-        var shellCommand = ElevatedCopyCommand(source, path);
-        var script = $"do shell script {JsonSerializer.Serialize(shellCommand)} with administrator privileges";
+        var script = ElevationScript(ElevatedCopyCommand(source, path));
         return await Shell.SucceedsAsync("osascript", ["-e", script]);
     }
 
