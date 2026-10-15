@@ -165,7 +165,11 @@ describe('E13-3 destructive guard', () => {
   it('refuses a destructive operation when the project has never been saved', async () => {
     const calls: string[] = [];
     const { client, close } = await connectServer(project(), calls, {
-      incrementResult: { success: false, error: 'project has never been saved' },
+      incrementResult: {
+        success: false,
+        code: 'PROJECT_NEVER_SAVED',
+        error: 'project has never been saved',
+      },
     });
     closes.push(close);
 
@@ -173,6 +177,21 @@ describe('E13-3 destructive guard', () => {
     expect(result.isError).toBe(true);
     const error = errorSchema.parse(JSON.parse(result.text));
     expect(error.code).toBe('UNSAVED_PROJECT');
+    expect(calls).toEqual(['project.increment_save']);
+  });
+
+  it('surfaces the real increment error instead of blaming an unsaved project', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      incrementResult: { success: false, error: 'the installed bridge payload is stale' },
+    });
+    closes.push(close);
+
+    const result = await call(client, 'layer.delete', { index: 1 });
+    expect(result.isError).toBe(true);
+    const error = errorSchema.parse(JSON.parse(result.text));
+    expect(error.code).toBe('SCRIPT_ERROR');
+    expect(error.message).toContain('the installed bridge payload is stale');
     expect(calls).toEqual(['project.increment_save']);
   });
 
@@ -233,7 +252,11 @@ describe('E13-3 destructive guard', () => {
   it('refuses a batch.run with a destructive sub-operation when the project has never been saved', async () => {
     const calls: string[] = [];
     const { client, close } = await connectServer(project(), calls, {
-      incrementResult: { success: false, error: 'project has never been saved' },
+      incrementResult: {
+        success: false,
+        code: 'PROJECT_NEVER_SAVED',
+        error: 'project has never been saved',
+      },
     });
     closes.push(close);
 
@@ -334,7 +357,11 @@ describe('E13-3 destructive guard', () => {
       ...observeHandlers(project()),
       'project.increment_save': () => {
         calls.push('project.increment_save');
-        return { success: false, error: 'project has never been saved' };
+        return {
+          success: false,
+          code: 'PROJECT_NEVER_SAVED',
+          error: 'project has never been saved',
+        };
       },
       'bulk.remove_unused': (args: unknown) => {
         calls.push('bulk.remove_unused');
@@ -396,7 +423,11 @@ describe('E13-3 destructive guard', () => {
       ...observeHandlers(proj),
       'project.increment_save': () => {
         calls.push('project.increment_save');
-        return { success: false, error: 'project has never been saved' };
+        return {
+          success: false,
+          code: 'PROJECT_NEVER_SAVED',
+          error: 'project has never been saved',
+        };
       },
       'layer.rename': (args: unknown) => {
         calls.push('layer.rename');
@@ -534,7 +565,11 @@ describe('E13-6 guard cannot be bypassed', () => {
     const { client, close } = await connectServer(project(), calls, {
       operations: registryWithEval(),
       settings: settings({ evalEnabled: true }),
-      incrementResult: { success: false, error: 'project has never been saved' },
+      incrementResult: {
+        success: false,
+        code: 'PROJECT_NEVER_SAVED',
+        error: 'project has never been saved',
+      },
       extraHandlers: evalHandlers(calls),
     });
     closes.push(close);

@@ -48,6 +48,10 @@ describe('project.increment_save', () => {
     const outcome = invoke(ctx, 'project.increment_save', null);
 
     expect(ae.executedCommands).toEqual([]);
-    expect(outcome.value).toEqual({ success: false, error: 'project has never been saved' });
+    expect(outcome.value).toEqual({
+      success: false,
+      code: 'PROJECT_NEVER_SAVED',
+      error: 'project has never been saved',
+    });
   });
 });

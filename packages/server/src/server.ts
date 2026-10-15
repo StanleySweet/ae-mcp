@@ -632,12 +632,28 @@ export function createServer(options: ServerOptions = {}): McpServer {
         if (!increment.ok) {
           return toResult(increment);
         }
-        const saved = increment.result as { success?: boolean; file?: unknown } | null;
+        const saved = increment.result as {
+          success?: boolean;
+          file?: unknown;
+          code?: unknown;
+          error?: unknown;
+        } | null;
         if (!saved || saved.success !== true) {
+          if (saved?.code === 'PROJECT_NEVER_SAVED') {
+            return text(
+              makeError(
+                'UNSAVED_PROJECT',
+                `operation '${toolArgs.op}' is destructive and the project has never been saved`,
+              ),
+              true,
+            );
+          }
+          const detail =
+            saved && typeof saved.error === 'string' ? saved.error : 'the increment step failed';
           return text(
             makeError(
-              'UNSAVED_PROJECT',
-              `operation '${toolArgs.op}' is destructive and the project has never been saved`,
+              'SCRIPT_ERROR',
+              `operation '${toolArgs.op}' is destructive and the pre-increment save failed: ${detail}`,
             ),
             true,
           );
@@ -769,12 +785,28 @@ export function createServer(options: ServerOptions = {}): McpServer {
         if (!increment.ok) {
           return toResult(increment);
         }
-        const saved = increment.result as { success?: boolean; file?: unknown } | null;
+        const saved = increment.result as {
+          success?: boolean;
+          file?: unknown;
+          code?: unknown;
+          error?: unknown;
+        } | null;
         if (!saved || saved.success !== true) {
+          if (saved?.code === 'PROJECT_NEVER_SAVED') {
+            return text(
+              makeError(
+                'UNSAVED_PROJECT',
+                `operation '${step.op}' is destructive and the project has never been saved`,
+              ),
+              true,
+            );
+          }
+          const detail =
+            saved && typeof saved.error === 'string' ? saved.error : 'the increment step failed';
           return text(
             makeError(
-              'UNSAVED_PROJECT',
-              `operation '${step.op}' is destructive and the project has never been saved`,
+              'SCRIPT_ERROR',
+              `operation '${step.op}' is destructive and the pre-increment save failed: ${detail}`,
             ),
             true,
           );
