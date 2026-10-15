@@ -228,6 +228,16 @@ export class MockCompItem extends MockItem {
   }
 }
 
+export class MockKeyframeEase {
+  constructor(
+    public speed: number,
+    public influence: number,
+  ) {}
+}
+
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#keyframeinterpolationtype
+export const MockKeyframeInterpolationType = { LINEAR: 1, BEZIER: 2, HOLD: 3 };
+
 export class MockProperty {
   expressionEnabled = false;
   expression = '';
@@ -273,6 +283,31 @@ export class MockProperty {
 
   removeKey(index: number): void {
     this.keys.splice(index - 1, 1);
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertynumdimensions
+  get numDimensions(): number {
+    return Array.isArray(this.value) ? this.value.length : 1;
+  }
+
+  readonly interpolationTypes: { keyIndex: number; inType: number; outType: number }[] = [];
+  readonly temporalEases: {
+    keyIndex: number;
+    inEase: MockKeyframeEase[];
+    outEase: MockKeyframeEase[];
+  }[] = [];
+
+  setInterpolationTypeAtKey(keyIndex: number, inType: number, outType: number): void {
+    this.interpolationTypes.push({ keyIndex, inType, outType });
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysettemporaleaseatkey
+  setTemporalEaseAtKey(
+    keyIndex: number,
+    inEase: MockKeyframeEase[],
+    outEase: MockKeyframeEase[],
+  ): void {
+    this.temporalEases.push({ keyIndex, inEase, outEase });
   }
 
   setValue(value: unknown): void {
@@ -826,6 +861,8 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     CameraLayer: MockCameraLayer,
     LightLayer: MockLightLayer,
     MarkerValue: MockMarkerValue,
+    KeyframeEase: MockKeyframeEase,
+    KeyframeInterpolationType: MockKeyframeInterpolationType,
     RQItemStatus,
     File: function (path: string): MockFile {
       return new MockFile(ae, path);

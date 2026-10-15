@@ -248,3 +248,107 @@ describe('marker handlers', () => {
     expect(listed.value.markers).toHaveLength(2);
   });
 });
+
+describe('keyframe handlers', () => {
+  function layerWithScale(ae: MockAE): MockProperty {
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const scale = new MockProperty('Scale', 'ADBE Scale', [100, 100, 100]);
+    layer.add(scale);
+    comp.addLayer(layer);
+    return scale;
+  }
+
+  it('adds and removes a keyframe on a nested transform property', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const scale = layerWithScale(ae);
+
+    const added = invoke(ctx, 'keyframe.add', {
+      comp: 'Main',
+      index: 1,
+      time: 1,
+      value: [100, 100, 100],
+      property: 'Scale',
+    });
+    expect(added.value).toMatchObject({ success: true, time: 1, property: 'Scale' });
+    expect(scale.numKeys).toBe(1);
+
+    const removed = invoke(ctx, 'keyframe.remove', {
+      comp: 'Main',
+      index: 1,
+      time: 1,
+      property: 'Scale',
+    });
+    expect(removed.value).toEqual({ success: true });
+    expect(scale.numKeys).toBe(0);
+  });
+
+  it('set_easing passes one KeyframeEase per value dimension', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const scale = layerWithScale(ae);
+    invoke(ctx, 'keyframe.add', {
+      comp: 'Main',
+      index: 1,
+      time: 1,
+      value: [100, 100, 100],
+      property: 'Scale',
+    });
+
+    const out = invoke(ctx, 'keyframe.set_easing', {
+      comp: 'Main',
+      index: 1,
+      time: 1,
+      property: 'Scale',
+      easing: 'easeIn',
+    });
+
+    expect(out.value).toMatchObject({ success: true, easing: 'easeIn', keyIndex: 1 });
+    expect(scale.interpolationTypes).toHaveLength(1);
+    expect(scale.temporalEases).toHaveLength(1);
+    expect(scale.temporalEases[0]!.inEase).toHaveLength(3);
+    expect(scale.temporalEases[0]!.outEase).toHaveLength(3);
+  });
+
+  it('set_easing hold only changes the interpolation type', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const scale = layerWithScale(ae);
+    invoke(ctx, 'keyframe.add', {
+      comp: 'Main',
+      index: 1,
+      time: 1,
+      value: [100, 100, 100],
+      property: 'Scale',
+    });
+
+    const out = invoke(ctx, 'keyframe.set_easing', {
+      comp: 'Main',
+      index: 1,
+      time: 1,
+      property: 'Scale',
+      easing: 'hold',
+    });
+
+    expect(out.value).toMatchObject({ success: true, easing: 'hold' });
+    expect(scale.interpolationTypes).toEqual([{ keyIndex: 1, inType: 3, outType: 3 }]);
+    expect(scale.temporalEases).toHaveLength(0);
+  });
+
+  it('set_easing reports a missing keyframe', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    layerWithScale(ae);
+
+    const out = invoke(ctx, 'keyframe.set_easing', {
+      comp: 'Main',
+      index: 1,
+      time: 5,
+      property: 'Scale',
+      easing: 'linear',
+    });
+
+    expect(out.value).toEqual({ success: false, error: 'No keyframe at time 5' });
+  });
+});

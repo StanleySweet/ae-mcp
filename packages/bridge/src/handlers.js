@@ -1057,10 +1057,10 @@ AEMCP.register('keyframe.add', function (args) {
     }
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
-    if (!prop) return { success: false, error: 'Property not found' };
+    var prop = aemcpResolveProperty(layer, propertyName);
+    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
     prop.setValueAtTime(time, value);
-    return aemcpWithExpressionWarning(prop, { success: true });
+    return aemcpWithExpressionWarning(prop, { success: true, time: time, property: propertyName });
 });
 
 AEMCP.register('keyframe.remove', function (args) {
@@ -1082,10 +1082,16 @@ AEMCP.register('keyframe.remove', function (args) {
     }
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
-    if (!prop) return { success: false, error: 'Property not found' };
-    prop.setValueAtTime(time, undefined);
-    return aemcpWithExpressionWarning(prop, { success: true });
+    var prop = aemcpResolveProperty(layer, propertyName);
+    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
+    var j;
+    for (j = prop.numKeys; j >= 1; j--) {
+        if (Math.abs(prop.keyTime(j) - time) < 0.0001) {
+            prop.removeKey(j);
+            return { success: true };
+        }
+    }
+    return { success: false, error: 'No keyframe at time ' + time };
 });
 
 AEMCP.register('keyframe.set_easing', function (args) {
@@ -1108,10 +1114,41 @@ AEMCP.register('keyframe.set_easing', function (args) {
     }
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
-    if (!prop) return { success: false, error: 'Property not found' };
-    prop.setEasingAtTime(time, easing);
-    return aemcpWithExpressionWarning(prop, { success: true });
+    var prop = aemcpResolveProperty(layer, propertyName);
+    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
+    var keyIndex = null;
+    var j;
+    for (j = 1; j <= prop.numKeys; j++) {
+        if (Math.abs(prop.keyTime(j) - time) < 0.0001) {
+            keyIndex = j;
+            break;
+        }
+    }
+    if (keyIndex === null) { return { success: false, error: 'No keyframe at time ' + time }; }
+    var interp;
+    if (easing === 'hold') {
+        interp = KeyframeInterpolationType.HOLD;
+        prop.setInterpolationTypeAtKey(keyIndex, interp, interp);
+    } else if (easing === 'linear') {
+        interp = KeyframeInterpolationType.LINEAR;
+        prop.setInterpolationTypeAtKey(keyIndex, interp, interp);
+    } else {
+        interp = KeyframeInterpolationType.BEZIER;
+        prop.setInterpolationTypeAtKey(keyIndex, interp, interp);
+        var easeAmt = easing === 'easeIn' ? 0 : (easing === 'easeOut' ? 1 : 0.5);
+        var easeIn = new KeyframeEase(easeAmt, 33.33);
+        var easeOut = new KeyframeEase(1 - easeAmt, 33.33);
+        // setTemporalEaseAtKey needs one KeyframeEase per value dimension.
+        // Use numDimensions (the definitive AE API) with a fallback.
+        var dims = 1;
+        try { dims = prop.numDimensions || 1; } catch (e) { dims = 1; }
+        var easeInArr = [];
+        var easeOutArr = [];
+        var d;
+        for (d = 0; d < dims; d++) { easeInArr.push(easeIn); easeOutArr.push(easeOut); }
+        prop.setTemporalEaseAtKey(keyIndex, easeInArr, easeOutArr);
+    }
+    return { success: true, easing: easing, keyIndex: keyIndex };
 });
 
 // Expression operation handlers (mutating, run via ae_do).
