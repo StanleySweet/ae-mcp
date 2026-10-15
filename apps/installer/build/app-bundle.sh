@@ -35,6 +35,11 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# Re-sign ad-hoc with the bundle identifier so macOS TCC (Automation/Desktop) and
+# the admin prompt key on com.aemcp.setup instead of the .NET apphost default.
+# --deep also signs the nested native libs (.NET publishes Avalonia.Native.dll as Mach-O).
+codesign --force --deep --sign - --identifier com.aemcp.setup "$app"
+
 dmg="$out_dir/AE-MCP Setup-${version}-${arch}.dmg"
 rm -f "$dmg"
 stage="$(mktemp -d)"

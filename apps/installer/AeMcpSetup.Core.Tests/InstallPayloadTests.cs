@@ -5,6 +5,28 @@ namespace AeMcpSetup.Core.Tests;
 public class InstallPayloadTests
 {
     [Fact]
+    public async Task CreatesTheQueueRootOwnerOnly()
+    {
+        var root = TempDir.Create("ae-mcp-root-");
+
+        await InstallPayload.InstallAsync(root, "var AEMCP_BRIDGE_VERSION = \"1.0.0\";");
+
+        Assert.Equal(0, (int)File.GetUnixFileMode(root) & 0b111_111);
+    }
+
+    [Fact]
+    public async Task RepairsTheQueueRootPermissions()
+    {
+        var root = TempDir.Create("ae-mcp-root-");
+        File.SetUnixFileMode(root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+            | UnixFileMode.GroupRead | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+
+        await InstallPayload.InstallAsync(root, "var AEMCP_BRIDGE_VERSION = \"1.0.0\";");
+
+        Assert.Equal(0, (int)File.GetUnixFileMode(root) & 0b111_111);
+    }
+
+    [Fact]
     public void PayloadVersionReadsTheVersionFromTheBuildStamp()
     {
         Assert.Equal("1.2.3", InstallPayload.PayloadVersion("var AEMCP_BRIDGE_VERSION = \"1.2.3\";"));

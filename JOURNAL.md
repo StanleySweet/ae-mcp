@@ -5,6 +5,12 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-15
 
+- Fixed two Setup bugs found by exercising the MCP: (1) the installer created
+  `~/.ae-mcp` at 755 so `check_setup` reported `queue_permissions: fail` until the
+  first bridge call lazily chmod'd it — now `InstallPayload` chmods it 0700; (2) the
+  built `.app` was ad-hoc signed as `apphost` (the .NET default), so TCC/admin
+  prompts were keyed wrong — `app-bundle.sh` now re-signs the bundle as
+  `com.aemcp.setup`.
 - Fixed the Setup **scripting-pref** row on a localized AE: `FindPrefsFile` matched
   the English `Prefs.txt`, but French AE writes `Préfs.txt` and macOS returns it
   NFD-decomposed, so it never matched (the row looped on "open AE once" /

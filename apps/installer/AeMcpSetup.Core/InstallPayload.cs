@@ -13,6 +13,10 @@ public static class InstallPayload
 {
     private const string VersionMarker = "AEMCP_BRIDGE_VERSION = \"";
 
+    /// <summary>The queue holds job payloads, so it stays owner-only (0700).</summary>
+    private static readonly UnixFileMode QueueMode =
+        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+
     /// <summary>Reads the bridge version from the generated payload's stamp, or null.</summary>
     public static string? PayloadVersion(string source)
     {
@@ -51,8 +55,12 @@ public static class InstallPayload
         var bridgeDir = Path.Combine(root, "bridge");
         try
         {
-            Directory.CreateDirectory(Path.Combine(bridgeDir, "inbox"));
-            Directory.CreateDirectory(Path.Combine(bridgeDir, "outbox"));
+            // Keep the queue owner-only (0700): check_setup verifies this, so create
+            // it right here rather than relying on the server's lazy repair.
+            Directory.CreateDirectory(root);
+            File.SetUnixFileMode(root, QueueMode);
+            Directory.CreateDirectory(Path.Combine(bridgeDir, "inbox"), QueueMode);
+            Directory.CreateDirectory(Path.Combine(bridgeDir, "outbox"), QueueMode);
             var currentPath = Path.Combine(bridgeDir, "current.jsx");
             var previous = await Io.ReadFileOrNullAsync(currentPath);
             var changed = previous != payload;

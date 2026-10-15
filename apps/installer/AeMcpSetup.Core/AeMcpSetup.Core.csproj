@@ -6,8 +6,9 @@
     <Nullable>enable</Nullable>
     <!-- IL2026: BridgeCall/InstallLoader serialize only string and
          Dictionary<string, object?> of primitives (see the app csproj); the
-         generic-Serialize warning is conservative here. -->
-    <NoWarn>$(NoWarn);IL2026</NoWarn>
+         generic-Serialize warning is conservative here.
+         CA1416: macOS-only app; the UnixFileMode/prename calls are never run on Windows. -->
+    <NoWarn>$(NoWarn);IL2026;CA1416</NoWarn>
   </PropertyGroup>
 
 </Project>
