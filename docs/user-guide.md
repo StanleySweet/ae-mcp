@@ -15,6 +15,12 @@ Control-click) the app and choose **Open**, and click **Open** again in the
 warning dialog. You only do this once; afterwards it opens normally with a
 double-click.
 
+If macOS says the app is damaged or still refuses to open it, double-click
+**If Setup will not open.command** in the dmg window. It clears the download
+quarantine with `xattr -cr "/Applications/AE-MCP Setup.app"`. The script is
+unsigned too, so macOS may ask you to confirm it the same way; you can also paste
+that command into Terminal yourself.
+
 ### 2. Run Setup
 
 AE-MCP Setup shows six checks. It detects After Effects and Claude Desktop, then

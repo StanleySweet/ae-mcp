@@ -26,7 +26,9 @@ release artifacts (`AE-MCP Setup-<version>-<arch>.dmg`, `ae-mcp.mcpb`,
    checksums: `shasum -a 256 -c SHA256SUMS.txt` (from the folder you downloaded
    into).
 2. Open the `.dmg` and drag **AE-MCP Setup** into Applications.
-3. First launch is unsigned: right-click the app, **Open**, then confirm. If
+3. First launch is unsigned. Double-click **If Setup will not open.command** in the
+   dmg window (it runs `xattr -cr` on the installed app), or right-click the app,
+   **Open**, then confirm. If
    macOS still blocks it, run
    `xattr -dr com.apple.quarantine "/Applications/AE-MCP Setup.app"` and open it
    again.

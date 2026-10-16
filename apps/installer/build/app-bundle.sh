@@ -45,6 +45,9 @@ rm -f "$dmg"
 stage="$(mktemp -d)"
 cp -R "$app" "$stage/"
 ln -s /Applications "$stage/Applications"
+# The app is ad-hoc signed only; this helper clears the download quarantine (#187).
+cp "$here/unquarantine.command" "$stage/If Setup will not open.command"
+chmod +x "$stage/If Setup will not open.command"
 hdiutil create -volname "AE-MCP Setup" -srcfolder "$stage" -ov -format UDZO "$dmg"
 rm -rf "$stage"
 
