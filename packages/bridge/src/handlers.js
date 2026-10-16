@@ -484,18 +484,6 @@ AEMCP.register('render.queue_set_output', function (args) {
     return aemcpRenderItemInfo(item, args && typeof args.item === 'number' ? args.item : 1);
 });
 
-// Start the render queue. AE renders synchronously and returns when complete.
-// Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueue/#renderqueuerender
-AEMCP.register('render.queue_start', function () {
-    var queue = app.project.renderQueue;
-    queue.render();
-    return {
-        rendered: true,
-        numItems: queue.numItems,
-        items: aemcpRenderQueueItems()
-    };
-});
-
 // Report the render queue and every item's status.
 AEMCP.register('render.status', function () {
     var queue = app.project.renderQueue;

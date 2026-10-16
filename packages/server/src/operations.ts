@@ -434,11 +434,6 @@ export function defaultOperationRegistry(): OperationRegistry {
       schema: { item: layerIndex, file: comp, template: comp },
     }),
   );
-  register(
-    operation('render.queue_start', 'render', 'Start the render queue and wait for it to finish.', {
-      destructive: true,
-    }),
-  );
   register(operation('render.status', 'render', 'Report the render queue and item statuses.', {
     readOnly: true,
   }));

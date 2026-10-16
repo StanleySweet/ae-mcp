@@ -93,7 +93,6 @@ Operations flagged destructive:
 
 - `layer.delete`, `keyframe.remove`, `effect.remove` — deletes and removals
 - `command.execute` — runs an arbitrary menu command
-- `render.queue_start` — renders onto files that may already exist
 - `bulk.remove_unused` — a bulk plan that removes or replaces items
 - `eval.run` — arbitrary ExtendScript, always destructive and off unless explicitly enabled
 

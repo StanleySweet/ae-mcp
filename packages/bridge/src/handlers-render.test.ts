@@ -160,7 +160,7 @@ describe('render queue operations', () => {
     expect(outcome.issue?.message).toContain('render queue item not found: 3');
   });
 
-  it('reports queue status, then renders and marks items done', async () => {
+  it('reports queue status for a queued item', async () => {
     const { ctx, ae } = await payloadContext();
     seedComp(ae);
     invoke(ctx, 'render.queue_add', { comp: 'Main' });
@@ -169,13 +169,14 @@ describe('render queue operations', () => {
     const before = invoke(ctx, 'render.status', {});
     expect(before.value).toMatchObject({ numItems: 1, rendering: false });
     expect((before.value?.items as { status: string }[])[0]?.status).toBe('QUEUED');
+  });
 
-    const started = invoke(ctx, 'render.queue_start', {});
-    expect(started.value).toMatchObject({ rendered: true, numItems: 1 });
-    expect((started.value?.items as { status: string }[])[0]?.status).toBe('DONE');
-    expect(ae.fs.get('/tmp/out.png')).toBe('PNG:Main:0');
+  // RenderQueue.render() blocks AE past the job deadline; ae_render covers it (#180).
+  it('has no render.queue_start', async () => {
+    const { ctx } = await payloadContext();
 
-    const after = invoke(ctx, 'render.status', {});
-    expect((after.value?.items as { status: string }[])[0]?.status).toBe('DONE');
+    const outcome = invoke(ctx, 'render.queue_start', {});
+
+    expect(outcome.issue?.code).toBe('UNKNOWN_TOOL');
   });
 });
