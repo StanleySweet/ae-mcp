@@ -1005,7 +1005,8 @@ AEMCP.register('layer.center', function (args) {
     var comp = aemcpRequireComp(compName);
     var sel = comp.selectedLayers;
     if (!sel) return { success: false, error: 'No layers selected' };
-    for (var i = 1; i <= sel.length; i++) {
+    // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemselectedlayers (0-based array)
+    for (var i = 0; i < sel.length; i++) {
         var layer = sel[i];
         if (layer.property) {
             var transform = layer.property(AEMCP_MATCH.TRANSFORM);

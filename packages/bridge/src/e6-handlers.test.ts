@@ -170,6 +170,28 @@ describe('layer handlers', () => {
     expect(comp.numLayers).toBe(1);
     expect(comp.layer(1)?.name).toBe('Keep');
   });
+
+  it('layer.center moves every selected layer, not just the first', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    invoke(ctx, 'layer.add_null', { comp: 'Main' });
+    invoke(ctx, 'layer.add_null', { comp: 'Main' });
+    const first = comp.layer(1) as MockAVLayer;
+    const second = comp.layer(2) as MockAVLayer;
+    const positionOf = (layer: MockAVLayer): MockProperty =>
+      (layer.property('ADBE Transform Group') as MockPropertyGroup).property('ADBE Position') as MockProperty;
+    positionOf(first).setValue([0, 0]);
+    positionOf(second).setValue([0, 0]);
+    // selectedLayers is a 0-based JS array (CompItem.selectedLayers, Ref: https://ae-scripting.docsforadobe.dev/item/compitem/).
+    comp.selectedLayers = [first, second];
+
+    const out = invoke(ctx, 'layer.center', { comp: 'Main' });
+
+    expect(out.value).toEqual({ success: true });
+    expect(positionOf(first).value).toEqual([400, 300]);
+    expect(positionOf(second).value).toEqual([400, 300]);
+  });
 });
 
 describe('expression-driver warnings', () => {
