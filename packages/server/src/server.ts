@@ -808,6 +808,16 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (incrementInfo) {
         payload.increment = incrementInfo;
       }
+      const size = Buffer.byteLength(JSON.stringify(payload));
+      if (size > maxResultBytes) {
+        return text(
+          makeError(
+            'INVALID_ARGS',
+            `result is ${size} bytes, over the ${maxResultBytes}-byte limit; narrow the request (index, depth, comp)`,
+          ),
+          true,
+        );
+      }
       return text(payload);
     },
   );

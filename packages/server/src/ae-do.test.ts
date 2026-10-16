@@ -38,6 +38,14 @@ function registry(): OperationRegistry {
     schema: {},
   });
   registry.register({
+    name: 'project.big',
+    category: 'project',
+    description: 'Return a large result.',
+    readOnly: true,
+    destructive: false,
+    schema: {},
+  });
+  registry.register({
     name: 'project.undo',
     category: 'project',
     description: 'Undo the last operation.',
@@ -51,6 +59,7 @@ function registry(): OperationRegistry {
 async function connectServer(
   project: FakeProject,
   calls: string[],
+  maxResultBytes?: number,
 ): Promise<{ client: Client; close: () => Promise<void> }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-ae-do-'));
   const root = join(home, '.ae-mcp');
@@ -69,13 +78,14 @@ async function connectServer(
       const parsed = args as { index: number; name: string };
       return { index: parsed.index, name: parsed.name };
     },
+    'project.big': () => Array.from({ length: 200 }, (_, i) => ({ index: i, name: `Layer ${i}` })),
   };
   const consumer = createQueueConsumer(root, handlers);
   await consumer.start();
 
   const aeClient = createAEClient({ transport: new FileQueueTransport(root, 10), root });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createServer({ root, client: aeClient, operations: registry() });
+  const server = createServer({ root, client: aeClient, operations: registry(), maxResultBytes });
   await server.connect(serverTransport);
   const client = new Client({ name: 'test-client', version: '0.0.0' });
   await client.connect(clientTransport);
@@ -128,6 +138,29 @@ describe('ae_do', () => {
     expect(isError).toBe(false);
     expect(JSON.parse(text)).toEqual({ result: { index: 1, name: 'Hero' } });
     expect(calls).toEqual(['layer.rename']);
+  });
+
+  it('refuses a result over maxResultBytes with INVALID_ARGS', async () => {
+    const { client, close } = await connectServer(project(), [], 500);
+    closes.push(close);
+
+    const { isError, text } = await call(client, { op: 'project.big' });
+    expect(isError).toBe(true);
+    expect(errorSchema.parse(JSON.parse(text)).code).toBe('INVALID_ARGS');
+    expect(text).toContain('over the 500-byte limit');
+  });
+
+  it('passes a result under maxResultBytes through unchanged', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, 500);
+    closes.push(close);
+
+    const { isError, text } = await call(client, {
+      op: 'layer.rename',
+      args: { index: 1, name: 'Hero' },
+    });
+    expect(isError).toBe(false);
+    expect(JSON.parse(text)).toEqual({ result: { index: 1, name: 'Hero' } });
   });
 
   it('rejects an unknown operation with the closest names and never reaches AE', async () => {
