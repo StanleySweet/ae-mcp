@@ -27,6 +27,9 @@ jobs:
           path: dist/*.mcpb
   installer:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64, x64]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -38,9 +41,11 @@ jobs:
           dotnet-version: '10.0.x'
       - run: npm ci
       - run: npm run installer:build
+        env:
+          AE_MCP_ARCH: ${{ matrix.arch }}
       - uses: actions/upload-artifact@v7
         with:
-          name: installer
+          name: installer-${{ matrix.arch }}
           path: apps/installer/dist/*.dmg
   publish:
     needs: [mcpb, installer]

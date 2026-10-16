@@ -5,6 +5,20 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-16
 
+- **E11-8 `chore(release): v1.0.0`** — cut v1.0.0. Bumped the three shipped
+  versions to 1.0.0: root `package.json` (drives the Setup app + dmg name),
+  `bundle/manifest.json` (extension version; `bundle/manifest.test.ts` keeps it
+  in step with `package.json`) and `SERVER_VERSION` in
+  `packages/server/src/server.ts`. The private workspace `package.json`s stay at
+  `0.0.0` — they are never published and esbuild inlines them. Found and fixed a
+  release-pipeline gap: `release.yml`'s installer job ran plain
+  `installer:build`, which builds a single arch (`scripts/build-installer.ts`
+  defaults to `arm64`), so a tag would have shipped only the Apple-Silicon dmg
+  and failed Story 11.1. The job is now an `arm64,x64` matrix running
+  `installer:build` with `AE_MCP_ARCH`, uploading per-arch artifacts the publish
+  job globs into the release. Verified locally both dmgs build at 1.0.0
+  (`AE-MCP Setup-1.0.0-{arm64,x64}.dmg`). `npm run check` green.
+
 - Finished the sweep by closing the last two bridge bugs. **#174** (`5c85b6a2`):
   `property.list` always returned `[]` because it read `layer.property.keys`,
   but `property` is a function — it now walks `layer.numProperties`/`property(i)`
