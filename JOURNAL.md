@@ -5,6 +5,15 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.2.0`**: ships #187–#211.
+  - **Features:** dialogs, batch rollback, file import, camera/light/3D, snippets and templates, keyframe tools, project open/save/import-JSON, AE_NOT_RUNNING, and a smaller `property.list`.
+  - **Installer:** checks what it installed and tells a fresh install from an update; the dmg ships an unquarantine helper.
+  - **Fixes:** the "undo group mismatch" warning (#195), the audit fixes #201–#208, and the bugs the test drive found (#209–#211).
+  - **Process:** built by Sonnet and Haiku agents in worktrees, merged one commit at a time through `npm run check`.
+  - **Live gate:** the new `npm run test:drive` (#200) ran on AE 26.5 with 115 passed, 0 failed, 13 skipped.
+  - **Gotcha:** two #198 tests reached the real `pgrep` and passed only while AE was running; fixed in `df3371f`.
+  - **Still open:** #196 does not verify the Claude extension.
+
 - **`chore(release): v1.1.0`**: bumped `package.json`, `bundle/manifest.json` and
   `SERVER_VERSION`, then tagged `v1.1.0`. It ships #175–#186. Minor rather than major:
   the 17 MCP tools are unchanged, and the operations changed under ADR-0007 are
