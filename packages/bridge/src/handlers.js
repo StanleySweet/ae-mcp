@@ -896,8 +896,11 @@ AEMCP.register('layer.add_text', function (args) {
     var text = args && args.text ? args.text : 'Text';
     var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addText(text);
-    layer.name = 'Text';
-    return { name: layer.name, id: layer.id };
+    // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerisnameset (name follows the source text unless set)
+    if (args && args.name) {
+        layer.name = args.name;
+    }
+    return { index: layer.index, name: layer.name, id: layer.id };
 });
 
 AEMCP.register('layer.add_shape', function (args) {

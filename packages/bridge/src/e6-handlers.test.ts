@@ -88,9 +88,20 @@ describe('layer handlers', () => {
 
     const out = invoke(ctx, 'layer.add_text', { comp: 'Main', text: 'Hello' });
 
-    expect(out.value).toMatchObject({ name: 'Text' });
+    // AE names a text layer after its source text unless a name is set.
+    expect(out.value).toEqual({ index: 1, name: 'Hello', id: expect.any(Number) });
     expect(ae.project.item(1)).toBeInstanceOf(MockCompItem);
     expect((ae.project.item(1) as MockCompItem).layer(1)).toBeInstanceOf(MockTextLayer);
+  });
+
+  it('layer.add_text keeps the given name when one is passed', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+
+    const out = invoke(ctx, 'layer.add_text', { comp: 'Main', text: 'Hello', name: 'Title' });
+
+    expect(out.value).toMatchObject({ index: 1, name: 'Title' });
+    expect((ae.project.item(1) as MockCompItem).layer(1)?.name).toBe('Title');
   });
 
   it('layer.add_shape creates a shape layer', async () => {

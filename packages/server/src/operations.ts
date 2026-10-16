@@ -155,7 +155,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
 
   // Layer.
-  register(operation('layer.add_text', 'layer', 'Add a text layer.', { schema: { comp, text: comp } }));
+  register(operation('layer.add_text', 'layer', 'Add a text layer.', { schema: { comp, text: comp, name: { type: 'string' } } }));
   register(operation('layer.add_shape', 'layer', 'Add a shape layer.', { schema: { comp } }));
   const centerPoint = { type: 'array', description: '[x, y]; defaults to the comp centre.' };
   register(operation('layer.add_camera', 'layer', 'Add a camera layer.', {
