@@ -46,6 +46,11 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - (#194) `project.save` (`save()`/`save(new File(path))`, a never-saved project without `path` → `INVALID_ARGS`), `project.open` (destructive; refuses unless `force` when `Project.dirty` is true or unreadable, then `close(CloseOptions.DO_NOT_SAVE_CHANGES)` + `app.open`) and `project.import_json` (rebuilds comps + solid/text/null/shape layers bottom-up with anchor/position/scale/rotation/opacity values, others in `skipped`; snapshot layers carry `nullLayer`/`solidColor`; helper `aemcpImportLayer`); tests `project-io.test.ts`. Mock layers from `layers.add*` get a Transform group (`withTransform`); `project.newLayersOnTop` opts into AE's insert-at-index-1 order.
 - Build: `bridge/src/build.ts` prepends polyfills + `job-runner.js` + `serializers.js` + `handlers.js`.
 
+## Live test drive (`scripts/test-drive/`, #200)
+
+- `npm run test:drive [-- --keep]` runs `run.ts`: `createServer` + MCP `Client` over `InMemoryTransport` against the real AE (manual, not CI), sequential steps with a 60 s timeout, live ANSI checklist, `.tmp/test-drive/report.html` (self-contained, rendered frames inline). `runJsx` (DoScriptFile wrapper that writes the script value to `.tmp/test-drive/harness.out`) does what no op can: select keyframes/layers before a step and clean up (remove prefixed items, solid sources, queue items).
+- `scenario.ts`: ordered `Step[]` (`kind` tool|op|plan, `args(state)`, `after`, `before`, `expectError`, `skip`/`skipIf`); `createState()` names everything `ae-mcp test drive <ts>`; `coveredNames()` feeds `coverage.test.ts`, which fails when a tool (via `listTools`) or registry op has neither a step nor a skip.
+
 ## Dialogs (`packages/server/src/dialogs.ts`, #188, ADR 0008)
 
 - `listDialogs(runner?)` / `dismissFrontDialog(runner?)` run AppleScript through System Events (process "After Effects", windows with subrole `AXDialog`/`AXSystemDialog`); `Runner` is injectable (default `defaultRunner` from `osascript-transport.ts`). Dismiss clicks `Cancel`/`Annuler`, else Escape (key code 53), never a save button. A missing Accessibility permission (-1719/-25211) yields a message with the fix (`ACCESSIBILITY_FIX`). Results are `{ok, value}` | `{ok:false, message}`.

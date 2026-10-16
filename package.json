@@ -42,6 +42,7 @@
     "test": "vitest run",
     "bridge:build": "tsx packages/bridge/src/build.ts",
     "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
-    "bundle:smoke": "tsx bundle/smoke.ts"
+    "bundle:smoke": "tsx bundle/smoke.ts",
+    "test:drive": "tsx scripts/test-drive/run.ts"
   }
 }

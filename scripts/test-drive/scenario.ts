@@ -1,0 +1,774 @@
+/**
+ * The test-drive scenario: an ordered list of steps that exercises every MCP
+ * tool and every `ae_do` operation once against a live After Effects.
+ *
+ * `scenario.test.ts` (coverage.test.ts) asserts every registered tool and
+ * operation appears here, as a step or as an explicit skip with a reason, so a
+ * new operation cannot ship without a drive step.
+ */
+
+export type StepKind = 'tool' | 'op' | 'plan';
+
+export interface ToolResult {
+  isError: boolean;
+  /** First text content block. */
+  text: string;
+  /** `text` parsed as JSON, or null. */
+  json: unknown;
+  images: Array<{ data: string; mimeType: string }>;
+}
+
+export interface DriveState {
+  /** `ae-mcp test drive <timestamp>`; every created item name starts with it. */
+  prefix: string;
+  folder: string;
+  comp: string;
+  /** Layers of the scene comp from the last `ae_layer_info` refresh. */
+  layers: Array<{ index: number; name: string; type?: string }>;
+  /** Files written by `ae_render_frame`. */
+  frames: Array<{ time: number; file: string }>;
+  importedName: string;
+  importedId: number | string;
+  snapshot: unknown;
+  preset: string;
+  planId: string;
+  /** Free-form scratch values set by `after` hooks. */
+  vars: Record<string, unknown>;
+}
+
+export interface Step {
+  id: string;
+  kind: StepKind;
+  /** Tool name, operation name, or (for `plan`) the bulk operation name. */
+  name: string;
+  /** Report category; defaults to the operation family or `tools`. */
+  category?: string;
+  args: (state: DriveState) => Record<string, unknown>;
+  after?: (result: ToolResult, state: DriveState) => void;
+  /** JSX run through DoScriptFile before the step (selecting keys, layers). */
+  before?: (state: DriveState) => string;
+  /** The step passes only when the call is an error (deliberate failure). */
+  expectError?: boolean;
+  /** `plan` steps run `ae_apply` after `ae_plan` unless false (dry run only). */
+  apply?: boolean;
+  /** Static skip: the step is listed, never run. */
+  skip?: string;
+  /** Dynamic skip, decided from earlier results. */
+  skipIf?: (state: DriveState) => string | undefined;
+}
+
+export function createState(now: Date = new Date()): DriveState {
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  const prefix = `ae-mcp test drive ${ts}`;
+  return {
+    prefix,
+    folder: prefix,
+    comp: `${prefix} scene`,
+    layers: [],
+    frames: [],
+    importedName: '',
+    importedId: '',
+    snapshot: null,
+    preset: '',
+    planId: '',
+    vars: {},
+  };
+}
+
+// ---------------------------------------------------------------- helpers
+
+const POS = 'ADBE Transform Group/ADBE Position';
+const OPACITY = 'ADBE Transform Group/ADBE Opacity';
+const SCALE = 'ADBE Transform Group/ADBE Scale';
+const BLUR = 'ADBE Gaussian Blur 2';
+const BLUR_AMOUNT = 'ADBE Gaussian Blur 2-0001';
+
+/** Operation result payload: `ae_do` wraps it as `{result}`. */
+function payload(result: ToolResult): Record<string, unknown> {
+  const json = result.json as { result?: unknown } | null;
+  const inner = json && typeof json === 'object' && 'result' in json ? json.result : json;
+  return (inner ?? {}) as Record<string, unknown>;
+}
+
+/** 1-based index of the first layer whose name satisfies `match`. */
+function layerIndex(state: DriveState, match: string | RegExp): number {
+  const found = state.layers.find((layer) =>
+    typeof match === 'string' ? layer.name === match : match.test(layer.name),
+  );
+  if (!found) {
+    throw new Error(`no layer matching ${String(match)} in [${state.layers.map((l) => l.name).join(', ')}]`);
+  }
+  return found.index;
+}
+
+function firstString(value: unknown, suffix: string): string | undefined {
+  if (typeof value === 'string') {
+    return value.endsWith(suffix) ? value : undefined;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const hit = firstString(entry, suffix);
+      if (hit) return hit;
+    }
+  } else if (value && typeof value === 'object') {
+    for (const entry of Object.values(value)) {
+      const hit = firstString(entry, suffix);
+      if (hit) return hit;
+    }
+  }
+  return undefined;
+}
+
+const op = (
+  id: string,
+  name: string,
+  args: Step['args'],
+  extra: Partial<Step> = {},
+): Step => ({ id, kind: 'op', name, args, ...extra });
+
+const tool = (
+  id: string,
+  name: string,
+  args: Step['args'],
+  extra: Partial<Step> = {},
+): Step => ({ id, kind: 'tool', name, category: 'tools', args, ...extra });
+
+const plan = (
+  id: string,
+  name: string,
+  args: Step['args'],
+  extra: Partial<Step> = {},
+): Step => ({ id, kind: 'plan', name, category: 'bulk', args, ...extra });
+
+const skipOp = (name: string, reason: string): Step => ({
+  id: `skip:${name}`,
+  kind: 'op',
+  name,
+  args: () => ({}),
+  skip: reason,
+});
+
+const skipTool = (name: string, reason: string): Step => ({
+  id: `skip:${name}`,
+  kind: 'tool',
+  name,
+  category: 'tools',
+  args: () => ({}),
+  skip: reason,
+});
+
+const refreshLayers = (id: string): Step =>
+  tool(id, 'ae_layer_info', (s) => ({ comp: s.comp }), {
+    after: (result, state) => {
+      const json = result.json as { layers?: Array<{ index: number; name: string; type?: string }> } | null;
+      state.layers = json?.layers ?? [];
+    },
+  });
+
+/** JSX that selects keyframes of one property of one layer. */
+function selectKeysJsx(comp: string, layer: number, propertyPath: string, keys: number[]): string {
+  return `
+var c = null;
+for (var i = 1; i <= app.project.numItems; i++) {
+  var it = app.project.item(i);
+  if (it instanceof CompItem && it.name === ${JSON.stringify(comp)}) { c = it; break; }
+}
+var l = c.layer(${layer});
+var p = l;
+var parts = ${JSON.stringify(propertyPath)}.split('/');
+for (var k = 0; k < parts.length; k++) { p = p.property(parts[k]); }
+for (var n = 1; n <= p.numKeys; n++) { p.setSelectedAtKey(n, false); }
+var keys = ${JSON.stringify(keys)};
+for (var m = 0; m < keys.length; m++) { p.setSelectedAtKey(keys[m], true); }
+'selected';`;
+}
+
+/** JSX that selects one layer (for layer.center). */
+function selectLayerJsx(comp: string, layer: number): string {
+  return `
+var c = null;
+for (var i = 1; i <= app.project.numItems; i++) {
+  var it = app.project.item(i);
+  if (it instanceof CompItem && it.name === ${JSON.stringify(comp)}) { c = it; break; }
+}
+for (var n = 1; n <= c.numLayers; n++) { c.layer(n).selected = false; }
+c.layer(${layer}).selected = true;
+'selected';`;
+}
+
+const SQUARE = [
+  [400, 200],
+  [1500, 200],
+  [1500, 900],
+  [400, 900],
+];
+
+// ---------------------------------------------------------------- scenario
+
+export const scenario: Step[] = [
+  // --- read-only orientation -------------------------------------------------
+  tool('check_setup', 'check_setup', () => ({})),
+  tool('ae_version_info', 'ae_version_info', () => ({})),
+  tool('ae_context', 'ae_context', () => ({})),
+  tool('ae_project_info', 'ae_project_info', () => ({})),
+  tool('ae_catalog', 'ae_catalog', () => ({})),
+  tool('ae_dialogs.list', 'ae_dialogs', () => ({ action: 'list' })),
+  tool('get_selection', 'get_selection', () => ({})),
+  op('project.info', 'project.info', () => ({})),
+  op('project.report_usage', 'project.report_usage', () => ({})),
+
+  // --- scratch comp inside a scratch folder ----------------------------------
+  op('comp.create', 'comp.create', (s) => ({
+    name: s.comp,
+    width: 1920,
+    height: 1080,
+    duration: 6,
+    fps: 30,
+    pixelAspect: 1,
+  })),
+  op('bulk.organize_items.folder', 'bulk.organize_items', (s) => ({
+    folders: [{ name: s.folder, items: [s.comp] }],
+    dryRun: false,
+  })),
+  op('comp.info', 'comp.info', (s) => ({ comp: s.comp })),
+  tool('ae_comp_info', 'ae_comp_info', (s) => ({ comps: [s.comp] })),
+
+  // --- build the scene (each add lands on top of the stack) ------------------
+  op('layer.add_solid', 'layer.add_solid', (s) => ({ comp: s.comp, color: [0.05, 0.08, 0.2] })),
+  op('shape.add.rect', 'shape.add', (s) => ({
+    comp: s.comp,
+    type: 'rect',
+    layerName: 'Shapes',
+    name: 'Card',
+    size: [600, 300],
+    fillColor: [0.9, 0.3, 0.3],
+    strokeColor: [1, 1, 1],
+    strokeWidth: 4,
+  })),
+  op('shape.add.ellipse', 'shape.add', (s) => ({
+    comp: s.comp,
+    layerIndex: 1,
+    type: 'ellipse',
+    name: 'Dot',
+    size: [160, 160],
+    fillColor: [0.2, 0.8, 0.9],
+  })),
+  op('shape.add.path', 'shape.add', (s) => ({
+    comp: s.comp,
+    layerIndex: 1,
+    type: 'path',
+    name: 'Triangle',
+    vertices: [
+      [0, -100],
+      [100, 80],
+      [-100, 80],
+    ],
+    closed: true,
+    fillColor: [0.95, 0.85, 0.2],
+  })),
+  op('shape.set', 'shape.set', (s) => ({
+    comp: s.comp,
+    layerIndex: 1,
+    vertices: [
+      [0, -120],
+      [120, 90],
+      [-120, 90],
+    ],
+    closed: true,
+  })),
+  op('shape.read', 'shape.read', (s) => ({ comp: s.comp, layerIndex: 1 })),
+  op('text.add', 'text.add', (s) => ({
+    comp: s.comp,
+    text: 'Hello drive',
+    fontSize: 120,
+    fillColor: [1, 1, 1],
+    justification: 'center',
+    tracking: 20,
+    leading: 10,
+  })),
+  op('text.set', 'text.set', (s) => ({ comp: s.comp, layerIndex: 1, text: 'Hello drive!', fontSize: 110 })),
+  op('text.read', 'text.read', (s) => ({ comp: s.comp, layerIndex: 1 })),
+  op('text.animate', 'text.animate', (s) => ({
+    comp: s.comp,
+    index: 1,
+    preset: 'typewriter',
+    duration: 2,
+  })),
+  op('layer.add_text', 'layer.add_text', (s) => ({ comp: s.comp, text: 'Text' })),
+  op('layer.add_null', 'layer.add_null', (s) => ({ comp: s.comp })),
+  op('layer.add_adjustment', 'layer.add_adjustment', (s) => ({ comp: s.comp })),
+  op('layer.add_shape', 'layer.add_shape', (s) => ({ comp: s.comp })),
+  op('layer.add_camera', 'layer.add_camera', (s) => ({ comp: s.comp, name: 'Drive Camera' })),
+  op('layer.add_light', 'layer.add_light', (s) => ({
+    comp: s.comp,
+    name: 'Drive Light',
+    lightType: 'point',
+  })),
+  refreshLayers('ae_layer_info.before-rig'),
+  op('rig.null_controller', 'rig.null_controller', (s) => ({
+    comp: s.comp,
+    name: 'Drive Controller',
+    sliders: ['Speed', 'Amount'],
+    layers: [layerIndex(s, 'Null')],
+  })),
+  op('template.lower_third', 'template.lower_third', (s) => ({
+    comp: s.comp,
+    title: 'Test Drive',
+    subtitle: 'every tool, once',
+    duration: 4,
+  })),
+  refreshLayers('ae_layer_info.after-build'),
+  op('layer.set_3d.shape', 'layer.set_3d', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    enabled: true,
+  })),
+  op('layer.set_3d.solid', 'layer.set_3d', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Solid'),
+    enabled: true,
+  })),
+
+  // --- transforms, parenting, properties ------------------------------------
+  op('layer.set_transform', 'layer.set_transform', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    position: [960, 540, 0],
+  })),
+  op('layer.set_parent', 'layer.set_parent', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Text'),
+    parent: layerIndex(s, 'Null'),
+  })),
+  op('layer.bounds', 'layer.bounds', (s) => ({ comp: s.comp, index: layerIndex(s, 'Shapes'), time: 1 })),
+  op('anchor.move_preserving', 'anchor.move_preserving', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    anchor: 'top-left',
+  })),
+  op('property.get', 'property.get', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    name: POS,
+  })),
+  op('property.set', 'property.set', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    name: SCALE,
+    value: [100, 100, 100],
+  })),
+  op('property.list', 'property.list', (s) => ({ comp: s.comp })),
+  op('comp.layer_clip_frames', 'comp.layer_clip_frames', (s) => ({
+    comp: s.comp,
+    from: 0,
+    to: 180,
+    layers: [layerIndex(s, 'Null')],
+  })),
+
+  // --- keyframes -------------------------------------------------------------
+  op('keyframe.add.pos0', 'keyframe.add', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    property: POS,
+    time: 0,
+    value: [400, 540, 0],
+  })),
+  op('keyframe.add.pos1', 'keyframe.add', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    property: POS,
+    time: 1.5,
+    value: [960, 300, 0],
+  })),
+  op('keyframe.add.pos2', 'keyframe.add', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    property: POS,
+    time: 3,
+    value: [1500, 540, 0],
+  })),
+  op('keyframe.add.pos3', 'keyframe.add', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    property: POS,
+    time: 4,
+    value: [1500, 700, 0],
+  })),
+  op('keyframe.add.opacity0', 'keyframe.add', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    property: OPACITY,
+    time: 0,
+    value: 0,
+  })),
+  op('keyframe.add.opacity1', 'keyframe.add', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    property: OPACITY,
+    time: 1,
+    value: 100,
+  })),
+  op('keyframe.set_easing', 'keyframe.set_easing', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    property: POS,
+    time: 1.5,
+    easing: 'easeIn',
+  })),
+  op(
+    'keyframe.ease_preset',
+    'keyframe.ease_preset',
+    (s) => ({
+      comp: s.comp,
+      index: layerIndex(s, 'Shapes'),
+      property: OPACITY,
+      preset: 'ease_out',
+    }),
+    { before: (s) => selectKeysJsx(s.comp, layerIndex(s, 'Shapes'), OPACITY, [1, 2]) },
+  ),
+  op('keyframe.copy', 'keyframe.copy', (s) => ({
+    comp: s.comp,
+    from: { index: layerIndex(s, 'Shapes'), property: POS },
+    to: { index: layerIndex(s, 'Drive Light'), property: POS },
+    offset: 0.5,
+  })),
+  op('keyframe.offset', 'keyframe.offset', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Drive Light'),
+    property: POS,
+    seconds: 0.25,
+  })),
+  op('keyframe.reverse', 'keyframe.reverse', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Drive Light'),
+    property: POS,
+  })),
+  op('keyframe.scale_time', 'keyframe.scale_time', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Drive Light'),
+    property: POS,
+    factor: 0.5,
+  })),
+  op('keyframe.remove', 'keyframe.remove', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    property: POS,
+    time: 4,
+  })),
+
+  // --- expressions -----------------------------------------------------------
+  op('expression.set', 'expression.set', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Text'),
+    property: OPACITY,
+    value: 'wiggle(2, 10) + 80',
+  })),
+  op('expression.check_errors', 'expression.check_errors', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Text'),
+    property: OPACITY,
+  })),
+  op('expression.snippet', 'expression.snippet', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Null'),
+    property: POS,
+    snippet: 'wiggle',
+    amplitude: 20,
+    frequency: 1,
+  })),
+  tool('ae_expression_report', 'ae_expression_report', (s) => ({ comps: [s.comp] })),
+  op('expression.clear', 'expression.clear', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Text'),
+    property: OPACITY,
+  })),
+
+  // --- masks -----------------------------------------------------------------
+  op('mask.add', 'mask.add', (s) => ({
+    comp: s.comp,
+    layerIndex: layerIndex(s, 'Solid'),
+    vertices: SQUARE,
+    closed: true,
+  })),
+  op('mask.set', 'mask.set', (s) => ({
+    comp: s.comp,
+    layerIndex: layerIndex(s, 'Solid'),
+    maskIndex: 1,
+    vertices: [
+      [300, 150],
+      [1600, 150],
+      [1600, 950],
+      [300, 950],
+    ],
+    closed: true,
+  })),
+  op('mask.read', 'mask.read', (s) => ({ comp: s.comp, layerIndex: layerIndex(s, 'Solid'), maskIndex: 1 })),
+
+  // --- effects ---------------------------------------------------------------
+  op('effect.list_available', 'effect.list_available', () => ({})),
+  op('effect.apply', 'effect.apply', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Solid'),
+    effect: BLUR,
+  })),
+  op('effect.list_on_layer', 'effect.list_on_layer', (s) => ({ comp: s.comp, index: layerIndex(s, 'Solid') })),
+  op('effect.set_property', 'effect.set_property', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Solid'),
+    effect: BLUR,
+    property: BLUR_AMOUNT,
+    value: 5,
+  })),
+  op('effect.set_keyframe', 'effect.set_keyframe', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Solid'),
+    effect: BLUR,
+    property: BLUR_AMOUNT,
+    time: 2,
+    value: 25,
+  })),
+  op('effect.remove', 'effect.remove', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Solid'),
+    effect: BLUR,
+  })),
+
+  // --- presets ---------------------------------------------------------------
+  op('preset.list', 'preset.list', () => ({}), {
+    after: (result, state) => {
+      state.preset = firstString(payload(result), '.ffx') ?? '';
+    },
+  }),
+  op('preset.search', 'preset.search', () => ({ query: 'blur' })),
+  op(
+    'preset.apply_ffx',
+    'preset.apply_ffx',
+    (s) => ({ comp: s.comp, index: layerIndex(s, 'Null'), path: s.preset }),
+    { skipIf: (s) => (s.preset === '' ? 'no .ffx preset found under the AE Presets folder' : undefined) },
+  ),
+
+  // --- markers ---------------------------------------------------------------
+  op('marker.add', 'marker.add', (s) => ({ comp: s.comp, time: 1, comment: 'comp marker', duration: 0.5 })),
+  op('marker.add_bulk', 'marker.add_bulk', (s) => ({
+    comp: s.comp,
+    layerIndex: layerIndex(s, 'Shapes'),
+    markers: [
+      { time: 0.5, comment: 'a' },
+      { time: 2, comment: 'b', duration: 1 },
+    ],
+  })),
+  op('marker.list', 'marker.list', (s) => ({ comp: s.comp })),
+
+  // --- audio (the scratch comp has no audio layer) ---------------------------
+  skipOp('audio.info', 'no audio layer in the scratch comp'),
+  skipOp('audio.set_levels', 'no audio layer in the scratch comp'),
+  skipOp('audio.peaks_to_markers', 'no audio layer in the scratch comp'),
+
+  // --- discovery -------------------------------------------------------------
+  op('font.list', 'font.list', () => ({})),
+  op('command.find', 'command.find', () => ({ name: 'Save' })),
+  op('command.list', 'command.list', () => ({})),
+  tool('find', 'find', () => ({ query: 'Shapes', kinds: ['layer'] })),
+
+  // --- render ----------------------------------------------------------------
+  ...[0, 3, 5.9].map((time, i) =>
+    tool(`ae_render_frame.${i + 1}`, 'ae_render_frame', (s) => ({ comp: s.comp, time }), {
+      after: (result, state) => {
+        const meta = result.json as { file?: string } | null;
+        if (typeof meta?.file === 'string') {
+          state.frames.push({ time, file: meta.file });
+        }
+      },
+    }),
+  ),
+  op('render.frame', 'render.frame', (s) => ({ comp: s.comp, time: 4 })),
+  op('render.queue_add', 'render.queue_add', (s) => ({
+    comp: s.comp,
+    timeSpanStart: 0,
+    timeSpanDuration: 1,
+  })),
+  op('render.queue_set_output', 'render.queue_set_output', (s) => ({
+    item: 1,
+    file: `${s.vars.outputDir as string}/${s.prefix} queue.mov`,
+  })),
+  op('render.status', 'render.status', () => ({})),
+  skipTool('ae_render', 'aerender needs a saved project; the drive never saves the open project'),
+  skipTool('job_status', 'no aerender job exists (ae_render is skipped)'),
+  skipTool('job_cancel', 'no aerender job exists (ae_render is skipped)'),
+
+  // --- footage ---------------------------------------------------------------
+  op(
+    'project.import_file',
+    'project.import_file',
+    (s) => ({ path: s.frames[0]!.file, folder: s.folder }),
+    {
+      after: (result, state) => {
+        const items = payload(result).items as Array<{ id: number; name: string }> | undefined;
+        state.importedName = items?.[0]?.name ?? '';
+        state.importedId = items?.[0]?.id ?? '';
+      },
+      skipIf: (s) => (s.frames.length === 0 ? 'no rendered frame to import' : undefined),
+    },
+  ),
+  op('layer.add_footage', 'layer.add_footage', (s) => ({ comp: s.comp, name: s.importedName })),
+  op('footage.replace', 'footage.replace', (s) => ({ item: s.importedName, path: s.frames[1]!.file }), {
+    skipIf: (s) => (s.frames.length < 2 ? 'no second rendered frame' : undefined),
+  }),
+
+  // --- project snapshot round trip -------------------------------------------
+  op('project.export_json', 'project.export_json', () => ({}), {
+    after: (result, state) => {
+      const snapshot = payload(result) as { items?: Array<{ name: string; type: string }> };
+      const items = (snapshot.items ?? [])
+        .filter((item) => item.type === 'Composition' && item.name === state.comp)
+        .map((item) => ({ ...item, name: `${state.prefix} imported` }));
+      state.snapshot = { ...snapshot, items };
+    },
+  }),
+  op('project.import_json', 'project.import_json', (s) => ({ snapshot: s.snapshot })),
+
+  // --- comp operations -------------------------------------------------------
+  op('comp.duplicate', 'comp.duplicate', (s) => ({ comp: s.comp, newName: `${s.prefix} copy` })),
+  op('comp.set_settings', 'comp.set_settings', (s) => ({
+    comp: `${s.prefix} copy`,
+    width: 1280,
+    height: 720,
+    duration: 5,
+    frameRate: 24,
+    bgColor: [0.1, 0.1, 0.1],
+  })),
+  op('comp.precompose', 'comp.precompose', (s) => ({
+    comp: `${s.prefix} copy`,
+    newName: `${s.prefix} precomp`,
+    layers: [1, 2],
+    moveAllAttributes: true,
+  })),
+
+  // --- layer housekeeping ----------------------------------------------------
+  refreshLayers('ae_layer_info.after-edits'),
+  tool('get_selection.after-edits', 'get_selection', () => ({})),
+  op(
+    'layer.center',
+    'layer.center',
+    (s) => ({ comp: s.comp }),
+    { before: (s) => selectLayerJsx(s.comp, layerIndex(s, 'Null')) },
+  ),
+  op('layer.delete', 'layer.delete', (s) => ({ comp: s.comp, index: layerIndex(s, 'Adjustment') })),
+  refreshLayers('ae_layer_info.after-delete'),
+
+  // --- bulk operations: ae_plan then ae_apply on scratch layers only ---------
+  plan('bulk.rename', 'bulk.rename', (s) => ({
+    comp: s.comp,
+    layers: [layerIndex(s, 'Null')],
+    prefix: 'TD ',
+  })),
+  refreshLayers('ae_layer_info.after-rename'),
+  plan('bulk.set_property', 'bulk.set_property', (s) => ({
+    comp: s.comp,
+    layers: [layerIndex(s, /Null$/)],
+    property: OPACITY,
+    value: 90,
+  })),
+  plan('bulk.apply_effect', 'bulk.apply_effect', (s) => ({
+    comp: s.comp,
+    layers: [layerIndex(s, 'Solid')],
+    effect: BLUR,
+  })),
+  plan('bulk.set_expression', 'bulk.set_expression', (s) => ({
+    comp: s.comp,
+    layers: [layerIndex(s, 'Text')],
+    property: OPACITY,
+    expression: 'value',
+  })),
+  plan(
+    'bulk.apply_preset',
+    'bulk.apply_preset',
+    (s) => ({ comp: s.comp, layers: [layerIndex(s, 'Solid')], preset: s.preset }),
+    { skipIf: (s) => (s.preset === '' ? 'no .ffx preset found under the AE Presets folder' : undefined) },
+  ),
+  plan('bulk.replace_text', 'bulk.replace_text', (s) => ({
+    comp: s.comp,
+    find: 'Text',
+    replace: 'Caption v2',
+  })),
+  plan('bulk.stagger', 'bulk.stagger', (s) => ({
+    comp: s.comp,
+    layers: [layerIndex(s, 'Solid'), layerIndex(s, 'Text')],
+    target: 'layers',
+    mode: 'fixed',
+    offset: 0.1,
+  })),
+  plan('bulk.set_label', 'bulk.set_label', (s) => ({
+    comp: s.comp,
+    layers: [layerIndex(s, 'Solid')],
+    label: 5,
+  })),
+  plan('bulk.duplicate_comp', 'bulk.duplicate_comp', (s) => ({
+    comp: s.comp,
+    name: `${s.prefix} dup`,
+    width: 960,
+    height: 540,
+  })),
+  plan('bulk.resize_comp', 'bulk.resize_comp', (s) => ({
+    comp: s.comp,
+    formats: [{ name: `${s.prefix} square`, width: 1080, height: 1080 }],
+  })),
+  plan('bulk.organize_items', 'bulk.organize_items', (s) => ({
+    folders: [{ name: `${s.prefix} misc`, items: [`${s.prefix} dup`] }],
+  })),
+  plan('bulk.remove_unused', 'bulk.remove_unused', () => ({}), { apply: false }),
+
+  // --- batch.run: one good batch, one that fails and must roll back ----------
+  op('batch.run', 'batch.run', (s) => ({
+    ops: [
+      { op: 'marker.add', args: { comp: s.comp, time: 2.5, comment: 'batch ok' } },
+      { op: 'property.get', args: { comp: s.comp, index: 1, name: OPACITY } },
+    ],
+  })),
+  op(
+    'batch.run.rollback',
+    'batch.run',
+    (s) => ({
+      ops: [
+        { op: 'marker.add', args: { comp: s.comp, time: 3.5, comment: 'batch rolled back' } },
+        { op: 'layer.set_transform', args: { comp: s.comp, index: 9999, position: [0, 0] } },
+      ],
+    }),
+    { expectError: true },
+  ),
+  op('marker.list.after-rollback', 'marker.list', (s) => ({ comp: s.comp }), {
+    after: (result) => {
+      if (result.text.includes('batch rolled back')) {
+        throw new Error('batch rollback left its marker behind');
+      }
+    },
+  }),
+
+  // --- final look ------------------------------------------------------------
+  tool('ae_project_info.final', 'ae_project_info', () => ({})),
+
+  // --- explicit skips --------------------------------------------------------
+  skipOp('project.open', 'replaces the open project (destructive); the drive never touches the user project file'),
+  skipOp('project.save', 'would save or Save As the open project; the drive never writes the user project'),
+  skipOp('project.increment_save', 'saves the open project to disk; the drive never saves'),
+  skipOp('project.undo', 'Edit > Undo rewrites the user undo history'),
+  skipOp('command.execute', 'runs arbitrary menu commands; unsafe in an unattended drive'),
+];
+
+/** Names this scenario covers: steps (run or skipped) plus the tools they imply. */
+export function coveredNames(steps: Step[] = scenario): Set<string> {
+  const names = new Set<string>();
+  for (const step of steps) {
+    names.add(step.name);
+    if (step.kind === 'op') {
+      names.add('ae_do');
+    } else if (step.kind === 'plan') {
+      names.add('ae_plan');
+      if (step.apply !== false) {
+        names.add('ae_apply');
+      }
+    }
+  }
+  return names;
+}

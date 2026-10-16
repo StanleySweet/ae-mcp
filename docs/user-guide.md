@@ -136,3 +136,22 @@ none. It never presses Save or Don't Save, so it cannot save or lose work.
 This needs the Accessibility permission for the app that runs the MCP server (for
 example Claude Desktop): System Settings > Privacy & Security > Accessibility. Without
 it `ae_dialogs` returns that instruction, and timeouts keep their usual message.
+
+## Test drive
+
+`npm run test:drive` takes the open After Effects for a spin: it starts the server
+in-process and calls every MCP tool and every `ae_do` operation once, as Claude would.
+It is a manual gate (never run in CI) and needs After Effects open with the bridge
+installed. Pass `--keep` (`npm run test:drive -- --keep`) to leave the scratch items.
+
+What it touches: only items named `ae-mcp test drive <timestamp>` (a project folder, a
+1920x1080 scene comp, copies, a precomp, one imported PNG) plus the solid and null
+sources AE creates for them, and its own render queue item. It never opens, saves or
+closes your project, never uses `eval.run`, `command.execute` or `project.undo`, and
+runs `bulk.remove_unused` as a dry-run plan only. `batch.run` includes one deliberate
+failing step to exercise rollback (Edit > Undo). Everything is removed at the end.
+
+Output: a live checklist in the terminal and `.tmp/test-drive/report.html` with counts,
+a per-category table, errors and the rendered frames. Exit code 1 when a step failed.
+The scenario is `scripts/test-drive/scenario.ts`; `coverage.test.ts` fails CI when a new
+tool or operation has no step or explicit skip.
