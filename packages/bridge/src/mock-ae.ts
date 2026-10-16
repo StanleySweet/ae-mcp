@@ -333,6 +333,7 @@ export class MockProperty {
 
 export class MockPropertyGroup {
   protected readonly children: (MockProperty | MockPropertyGroup)[] = [];
+  private parentGroup: MockPropertyGroup | null = null;
 
   constructor(
     readonly name: string,
@@ -357,7 +358,28 @@ export class MockPropertyGroup {
 
   add<T extends MockProperty | MockPropertyGroup>(child: T): T {
     this.children.push(child);
+    if (child instanceof MockPropertyGroup) {
+      child.parentGroup = this;
+    }
     return child;
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/property/propertygroup/#propertygroupcanaddproperty
+  canAddProperty(name: string): boolean {
+    void name;
+    return true;
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybaseremove
+  remove(): void {
+    const parent = this.parentGroup;
+    if (!parent) {
+      return;
+    }
+    const index = parent.children.indexOf(this);
+    if (index >= 0) {
+      parent.children.splice(index, 1);
+    }
   }
 
   addProperty(matchName: string): MockEffect {
@@ -810,6 +832,11 @@ export class MockAE {
   readonly project = new MockProject();
   readonly executedCommands: number[] = [];
   readonly menuCommandIds: Record<string, number> = { 'Increment and Save': 3088 };
+  // Ref: https://ae-scripting.docsforadobe.dev/general/application/#appeffects
+  readonly effects = [
+    { displayName: 'Slider Control', matchName: 'ADBE Slider Control', category: 'Expression Controls', version: '1.0' },
+    { displayName: 'Glow', matchName: 'ADBE Glo2', category: 'Stylize', version: '1.0' },
+  ];
   evalFileCalls = 0;
   context: vm.Context | null = null;
   private clock = 0;
@@ -821,6 +848,7 @@ export class MockAE {
     exitCode: 0,
     version: 'MockAE-25',
     project: this.project,
+    effects: this.effects,
     beginUndoGroup: (name?: string): void => {
       this.undoDepth += 1;
       this.undoGroups.push({ name, start: this.clock, end: -1 });

@@ -294,6 +294,93 @@ describe('property.list', () => {
   });
 });
 
+describe('effect handlers', () => {
+  it('applies, lists, keys and removes an effect on the chosen layer', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const first = new MockAVLayer('First', 'Layer');
+    comp.addLayer(first);
+    const second = new MockAVLayer('Second', 'Layer');
+    comp.addLayer(second);
+
+    const applied = invoke(ctx, 'effect.apply', {
+      comp: 'Main',
+      index: 2,
+      effect: 'ADBE Slider Control',
+    });
+    expect(applied.value).toMatchObject({ effect: { matchName: 'ADBE Slider Control' } });
+    // The effect lands on layer 2; layer 1's parade stays empty.
+    const parade = second.property('ADBE Effect Parade') as MockPropertyGroup;
+    expect(parade.numProperties).toBe(1);
+    expect((first.property('ADBE Effect Parade') as MockPropertyGroup).numProperties).toBe(0);
+
+    expect(invoke(ctx, 'effect.list_on_layer', { comp: 'Main', index: 2 }).value).toEqual({
+      success: true,
+      effects: [
+        { index: 1, name: 'ADBE Slider Control', matchName: 'ADBE Slider Control', enabled: true },
+      ],
+    });
+
+    const effect = parade.property(1) as MockPropertyGroup;
+    const slider = effect.property('ADBE Slider Control-0001') as MockProperty;
+    expect(
+      invoke(ctx, 'effect.set_property', {
+        comp: 'Main',
+        index: 2,
+        effect: 'ADBE Slider Control',
+        property: 'ADBE Slider Control-0001',
+        value: 42,
+      }).value,
+    ).toMatchObject({ success: true });
+    expect(slider.value).toBe(42);
+
+    invoke(ctx, 'effect.set_keyframe', {
+      comp: 'Main',
+      index: 2,
+      effect: 'ADBE Slider Control',
+      property: 'ADBE Slider Control-0001',
+      time: 1,
+      value: 7,
+    });
+    expect(slider.keys).toEqual([{ time: 1, value: 7 }]);
+
+    expect(
+      invoke(ctx, 'effect.remove', { comp: 'Main', index: 2, effect: 'ADBE Slider Control' }).value,
+    ).toEqual({ success: true, removed: 'ADBE Slider Control' });
+    expect(parade.numProperties).toBe(0);
+  });
+
+  it('lists the effects available in the application', async () => {
+    const { ctx } = await payloadContext();
+
+    const out = invoke(ctx, 'effect.list_available', null).value as {
+      effects: { name: string; matchName: string; category: string }[];
+    };
+
+    expect(out.effects).toContainEqual({
+      name: 'Glow',
+      matchName: 'ADBE Glo2',
+      category: 'Stylize',
+    });
+  });
+
+  it('reports missing arguments and a missing effect', async () => {
+    const { ctx } = await payloadContext();
+    createComp(ctx);
+    invoke(ctx, 'layer.add_shape', { comp: 'Main' });
+
+    expect(invoke(ctx, 'effect.apply', { comp: 'Main' }).value).toEqual({
+      success: false,
+      error: 'Effect required',
+    });
+    expect(invoke(ctx, 'effect.remove', { comp: 'Main', effect: 'ADBE Nope' }).value).toEqual({
+      success: false,
+      error: 'Effect not found: ADBE Nope',
+    });
+  });
+});
+
 describe('expression handlers', () => {
   it('sets and enables an expression on the requested layer', async () => {
     const { ctx, ae } = await payloadContext();

@@ -5,6 +5,22 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-16
 
+- Finished the sweep by closing the last two bridge bugs. **#174** (`5c85b6a2`):
+  `property.list` always returned `[]` because it read `layer.property.keys`,
+  but `property` is a function — it now walks `layer.numProperties`/`property(i)`
+  recursively (`aemcpListProperties`) and returns
+  `{layers:[{index,name,properties}]}` with nested groups. **#173**: redesigned
+  the `effect.*` family per **ADR-0006**. Every op now takes a layer `index`
+  (default 1) and names the effect by display **or match name**; `apply` calls
+  `ADBE Effect Parade.addProperty` (apply = add, duplicates allowed), `remove`
+  calls `PropertyBase.remove`, `list_on_layer` lists the parade,
+  `list_available` reads `app.effects` as `{name,matchName,category}`,
+  `set_property`/`set_keyframe` resolve the effect then its property via
+  `aemcpResolveProperty`. `effect.apply_template` (a success-returning no-op) is
+  **removed**; `.ffx` presets stay on `preset.apply_ffx`. Reused the
+  `bulk.apply_effect` parade pattern. `npm run check` green: 488 TS tests, ES3
+  lint, bundle smoke 17 tools, dotnet 81.
+
 - Fixed six bugs found while driving a real project, and filed two more. Six
   issues filed and closed: **#167** `ae_render_frame` rejected args (client-side)
   and returned an oversized image — the oversized half is fixed, `ae_render_frame`

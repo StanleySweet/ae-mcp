@@ -41,6 +41,7 @@ function operation(
 const comp = { type: 'string' };
 const layerIndex = { type: 'number' };
 const propertyName = { type: 'string' };
+const effectName = { type: 'string' };
 
 // One entry per operation the bridge implements (`packages/bridge/src/handlers.js`
 // plus `batch.run` in `job-runner.js`), so `ae_do` can dispatch it and `ae_catalog`
@@ -238,29 +239,32 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
 
   // Effect (targets layer 1 unless the handler reads an index).
-  register(operation('effect.apply', 'effect', 'Apply an effect to layer 1.', {
-    schema: { comp, property: propertyName, value: {} },
+  register(operation('effect.apply', 'effect', 'Add an effect to a layer (display name or match name).', {
+    schema: { comp, index: layerIndex, effect: effectName },
   }));
-  register(operation('effect.list_on_layer', 'effect', 'List effects on layer 1.', {
+  register(operation('effect.list_on_layer', 'effect', 'List the effects on a layer.', {
     readOnly: true,
-    schema: { comp, property: propertyName },
+    schema: { comp, index: layerIndex },
   }));
-  register(operation('effect.list_available', 'effect', 'List available effects.', {
+  register(operation('effect.list_available', 'effect', 'List the effects available in the application.', {
     readOnly: true,
-    schema: { comp },
   }));
-  register(operation('effect.set_property', 'effect', 'Set an effect property on layer 1.', {
-    schema: { comp, property: propertyName, value: {} },
+  register(operation('effect.set_property', 'effect', 'Set a property of an effect on a layer.', {
+    schema: { comp, index: layerIndex, effect: effectName, property: propertyName, value: {} },
   }));
-  register(operation('effect.set_keyframe', 'effect', 'Set an effect property keyframe.', {
-    schema: { comp, index: layerIndex, time: { type: 'number' }, value: {}, property: propertyName },
+  register(operation('effect.set_keyframe', 'effect', 'Set a keyframe on a property of an effect on a layer.', {
+    schema: {
+      comp,
+      index: layerIndex,
+      effect: effectName,
+      property: propertyName,
+      time: { type: 'number' },
+      value: {},
+    },
   }));
-  register(operation('effect.remove', 'effect', 'Remove an effect from layer 1.', {
+  register(operation('effect.remove', 'effect', 'Remove an effect from a layer.', {
     destructive: true,
-    schema: { comp, property: propertyName },
-  }));
-  register(operation('effect.apply_template', 'effect', 'Apply an effect template to layer 1.', {
-    schema: { comp, template: comp },
+    schema: { comp, index: layerIndex, effect: effectName },
   }));
 
   // Preset.

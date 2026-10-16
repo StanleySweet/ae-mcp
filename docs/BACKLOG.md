@@ -488,7 +488,7 @@ Sources: kumo = [kumoproductions/mcp-aftereffects](https://github.com/kumoproduc
 | keyframe         | add, remove, set_easing (temporal and spatial), ease_preset (selected keyframes) | both |
 | anchor           | move_preserving (nine positions or [x,y])           | both |
 | expression       | set, clear, check_errors                            | both |
-| effect           | apply (name or matchName), list_on_layer, list_available, set_property, set_keyframe, remove, apply_template | llama |
+| effect           | apply, remove, list_on_layer, list_available, set_property, set_keyframe (effect by name or matchName, per layer index; see ADR-0006) | llama |
 | preset           | apply_ffx, list, search                              | llama |
 | marker           | add (comp or layer), add_bulk, list                  | both |
 | mask, shape, text | add, set, read (paths, fills, strokes, text document) | kumo |

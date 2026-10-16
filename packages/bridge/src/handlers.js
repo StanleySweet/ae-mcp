@@ -1479,110 +1479,42 @@ AEMCP.register('rig.null_controller', function (args) {
     };
 });
 
-// Effect operation handlers (mutating, run via ae_do).
+// Effect operation handlers (mutating, run via ae_do). Every op takes a layer
+// `index` (default 1) and addresses the effect by `effect` — its display name
+// or its stable match name (BACKLOG §2 rule 11). See ADR-0006.
+// Ref: https://ae-scripting.docsforadobe.dev/property/propertygroup/#propertygroupaddproperty
+// Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybaseremove
+// Ref: https://ae-scripting.docsforadobe.dev/general/application/#appeffects
+
+// The layer's effect parade, or null when the layer has none.
+function aemcpEffectParade(layer) {
+    var parade = layer.property('ADBE Effect Parade');
+    return aemcpIsGroup(parade) ? parade : null;
+}
+
+// The effect on a parade matching a display name or match name, or null.
+// Ref: https://ae-scripting.docsforadobe.dev/property/propertygroup/#propertygroupproperty
+function aemcpFindEffect(parade, name) {
+    if (!aemcpIsGroup(parade) || name === null || name === undefined || name === '') {
+        return null;
+    }
+    var i, effect;
+    for (i = 1; i <= parade.numProperties; i++) {
+        effect = parade.property(i);
+        if (effect && (effect.name === name || effect.matchName === name)) {
+            return effect;
+        }
+    }
+    return null;
+}
+
 AEMCP.register('effect.apply', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var propertyName = args && args.property ? args.property : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
-    var layer = comp.layer(1);
-    if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
-    if (!prop) return { success: false, error: 'Property not found' };
-    prop.setValue(args && args.value ? args.value : [1, 1, 1]);
-    return { success: true };
-});
-
-AEMCP.register('effect.list_on_layer', function (args) {
-    var compName = args && args.comp ? args.comp : null;
-    var propertyName = args && args.property ? args.property : null;
-    var project = app.project;
-    var comp;
-    var results = [];
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
-    var layer = comp.layer(1);
-    if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
-    if (!prop) return { success: false, error: 'Property not found' };
-    var list = prop.list_on_layer ? prop.list_on_layer() : [];
-    return { list: list };
-});
-
-AEMCP.register('effect.list_available', function (args) {
-    var compName = args && args.comp ? args.comp : null;
-    var project = app.project;
-    var comp;
-    var results = [];
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
-    // Return available effects from the effect parade
-    var parade = comp.property('ADBE Effect Parade');
-    if (parade) {
-        for (var i = 1; i <= parade.numProperties; i++) {
-            var effect = parade.property(i);
-            results.push({ name: effect.name });
-        }
-    }
-    return { list: results };
-});
-
-AEMCP.register('effect.set_property', function (args) {
-    var compName = args && args.comp ? args.comp : null;
-    var propertyName = args && args.property ? args.property : null;
-    var value = args && args.value !== undefined ? args.value : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
-    var layer = comp.layer(1);
-    if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
-    if (!prop) return { success: false, error: 'Property not found' };
-    prop.setValue(value);
-    return aemcpWithExpressionWarning(prop, { success: true });
-});
-
-AEMCP.register('effect.set_keyframe', function (args) {
-    var compName = args && args.comp ? args.comp : null;
+    var effectName = args && args.effect ? args.effect : null;
     var layerIndex = args && args.index ? args.index : 1;
-    var time = args && args.time ? args.time : 0;
-    var value = args && args.value !== undefined ? args.value : null;
-    var propertyName = args && args.property ? args.property : null;
+    if (!effectName) {
+        return { success: false, error: 'Effect required' };
+    }
     var project = app.project;
     var comp;
     for (var i = 1; i <= project.numItems; i++) {
@@ -1597,15 +1529,146 @@ AEMCP.register('effect.set_keyframe', function (args) {
     }
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
-    if (!prop) return { success: false, error: 'Property not found' };
+    var parade = aemcpEffectParade(layer);
+    if (!parade) return { success: false, error: 'Effect parade not found' };
+    // Real AE throws from addProperty for an unknown effect; check first so the
+    // caller gets a clean error. The mock has no catalog, so it always allows.
+    if (parade.canAddProperty && !parade.canAddProperty(effectName)) {
+        return { success: false, error: 'Effect not available: ' + effectName };
+    }
+    // apply = add: a second apply adds a second copy, matching addProperty.
+    var effect = parade.addProperty(effectName);
+    return { success: true, effect: { name: effect.name, matchName: effect.matchName } };
+});
+
+AEMCP.register('effect.list_on_layer', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var parade = aemcpEffectParade(layer);
+    var effects = [];
+    if (parade) {
+        for (var j = 1; j <= parade.numProperties; j++) {
+            var effect = parade.property(j);
+            if (!effect) {
+                continue;
+            }
+            effects.push({
+                index: j,
+                name: effect.name,
+                matchName: effect.matchName,
+                enabled: !!effect.enabled
+            });
+        }
+    }
+    return { success: true, effects: effects };
+});
+
+AEMCP.register('effect.list_available', function (args) {
+    var effects = [];
+    var available = app.effects ? app.effects : [];
+    for (var i = 0; i < available.length; i++) {
+        effects.push({
+            name: available[i].displayName,
+            matchName: available[i].matchName,
+            category: available[i].category
+        });
+    }
+    return { success: true, effects: effects };
+});
+
+AEMCP.register('effect.set_property', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var effectName = args && args.effect ? args.effect : null;
+    var propertyName = args && args.property ? args.property : null;
+    // 0, [], "" and false are valid values, so test presence, not truthiness.
+    var value = args && args.value !== undefined ? args.value : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    if (!effectName) {
+        return { success: false, error: 'Effect required' };
+    }
+    if (!propertyName) {
+        return { success: false, error: 'Property required' };
+    }
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var parade = aemcpEffectParade(layer);
+    var effect = aemcpFindEffect(parade, effectName);
+    if (!effect) return { success: false, error: 'Effect not found: ' + effectName };
+    var prop = aemcpResolveProperty(effect, propertyName);
+    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
+    prop.setValue(value);
+    return aemcpWithExpressionWarning(prop, { success: true });
+});
+
+AEMCP.register('effect.set_keyframe', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var effectName = args && args.effect ? args.effect : null;
+    var propertyName = args && args.property ? args.property : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var time = args && args.time ? args.time : 0;
+    var value = args && args.value !== undefined ? args.value : null;
+    if (!effectName) {
+        return { success: false, error: 'Effect required' };
+    }
+    if (!propertyName) {
+        return { success: false, error: 'Property required' };
+    }
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var parade = aemcpEffectParade(layer);
+    var effect = aemcpFindEffect(parade, effectName);
+    if (!effect) return { success: false, error: 'Effect not found: ' + effectName };
+    var prop = aemcpResolveProperty(effect, propertyName);
+    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
     prop.setValueAtTime(time, value);
     return aemcpWithExpressionWarning(prop, { success: true });
 });
 
 AEMCP.register('effect.remove', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var propertyName = args && args.property ? args.property : null;
+    var effectName = args && args.effect ? args.effect : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    if (!effectName) {
+        return { success: false, error: 'Effect required' };
+    }
     var project = app.project;
     var comp;
     for (var i = 1; i <= project.numItems; i++) {
@@ -1618,33 +1681,13 @@ AEMCP.register('effect.remove', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layer(1);
+    var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
-    if (!prop) return { success: false, error: 'Property not found' };
-    prop.setValueAtTime(0, null);
-    return { success: true };
-});
-
-AEMCP.register('effect.apply_template', function (args) {
-    var compName = args && args.comp ? args.comp : null;
-    var templateName = args && args.template ? args.template : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
-    // Apply template - basic implementation
-    var layer = comp.layer(1);
-    if (!layer) return { success: false, error: 'Layer not found' };
-    return { success: true };
+    var parade = aemcpEffectParade(layer);
+    var effect = aemcpFindEffect(parade, effectName);
+    if (!effect) return { success: false, error: 'Effect not found: ' + effectName };
+    effect.remove();
+    return { success: true, removed: effectName };
 });
 
 // Preset operation handlers (mutating, run via ae_do).

@@ -45,7 +45,6 @@ const BRIDGE_OPS = [
   'effect.set_property',
   'effect.set_keyframe',
   'effect.remove',
-  'effect.apply_template',
   'preset.apply_ffx',
   'preset.list',
   'preset.search',
