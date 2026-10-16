@@ -280,7 +280,7 @@ describe('property.list', () => {
     layer.add(transform);
     comp.addLayer(layer);
 
-    const out = invoke(ctx, 'property.list', { comp: 'Main' });
+    const out = invoke(ctx, 'property.list', { comp: 'Main', depth: 2 });
     const layers = (
       out.value as {
         layers: { name: string; properties: { matchName: string; properties?: { matchName: string }[] }[] }[];
@@ -291,6 +291,93 @@ describe('property.list', () => {
     const transformEntry = layers[0].properties.find((p) => p.matchName === 'ADBE Transform Group');
     expect(transformEntry).toBeDefined();
     expect(transformEntry!.properties?.some((c) => c.matchName === 'ADBE Opacity')).toBe(true);
+  });
+
+  type ListedProperty = { matchName: string; numProperties?: number; properties?: ListedProperty[] };
+  type ListedLayer = { index: number; name: string; properties: ListedProperty[] };
+
+  // A layer whose Transform group holds Opacity and a nested Deep group (with Child).
+  function layerWithNestedGroups(comp: MockCompItem, name: string): void {
+    const layer = new MockAVLayer(name, 'Layer');
+    const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+    transform.add(new MockProperty('Opacity', 'ADBE Opacity', 100));
+    const deep = transform.add(new MockPropertyGroup('Deep', 'ADBE Deep Group'));
+    deep.add(new MockProperty('Child', 'ADBE Child', 1));
+    layer.add(transform);
+    comp.addLayer(layer);
+  }
+
+  it('does not expand groups at the default depth', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    layerWithNestedGroups(ae.project.item(1) as MockCompItem, 'Layer');
+
+    const out = invoke(ctx, 'property.list', { comp: 'Main' });
+    const layers = (out.value as { layers: ListedLayer[] }).layers;
+
+    const transform = layers[0].properties.find((p) => p.matchName === 'ADBE Transform Group');
+    expect(transform).toMatchObject({ numProperties: 2 });
+    expect(transform!.properties).toBeUndefined();
+  });
+
+  it('expands one group level per depth step', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    layerWithNestedGroups(ae.project.item(1) as MockCompItem, 'Layer');
+
+    const out = invoke(ctx, 'property.list', { comp: 'Main', depth: 2 });
+    const layers = (out.value as { layers: ListedLayer[] }).layers;
+
+    const transform = layers[0].properties.find((p) => p.matchName === 'ADBE Transform Group');
+    expect(transform!.properties?.map((p) => p.matchName)).toEqual(['ADBE Opacity', 'ADBE Deep Group']);
+    const deep = transform!.properties!.find((p) => p.matchName === 'ADBE Deep Group');
+    expect(deep).toMatchObject({ numProperties: 1 });
+    expect(deep!.properties).toBeUndefined();
+  });
+
+  it('lists only the layer at index when index is given', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    layerWithNestedGroups(comp, 'First');
+    layerWithNestedGroups(comp, 'Second');
+
+    const out = invoke(ctx, 'property.list', { comp: 'Main', index: 2 });
+    const layers = (out.value as { layers: ListedLayer[] }).layers;
+
+    expect(layers.map((l) => [l.index, l.name])).toEqual([[2, 'Second']]);
+  });
+
+  it('rejects an index that names no layer with INVALID_ARGS', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    layerWithNestedGroups(ae.project.item(1) as MockCompItem, 'Layer');
+
+    const out = invoke(ctx, 'property.list', { comp: 'Main', index: 5 });
+
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'layer not found: 5' });
+  });
+
+  it('skips disabled properties and empty groups', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+    transform.add(new MockProperty('Opacity', 'ADBE Opacity', 100));
+    const hidden = transform.add(new MockProperty('Hidden', 'ADBE Hidden', 0));
+    hidden.enabled = false;
+    layer.add(transform);
+    const disabledGroup = layer.add(new MockPropertyGroup('Disabled', 'ADBE Disabled Group'));
+    disabledGroup.add(new MockProperty('Inside', 'ADBE Inside', 1));
+    (disabledGroup as unknown as { enabled: boolean }).enabled = false;
+    layer.add(new MockPropertyGroup('Layer Styles', 'ADBE Layer Styles'));
+    (ae.project.item(1) as MockCompItem).addLayer(layer);
+
+    const out = invoke(ctx, 'property.list', { comp: 'Main', depth: 2 });
+    const top = (out.value as { layers: ListedLayer[] }).layers[0].properties;
+
+    expect(top.map((p) => p.matchName)).toEqual(['ADBE Transform Group']);
+    expect(top[0].properties?.map((p) => p.matchName)).toEqual(['ADBE Opacity']);
   });
 });
 

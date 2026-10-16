@@ -199,9 +199,9 @@ export function defaultOperationRegistry(): OperationRegistry {
     readOnly: true,
     schema: { comp, index: layerIndex, name: propertyName },
   }));
-  register(operation('property.list', 'property', "List each layer's properties, nested groups included.", {
+  register(operation('property.list', 'property', "List each layer's properties, expanding groups by depth levels (default 1); pass index for one layer.", {
     readOnly: true,
-    schema: { comp },
+    schema: { comp, index: layerIndex, depth: { type: 'number' } },
   }));
   register(operation('property.set', 'property', 'Set a property value on a layer.', {
     schema: { comp, index: layerIndex, name: propertyName, value: {} },

@@ -251,6 +251,8 @@ export const MockParagraphJustification = {
 };
 
 export class MockProperty {
+  // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybaseenabled
+  enabled = true;
   expressionEnabled = false;
   expression = '';
   // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpressionerror

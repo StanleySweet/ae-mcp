@@ -715,19 +715,29 @@ function aemcpCollectExpressions(group, prefix, out) {
     return out;
 }
 
-// Enumerate a layer/group's properties (name + match name) down through nested
-// groups, so property.list reports Transform, Text, Effects and their children.
+// Enumerate a layer/group's properties (name + match name). Groups are expanded
+// only while `depth` allows (depth 1 = top level, groups listed with numProperties).
+// Properties with enabled === false and empty groups are skipped.
+// Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybaseenabled
 // Ref: https://ae-scripting.docsforadobe.dev/property/propertygroup/#propertyproperty
-function aemcpListProperties(group) {
+function aemcpListProperties(group, depth) {
     var out = [];
     for (var i = 1; i <= group.numProperties; i++) {
         var child = group.property(i);
-        if (!child) {
+        if (!child || child.enabled === false) {
+            continue;
+        }
+        var isGroup = aemcpIsGroup(child);
+        if (isGroup && child.numProperties === 0) {
             continue;
         }
         var entry = { name: child.name, matchName: child.matchName };
-        if (aemcpIsGroup(child)) {
-            entry.properties = aemcpListProperties(child);
+        if (isGroup) {
+            if (depth > 1) {
+                entry.properties = aemcpListProperties(child, depth - 1);
+            } else {
+                entry.numProperties = child.numProperties;
+            }
         }
         out.push(entry);
     }
@@ -1099,10 +1109,27 @@ AEMCP.register('property.list', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
+    var depth = args && args.depth !== undefined && args.depth !== null ? args.depth : 1;
+    if (typeof depth !== 'number' || depth !== Math.floor(depth) || depth < 1) {
+        aemcpAbortArgs('depth must be an integer of at least 1');
+    }
+    var indices = [];
+    var i;
+    if (args && args.index !== undefined && args.index !== null) {
+        var index = args.index;
+        if (typeof index !== 'number' || index !== Math.floor(index) || index < 1 || index > comp.numLayers) {
+            aemcpAbortArgs('layer not found: ' + index);
+        }
+        indices.push(index);
+    } else {
+        for (i = 1; i <= comp.numLayers; i++) {
+            indices.push(i);
+        }
+    }
     var layers = [];
-    for (var i = 1; i <= comp.numLayers; i++) {
-        var layer = comp.layer(i);
-        layers.push({ index: i, name: layer.name, properties: aemcpListProperties(layer) });
+    for (i = 0; i < indices.length; i++) {
+        var layer = comp.layer(indices[i]);
+        layers.push({ index: indices[i], name: layer.name, properties: aemcpListProperties(layer, depth) });
     }
     return { layers: layers };
 });
