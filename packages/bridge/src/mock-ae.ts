@@ -1039,6 +1039,8 @@ export class MockAE {
   readonly env: Record<string, string> = {};
   readonly project = new MockProject();
   readonly executedCommands: number[] = [];
+  // Commands run while an undo group is open; real AE warns "Undo group mismatch" for Undo (#195).
+  readonly commandsInUndoGroup: number[] = [];
   readonly opened: string[] = [];
   readonly menuCommandIds: Record<string, number> = { 'Increment and Save': 3088 };
   // Ref: https://ae-scripting.docsforadobe.dev/general/application/#appeffects
@@ -1083,6 +1085,7 @@ export class MockAE {
     },
     findMenuCommandId: (name: string): number => this.menuCommandIds[name] ?? 0,
     executeCommand: (id: number): void => {
+      if (this.undoDepth > 0) this.commandsInUndoGroup.push(id);
       this.executedCommands.push(id);
     },
     // Real AE only accepts a string of code, evaluated later in the global scope.

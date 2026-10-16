@@ -143,6 +143,31 @@ describe('bridge job runner', () => {
   });
 });
 
+// Edit > Undo inside an open undo group makes AE warn "Undo group mismatch" (#195).
+describe('bridge project.undo', () => {
+  it('runs Edit > Undo outside any undo group', async () => {
+    const { ae, ctx } = await setup();
+
+    const outcome = vm.runInContext("AEMCP.invoke('project.undo', null, null)", ctx);
+
+    expect(outcome.ok).toBe(true);
+    expect(ae.executedCommands).toEqual([16]);
+    expect(ae.commandsInUndoGroup).toEqual([]);
+  });
+
+  it('is refused inside batch.run', async () => {
+    const { ae, ctx } = await setup();
+
+    const outcome = vm.runInContext(
+      "AEMCP.invoke('batch.run', { ops: [{ op: 'project.undo' }] }, null)",
+      ctx,
+    );
+
+    expect(outcome).toMatchObject({ ok: false, issue: { code: 'INVALID_ARGS' } });
+    expect(ae.executedCommands).toEqual([]);
+  });
+});
+
 describe('bridge batch.run', () => {
   it('runs every sub-op inside a single batch.run undo group', async () => {
     const { driver, ae, ctx } = await setup();

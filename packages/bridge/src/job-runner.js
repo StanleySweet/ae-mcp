@@ -66,6 +66,10 @@ function aemcpRunHandler(tool, args) {
     return aemcpCallHandler(handler, args);
 }
 
+// Ops that must run outside an undo group: Edit > Undo inside an open group makes
+// AE warn "Undo group mismatch, will attempt to fix" (#195).
+var AEMCP_NO_UNDO_GROUP = { 'project.undo': true };
+
 function aemcpInvoke(tool, args, deadline) {
     if (typeof deadline === 'number' && new Date().getTime() >= deadline) {
         return { ok: false, issue: aemcpErrorIssue('TIMEOUT', 'job deadline exceeded') };
@@ -74,13 +78,18 @@ function aemcpInvoke(tool, args, deadline) {
     if (!handler) {
         return { ok: false, issue: aemcpErrorIssue('UNKNOWN_TOOL', 'no handler for tool ' + tool) };
     }
-    app.beginUndoGroup('Claude: ' + tool);
+    var grouped = !AEMCP_NO_UNDO_GROUP[tool];
+    if (grouped) {
+        app.beginUndoGroup('Claude: ' + tool);
+    }
     AEMCP_BUSY = true;
     var outcome;
     try {
         outcome = aemcpCallHandler(handler, args);
     } finally {
-        app.endUndoGroup();
+        if (grouped) {
+            app.endUndoGroup();
+        }
         AEMCP_BUSY = false;
     }
     // batch.run asks for a rollback; Undo only reverts the whole batch once its
@@ -200,6 +209,9 @@ AEMCP.register('batch.run', function (args) {
         sub = ops[i];
         if (!sub || typeof sub.op !== 'string' || sub.op.length === 0) {
             aemcpAbort(aemcpErrorIssue('INVALID_ARGS', 'ops[' + i + '].op must be a non-empty string'));
+        }
+        if (AEMCP_NO_UNDO_GROUP[sub.op]) {
+            aemcpAbort(aemcpErrorIssue('INVALID_ARGS', 'ops[' + i + '] (' + sub.op + ') cannot run inside batch.run'));
         }
         outcome = aemcpRunHandler(sub.op, sub.args);
         if (!outcome.ok) {
