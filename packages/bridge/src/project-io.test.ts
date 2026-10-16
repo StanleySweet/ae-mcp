@@ -50,6 +50,30 @@ describe('project.save', () => {
     const { ctx } = await payloadContext();
     expect(failureOf(invoke(ctx, 'project.save', {}))).toContain('never been saved');
   });
+
+  it('refuses to overwrite an existing file unless overwrite is true (#203)', async () => {
+    const { ctx, ae } = await payloadContext();
+    ae.project.file = new MockFile(ae, '/p/demo.aep');
+    ae.fs.set('/p/client_final.aep', 'other project');
+
+    const refused = invoke(ctx, 'project.save', { path: '/p/client_final.aep' });
+
+    expect(refused).toMatchObject({ issue: { code: 'INVALID_ARGS' } });
+    expect(failureOf(refused)).toContain('file exists: /p/client_final.aep (pass overwrite: true to replace it)');
+    expect(ae.project.file?.fsName).toBe('/p/demo.aep');
+    expect(ae.fs.get('/p/client_final.aep')).toBe('other project');
+  });
+
+  it('replaces an existing file when overwrite is true', async () => {
+    const { ctx, ae } = await payloadContext();
+    ae.project.file = new MockFile(ae, '/p/demo.aep');
+    ae.fs.set('/p/client_final.aep', 'other project');
+
+    const outcome = invoke(ctx, 'project.save', { path: '/p/client_final.aep', overwrite: true });
+
+    expect(outcome.value).toEqual({ file: '/p/client_final.aep' });
+    expect(ae.project.file?.fsName).toBe('/p/client_final.aep');
+  });
 });
 
 describe('project.open', () => {

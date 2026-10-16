@@ -69,11 +69,16 @@ AEMCP.register('project.export_json', function () {
 
 // Save the open project, or Save As when `path` is given (no dialog either way).
 // A never-saved project has nowhere to go without a path: save() would prompt.
+// Save As over an existing file replaces another project, so it needs overwrite: true (#203).
 // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectsave
 AEMCP.register('project.save', function (args) {
     var path = args && args.path ? args.path : null;
     if (path) {
-        app.project.save(new File(path));
+        var target = new File(path);
+        if (target.exists && !(args.overwrite === true)) {
+            aemcpAbortArgs('file exists: ' + path + ' (pass overwrite: true to replace it)');
+        }
+        app.project.save(target);
     } else {
         if (!app.project.file) {
             aemcpAbortArgs('project has never been saved: pass path');

@@ -78,8 +78,8 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
-  register(operation('project.save', 'project', 'Save the open project, or Save As when path is given (never prompts).', {
-    schema: { path: { type: 'string' } },
+  register(operation('project.save', 'project', 'Save the open project, or Save As when path is given (never prompts). Save As refuses an existing file unless overwrite: true.', {
+    schema: { path: { type: 'string' }, overwrite: { type: 'boolean' } },
   }));
   register(operation('project.open', 'project', 'Open a project file, replacing the open project. Refuses unless force: true when the open project has unsaved changes or that cannot be told.', {
     destructive: true,
