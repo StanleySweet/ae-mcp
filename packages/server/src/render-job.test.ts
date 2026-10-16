@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { mkdtemp, stat, utimes, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, stat, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AerenderProcess, SpawnAerender } from '@ae-mcp/core';
@@ -10,6 +10,7 @@ import { afterEach, describe, it, expect } from 'vitest';
 import type { AEClient } from './ae-client.js';
 import { JobStore } from './jobs.js';
 import { createServer, type ServerOptions } from './server.js';
+import type { Settings } from './settings.js';
 
 class FakeStream extends EventEmitter {
   write(text: string): void {
@@ -68,6 +69,7 @@ async function connect(options: {
   projectFile?: string | null;
   aerender?: string;
   failSpawn?: boolean;
+  settings?: Settings;
 } = {}): Promise<Harness> {
   const store = new JobStore();
   const processes: FakeProcess[] = [];
@@ -89,6 +91,7 @@ async function connect(options: {
     ),
     jobStore: store,
     spawnAerender,
+    settings: options.settings,
   };
   if (options.aerender !== undefined) {
     serverOptions.aerender = options.aerender;
@@ -247,6 +250,40 @@ describe('ae_render / job_status', () => {
     })) as { content: unknown[]; isError?: boolean };
     expect(result.isError).toBe(true);
     expect(errorCode(result)).toBe('UNSAVED_PROJECT');
+  });
+
+  it('refuses to render in read-only mode before spawning aerender', async () => {
+    const harness = await start({
+      aerender: '/fake/aerender',
+      settings: {
+        readOnly: true,
+        allowedCategories: null,
+        evalEnabled: false,
+        incrementBeforeDestructive: true,
+      },
+    });
+    const result = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main', output: '/out/movie.mp4' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe('FORBIDDEN');
+    expect(harness.calls).toEqual([]);
+  });
+
+  it('refuses an output path that already exists before spawning aerender', async () => {
+    const harness = await start({ aerender: '/fake/aerender' });
+    const dir = await mkdtemp(join(tmpdir(), 'ae-mcp-render-'));
+    const output = join(dir, 'movie.mp4');
+    await writeFile(output, 'keep me');
+    const result = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main', output },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe('INVALID_ARGS');
+    expect(harness.calls).toEqual([]);
+    expect(await readFile(output, 'utf8')).toBe('keep me');
   });
 
   it('returns UNKNOWN_JOB for an id that was never started', async () => {

@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import {
@@ -583,11 +583,24 @@ export function createServer(options: ServerOptions = {}): McpServer {
       },
     },
     async (args) => {
+      const settings = await getSettings();
+      if (settings.readOnly) {
+        return text(
+          makeError('FORBIDDEN', 'ae_render writes files and is not permitted in read-only mode'),
+          true,
+        );
+      }
       if ((args.comp === undefined) === (args.rqindex === undefined)) {
         return text(
           makeError('INVALID_ARGS', 'aerender needs exactly one of comp or rqindex'),
           true,
         );
+      }
+      // Never overwrite, and never let cancel delete, a file that already exists (#201).
+      const outputExists =
+        args.output !== undefined && (await stat(args.output).then(() => true, () => false));
+      if (outputExists) {
+        return text(makeError('INVALID_ARGS', `output already exists: ${args.output}`), true);
       }
       const aerender = await findAerender();
       if (aerender === null) {
