@@ -662,7 +662,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_do',
     {
       description:
-        'Run a named operation from ae_catalog. Arguments are validated against the operation schema before reaching After Effects, and the response carries the ambient context (active comp and selection).',
+        'Run a named operation from ae_catalog. Arguments are validated against the operation schema before reaching After Effects. Call get_selection for the active comp and selection.',
       inputSchema: {
         op: z.string(),
         args: z.record(z.string(), z.unknown()).optional(),
@@ -749,11 +749,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (!result.ok) {
         return toResult(result);
       }
-      const selection = await callRaw('get_selection');
-      const payload: Record<string, unknown> = {
-        result: result.result,
-        context: selection.ok ? selection.result : null,
-      };
+      const payload: Record<string, unknown> = { result: result.result };
       if (incrementInfo) {
         payload.increment = incrementInfo;
       }

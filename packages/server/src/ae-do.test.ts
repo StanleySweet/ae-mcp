@@ -57,8 +57,13 @@ async function connectServer(
   await mkdir(root, { recursive: true, mode: 0o700 });
   await chmod(root, 0o700);
 
+  const observe = observeHandlers(project);
   const handlers = {
-    ...observeHandlers(project),
+    ...observe,
+    get_selection: (args: unknown) => {
+      calls.push('get_selection');
+      return observe.get_selection!(args);
+    },
     'layer.rename': (args: unknown) => {
       calls.push('layer.rename');
       const parsed = args as { index: number; name: string };
@@ -110,7 +115,8 @@ describe('ae_do', () => {
     return project;
   }
 
-  it('runs a registered operation and returns the ambient context', async () => {
+  // One AE round trip per call: no automatic get_selection context (#186).
+  it('runs a registered operation in a single AE call', async () => {
     const calls: string[] = [];
     const { client, close } = await connectServer(project(), calls);
     closes.push(close);
@@ -120,12 +126,7 @@ describe('ae_do', () => {
       args: { index: 1, name: 'Hero' },
     });
     expect(isError).toBe(false);
-    const value = JSON.parse(text) as {
-      result: unknown;
-      context: { comp: string | null };
-    };
-    expect(value.result).toEqual({ index: 1, name: 'Hero' });
-    expect(value.context.comp).toBe('Main');
+    expect(JSON.parse(text)).toEqual({ result: { index: 1, name: 'Hero' } });
     expect(calls).toEqual(['layer.rename']);
   });
 
