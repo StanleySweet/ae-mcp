@@ -130,6 +130,21 @@ export function defaultOperationRegistry(): OperationRegistry {
   // Layer.
   register(operation('layer.add_text', 'layer', 'Add a text layer.', { schema: { comp, text: comp } }));
   register(operation('layer.add_shape', 'layer', 'Add a shape layer.', { schema: { comp } }));
+  const centerPoint = { type: 'array', description: '[x, y]; defaults to the comp centre.' };
+  register(operation('layer.add_camera', 'layer', 'Add a camera layer.', {
+    schema: { comp, name: { type: 'string' }, centerPoint },
+  }));
+  register(operation('layer.add_light', 'layer', 'Add a light layer.', {
+    schema: {
+      comp,
+      name: { type: 'string' },
+      centerPoint,
+      lightType: { type: 'string', enum: ['parallel', 'spot', 'point', 'ambient'] },
+    },
+  }));
+  register(operation('layer.set_3d', 'layer', 'Turn the 3D switch on or off for an AV layer (not camera/light).', {
+    schema: { comp, index: layerIndex, enabled: { type: 'boolean' } },
+  }));
   register(operation('layer.add_solid', 'layer', 'Add a solid layer.', {
     schema: { comp, color: { type: 'array' } },
   }));

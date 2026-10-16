@@ -772,6 +772,47 @@ AEMCP.register('layer.add_shape', function (args) {
     return { name: layer.name, id: layer.id };
 });
 
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layercollection/#layercollectionaddcamera
+AEMCP.register('layer.add_camera', function (args) {
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var name = args && args.name ? args.name : 'Camera';
+    var center = args && args.centerPoint ? args.centerPoint : [comp.width / 2, comp.height / 2];
+    var layer = comp.layers.addCamera(name, center);
+    return { index: layer.index, name: layer.name, id: layer.id };
+});
+
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layercollection/#layercollectionaddlight
+// Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlighttype
+AEMCP.register('layer.add_light', function (args) {
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var types = { parallel: LightType.PARALLEL, spot: LightType.SPOT, point: LightType.POINT, ambient: LightType.AMBIENT };
+    var lightType = args && args.lightType ? args.lightType : null;
+    if (lightType !== null && !types.hasOwnProperty(lightType)) {
+        aemcpAbortArgs('unknown lightType: ' + lightType + ' (parallel, spot, point, ambient)');
+    }
+    var name = args && args.name ? args.name : 'Light';
+    var center = args && args.centerPoint ? args.centerPoint : [comp.width / 2, comp.height / 2];
+    var layer = comp.layers.addLight(name, center);
+    if (lightType !== null) {
+        layer.lightType = types[lightType];
+    }
+    return { index: layer.index, name: layer.name, id: layer.id, lightType: lightType };
+});
+
+// Ref: https://ae-scripting.docsforadobe.dev/layer/avlayer/#avlayerthreedlayer
+AEMCP.register('layer.set_3d', function (args) {
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var layer = comp.layer(args ? args.index : 0);
+    if (!layer) {
+        aemcpAbortArgs('layer not found: ' + (args ? args.index : undefined));
+    }
+    if (!(layer instanceof AVLayer)) {
+        aemcpAbortArgs('layer ' + layer.index + ' cannot be 3D (camera and light layers are not AV layers)');
+    }
+    layer.threeDLayer = !!(args && args.enabled);
+    return { index: layer.index, threeDLayer: layer.threeDLayer };
+});
+
 AEMCP.register('layer.add_solid', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var color = args && args.color ? args.color : [1, 1, 1];

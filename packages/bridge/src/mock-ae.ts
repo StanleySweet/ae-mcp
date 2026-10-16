@@ -593,7 +593,12 @@ export class MockShapeLayer extends MockAVLayer {
 
 export class MockCameraLayer extends MockLayer {}
 
-export class MockLightLayer extends MockLayer {}
+export class MockLightLayer extends MockLayer {
+  lightType = 0;
+}
+
+// Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlighttype
+export const MockLightType = { PARALLEL: 1, SPOT: 2, POINT: 3, AMBIENT: 4, ENVIRONMENT: 5 };
 
 export class MockFootageItem extends MockItem {
   pixelAspect = 1;
@@ -646,6 +651,22 @@ export class MockLayerCollection {
     layer.width = width;
     layer.height = height;
     void color;
+    return this.comp.addLayer(layer);
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/layercollection/#layercollectionaddcamera
+  addCamera(name: string, centerPoint: number[]): MockCameraLayer {
+    void centerPoint;
+    const layer = new MockCameraLayer(name, 'Layer');
+    layer.id = this.comp.nextLayerId();
+    return this.comp.addLayer(layer);
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/layercollection/#layercollectionaddlight
+  addLight(name: string, centerPoint: number[]): MockLightLayer {
+    void centerPoint;
+    const layer = new MockLightLayer(name, 'Layer');
+    layer.id = this.comp.nextLayerId();
     return this.comp.addLayer(layer);
   }
 
@@ -1029,6 +1050,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     Shape: MockShape,
     CameraLayer: MockCameraLayer,
     LightLayer: MockLightLayer,
+    LightType: MockLightType,
     MarkerValue: MockMarkerValue,
     KeyframeEase: MockKeyframeEase,
     KeyframeInterpolationType: MockKeyframeInterpolationType,
