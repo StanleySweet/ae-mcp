@@ -551,6 +551,25 @@ function aemcpCollectExpressions(group, prefix, out) {
     return out;
 }
 
+// Enumerate a layer/group's properties (name + match name) down through nested
+// groups, so property.list reports Transform, Text, Effects and their children.
+// Ref: https://ae-scripting.docsforadobe.dev/property/propertygroup/#propertyproperty
+function aemcpListProperties(group) {
+    var out = [];
+    for (var i = 1; i <= group.numProperties; i++) {
+        var child = group.property(i);
+        if (!child) {
+            continue;
+        }
+        var entry = { name: child.name, matchName: child.matchName };
+        if (aemcpIsGroup(child)) {
+            entry.properties = aemcpListProperties(child);
+        }
+        out.push(entry);
+    }
+    return out;
+}
+
 AEMCP.register('ae_expression_report', function (args) {
     var comp = aemcpResolveComp(args ? args.comp : null);
     var layers = [];
@@ -1002,32 +1021,16 @@ AEMCP.register('property.get', function (args) {
 });
 
 AEMCP.register('property.list', function (args) {
-    var compName = args && args.comp ? args.comp : null;
-    var project = app.project;
-    var comp;
-    var properties = [];
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
+    var comp = aemcpResolveComp(args ? args.comp : null);
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
+    var layers = [];
     for (var i = 1; i <= comp.numLayers; i++) {
         var layer = comp.layer(i);
-        if (layer.property) {
-            var keys = layer.property.keys;
-            if (keys) {
-                for (var j = 1; j <= keys.length; j++) {
-                    properties.push({ name: keys[j].name, id: keys[j].id });
-                }
-            }
-        }
+        layers.push({ index: i, name: layer.name, properties: aemcpListProperties(layer) });
     }
-    return { properties: properties };
+    return { layers: layers };
 });
 
 AEMCP.register('property.set', function (args) {

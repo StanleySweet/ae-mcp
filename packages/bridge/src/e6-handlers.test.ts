@@ -269,6 +269,31 @@ describe('property layer index', () => {
   });
 });
 
+describe('property.list', () => {
+  it('lists a layer properties, including nested groups', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+    transform.add(new MockProperty('Opacity', 'ADBE Opacity', 100));
+    layer.add(transform);
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'property.list', { comp: 'Main' });
+    const layers = (
+      out.value as {
+        layers: { name: string; properties: { matchName: string; properties?: { matchName: string }[] }[] }[];
+      }
+    ).layers;
+
+    expect(layers.length).toBe(1);
+    const transformEntry = layers[0].properties.find((p) => p.matchName === 'ADBE Transform Group');
+    expect(transformEntry).toBeDefined();
+    expect(transformEntry!.properties?.some((c) => c.matchName === 'ADBE Opacity')).toBe(true);
+  });
+});
+
 describe('expression handlers', () => {
   it('sets and enables an expression on the requested layer', async () => {
     const { ctx, ae } = await payloadContext();

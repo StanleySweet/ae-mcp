@@ -156,7 +156,7 @@ export function defaultOperationRegistry(): OperationRegistry {
     readOnly: true,
     schema: { comp, index: layerIndex, name: propertyName },
   }));
-  register(operation('property.list', 'property', 'List layer properties.', {
+  register(operation('property.list', 'property', "List each layer's properties, nested groups included.", {
     readOnly: true,
     schema: { comp },
   }));
