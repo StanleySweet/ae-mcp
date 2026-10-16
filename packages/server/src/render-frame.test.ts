@@ -14,7 +14,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, describe, it, expect } from 'vitest';
 import { createAEClient } from './ae-client.js';
 import { FileQueueTransport } from './file-queue-transport.js';
-import { createServer } from './server.js';
+import { createServer, readRenderedFrame } from './server.js';
 
 // A 1x1 transparent PNG, good enough to prove the bytes round-trip.
 const FAKE_PNG = Buffer.from(
@@ -188,5 +188,57 @@ describe('ae_render_frame tool', () => {
     const error = errorSchema.parse(JSON.parse(first!.text));
     expect(error.code).toBe('SCRIPT_ERROR');
     expect(error.message).toContain('could not read rendered frame');
+  });
+
+  it('accepts a maxEdge argument', async () => {
+    const client = await start();
+    const result = (await client.callTool({
+      name: 'ae_render_frame',
+      arguments: { maxEdge: 800 },
+    })) as { content: unknown[]; isError?: boolean };
+
+    expect(result.isError).toBeFalsy();
+    expect(imageContent(result).mimeType).toBe('image/png');
+  });
+});
+
+describe('readRenderedFrame', () => {
+  async function renderDirWith(name: string, bytes: Buffer): Promise<{ root: string; file: string }> {
+    const home = await mkdtemp(join(tmpdir(), 'ae-mcp-frame-read-'));
+    const root = join(home, '.ae-mcp');
+    const renderDir = join(root, 'render');
+    await mkdir(renderDir, { recursive: true });
+    const file = join(renderDir, name);
+    await writeFile(file, bytes);
+    return { root, file };
+  }
+
+  it('downscales an oversized frame through the supplied resizer', async () => {
+    const { root, file } = await renderDirWith('big.png', Buffer.alloc(100, 1));
+    const smaller = join(root, 'render', 'small.png');
+    await writeFile(smaller, FAKE_PNG);
+
+    const read = await readRenderedFrame(root, file, 80, async () => smaller);
+
+    expect(read.ok).toBe(true);
+    expect((read as { data: string }).data).toBe(FAKE_PNG.toString('base64'));
+  });
+
+  it('reports a frame that stays too large when the resizer declines', async () => {
+    const { root, file } = await renderDirWith('big.png', Buffer.alloc(100, 1));
+
+    const read = await readRenderedFrame(root, file, 10, async () => null);
+
+    expect(read.ok).toBe(false);
+    expect((read as { message: string }).message).toContain('too large');
+  });
+
+  it('reads a frame under the cap without a resizer', async () => {
+    const { root, file } = await renderDirWith('small.png', FAKE_PNG);
+
+    const read = await readRenderedFrame(root, file, 10_000);
+
+    expect(read.ok).toBe(true);
+    expect((read as { data: string }).data).toBe(FAKE_PNG.toString('base64'));
   });
 });

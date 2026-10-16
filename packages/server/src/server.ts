@@ -1,6 +1,8 @@
 import { Buffer } from 'node:buffer';
+import { execFile } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
+import { promisify } from 'node:util';
 import {
   discoverAerenders,
   runAerender,
@@ -83,11 +85,33 @@ async function persistSavedVersionPath(root: string, savedFile: string): Promise
   await writeFile(join(root, 'bridge', 'last-saved-version'), savedFile);
 }
 
-/** Reads a frame the bridge rendered, refusing anything outside `<root>/render`. */
-async function readRenderedFrame(
+/** Reads a frame the bridge rendered, refusing anything outside `<root>/render`.
+`downscale` is called when the file exceeds `maxBytes`, and should return the path
+of a smaller file (or null when it cannot resize). */
+export type FrameDownscale = (file: string) => Promise<string | null>;
+
+/** Longest edge a rendered frame is scaled down to when it is too large to return. */
+export const MAX_RENDER_EDGE = 1568;
+
+const execFileAsync = promisify(execFile);
+
+/** Downscales a PNG so its longest edge is `maxEdge`, using the macOS `sips`
+tool, and returns the new path (null when `sips` is unavailable or fails). */
+async function shrinkPng(file: string, maxEdge: number): Promise<string | null> {
+  const out = file.replace(/\.[^./\\]+$/, '') + `-${maxEdge}.png`;
+  try {
+    await execFileAsync('sips', ['-Z', String(maxEdge), file, '--out', out]);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+export async function readRenderedFrame(
   root: string,
   file: string,
   maxBytes: number,
+  downscale?: FrameDownscale,
 ): Promise<{ ok: true; data: string } | { ok: false; message: string }> {
   const renderDir = resolve(root, 'render');
   const target = resolve(file);
@@ -99,6 +123,16 @@ async function readRenderedFrame(
     buffer = await readFile(target);
   } catch (error) {
     return { ok: false, message: `could not read rendered frame: ${(error as Error).message}` };
+  }
+  if (buffer.length > maxBytes && downscale) {
+    const smaller = await downscale(target);
+    if (smaller) {
+      try {
+        buffer = await readFile(smaller);
+      } catch {
+        // Keep the original buffer; the size check below reports the problem.
+      }
+    }
   }
   if (buffer.length > maxBytes) {
     return { ok: false, message: `rendered frame is too large (${buffer.length} bytes)` };
@@ -399,10 +433,11 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_render_frame',
     {
       description:
-        'Render a single frame of a composition (default: the active comp, frame 0) to PNG and return it as image content plus metadata.',
+        'Render a single frame of a composition (default: the active comp, frame 0) to PNG and return it as image content plus metadata. Frames too large to return are downscaled so their longest edge is maxEdge (default 1568).',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         time: z.number().optional(),
+        maxEdge: z.number().int().positive().optional(),
       },
     },
     async (args) => {
@@ -425,7 +460,10 @@ export function createServer(options: ServerOptions = {}): McpServer {
           true,
         );
       }
-      const read = await readRenderedFrame(root, value.file, MAX_RENDER_BYTES);
+      const maxEdge = args.maxEdge ?? MAX_RENDER_EDGE;
+      const read = await readRenderedFrame(root, value.file, MAX_RENDER_BYTES, (file) =>
+        shrinkPng(file, maxEdge),
+      );
       if (!read.ok) {
         return text(makeError('SCRIPT_ERROR', read.message), true);
       }
