@@ -1151,6 +1151,54 @@ AEMCP.register('keyframe.set_easing', function (args) {
     return { success: true, easing: easing, keyIndex: keyIndex };
 });
 
+// E14-12: apply an easing preset to the keyframes selected on a property.
+AEMCP.register('keyframe.ease_preset', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var propertyName = args && args.property ? args.property : null;
+    var preset = args && args.preset ? args.preset : null;
+    // ponytail: KeyframeEase speed is absolute (units/sec), so a fixed speed means
+    // nothing across properties; ease with a flat tangent (speed 0) and influence
+    // only, which is scale-independent. The influence values are heuristics — tune
+    // them against real AE, or expose custom speed/influence if finer control is needed.
+    var curves = { ease_in: [66.67, 0.1], ease_out: [0.1, 66.67], overshoot: [0.1, 85] };
+    var curve = curves[preset];
+    if (!curve) return { success: false, error: 'Unknown preset: ' + preset };
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = aemcpResolveProperty(layer, propertyName);
+    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
+    var selection = prop.selectedKeys || [];
+    if (!selection.length) {
+        return { success: false, error: 'No keyframes selected on ' + propertyName + '. Select them in the Timeline or Graph Editor first.' };
+    }
+    var dims = 1;
+    try { dims = prop.numDimensions || 1; } catch (e) { dims = 1; }
+    var s;
+    for (s = 0; s < selection.length; s++) {
+        var keyIndex = selection[s];
+        prop.setInterpolationTypeAtKey(keyIndex, KeyframeInterpolationType.BEZIER, KeyframeInterpolationType.BEZIER);
+        var easeInArr = [];
+        var easeOutArr = [];
+        for (var d = 0; d < dims; d++) {
+            easeInArr.push(new KeyframeEase(0, curve[0]));
+            easeOutArr.push(new KeyframeEase(0, curve[1]));
+        }
+        prop.setTemporalEaseAtKey(keyIndex, easeInArr, easeOutArr);
+    }
+    return aemcpWithExpressionWarning(prop, { success: true, preset: preset, property: propertyName, keyframes: selection.length });
+});
+
 // Expression operation handlers (mutating, run via ae_do).
 AEMCP.register('expression.set', function (args) {
     var compName = args && args.comp ? args.comp : null;

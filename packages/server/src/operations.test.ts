@@ -32,6 +32,7 @@ const BRIDGE_OPS = [
   'keyframe.add',
   'keyframe.remove',
   'keyframe.set_easing',
+  'keyframe.ease_preset',
   'expression.set',
   'expression.clear',
   'expression.check_errors',

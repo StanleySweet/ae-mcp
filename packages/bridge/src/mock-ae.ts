@@ -242,6 +242,8 @@ export class MockProperty {
   expressionEnabled = false;
   expression = '';
   readonly keys: { time: number; value: unknown }[] = [];
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyselectedkeys
+  selectedKeys: number[] = [];
 
   constructor(
     readonly name: string,

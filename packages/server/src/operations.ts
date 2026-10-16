@@ -183,6 +183,16 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(
+    operation('keyframe.ease_preset', 'keyframe', 'Apply an easing preset to the keyframes selected on a property.', {
+      schema: {
+        comp,
+        index: layerIndex,
+        property: propertyName,
+        preset: { type: 'string', enum: ['ease_in', 'ease_out', 'overshoot'] },
+      },
+    }),
+  );
 
   // Expression.
   register(operation('expression.set', 'expression', 'Set an expression on a layer 1 property.', {
