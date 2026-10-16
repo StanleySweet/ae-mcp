@@ -11,7 +11,7 @@ import {
 } from '@ae-mcp/protocol';
 import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
-import { MockAE, runInMockAE } from './mock-ae.js';
+import { MockAE, MockFile, runInMockAE } from './mock-ae.js';
 
 class VmBridgeDriver implements BridgeDriver {
   constructor(
@@ -165,6 +165,26 @@ describe('bridge project.undo', () => {
 
     expect(outcome).toMatchObject({ ok: false, issue: { code: 'INVALID_ARGS' } });
     expect(ae.executedCommands).toEqual([]);
+  });
+
+  // These leave nothing in Edit > Undo, so a rollback Undo would revert the user's own edit (#202).
+  it.each([
+    ['project.save', {}],
+    ['project.open', { path: '/p/other.aep' }],
+    ['project.increment_save', null],
+  ])('refuses %s inside batch.run before running anything', async (op, args) => {
+      const { ae, ctx } = await setup();
+      ae.project.file = new MockFile(ae, '/p/demo.aep');
+      ae.fs.set('/p/other.aep', 'x');
+
+      const outcome = vm.runInContext(
+        `AEMCP.invoke('batch.run', { ops: [{ op: ${JSON.stringify(op)}, args: ${JSON.stringify(args)} }] }, null)`,
+        ctx,
+      );
+
+      expect(outcome).toMatchObject({ ok: false, issue: { code: 'INVALID_ARGS' } });
+      expect(ae.project.file?.fsName).toBe('/p/demo.aep');
+      expect(ae.executedCommands).toEqual([]);
   });
 });
 
