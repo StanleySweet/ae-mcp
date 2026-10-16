@@ -5,6 +5,34 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-16
 
+- Fixed six bugs found while driving a real project, and filed two more. Six
+  issues filed and closed: **#167** `ae_render_frame` rejected args (client-side)
+  and returned an oversized image — the oversized half is fixed, `ae_render_frame`
+  now takes `maxEdge` (default 1568) and downscales through macOS `sips`
+  (`7958c610`); **#168** `layer.bounds` returned the comp rect — now
+  `sourceRectAtTime` + `sourcePointToComp` comp-space box, erroring when the layer
+  cannot report bounds; **#169** `property.*`/`expression.*` hardcoded `comp.layer(1)`
+  — now an `index` arg plus `aemcpResolveProperty` nested-path resolution, and
+  `expression.set`/`clear`/`check_errors` drive `Property.expression`/
+  `expressionEnabled`/`expressionError` for real; **#170** `keyframe.add`,
+  `property.set`, `effect.set_property`/`set_keyframe` treated `0` as missing;
+  **#171** `text.add`/`set`/`read` gained `font`/`justification`/`tracking`/`leading`
+  and `text.add` now applies `fillColor` without requiring `fontSize`; **#172**
+  `check_setup` gained a `bridge_capabilities` row that compares the heartbeat's
+  reported operations against the server registry and fails when the installed
+  payload is stale (`c546aba0`). The four interleaved bridge fixes share one commit
+  (`2d83f459`) because their edits sit in the same hunks. `npm run check` green:
+  484 TS tests, ES3 lint, bundle smoke 17 tools, dotnet 81.
+- **Filed #173** (`effect.apply`/`remove`/`list_on_layer`/`list_available`/
+  `apply_template` are broken — `effect.remove` is a no-op, `apply` does not add;
+  needs a contract redesign, reuse `bulk.apply_effect`) and **#174**
+  (`property.list` always returns `[]` — `layer.property` is a function, should be
+  `layer.property(index)`), both `needs-triage`.
+- Docs in the same commits: user-guide and troubleshooting now describe six
+  `check_setup` rows, code-map refreshed (server.ts tool line numbers, the new
+  render/check helpers), and the fr_FR finding is captured as **BACKLOG §2 rule 11**
+  + `docs/findings/2026-10-16-localized-property-names.md` (`b87d9aa8`): address AE
+  properties/groups/effects by **match name**, never a localized display name.
 - Follow-up to #149: animation principles now reach **MCP callers**, not just
   repo agents. `packages/server/src/index.ts` imports
   `docs/agents/animation-principles.md` as text (esbuild `loader: { '.md': 'text' }`

@@ -45,6 +45,9 @@ After Effects project the user has open. macOS only.
   property.
 - **mock** — `packages/bridge/src/mock-ae.ts`: a fake AE that lets the bridge run
   under Node for tests.
+- **match name** — AE's locale-stable identifier for a property/group/effect
+  (`ADBE Opacity`), as opposed to its localized display `name` (`Opacité`). Bridge
+  lookups target match names (BACKLOG §2 rule 11).
 
 ## Pointers
 
