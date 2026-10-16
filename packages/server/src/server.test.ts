@@ -37,6 +37,13 @@ describe('mcp server skeleton', () => {
     await server.close();
   });
 
+  it('serves the instructions option to the client on connect', async () => {
+    const { client, server } = await connect({ instructions: 'Animation Principles' });
+    expect(client.getInstructions()).toBe('Animation Principles');
+    await client.close();
+    await server.close();
+  });
+
   it('lists check_setup and returns one JSON row per check', async () => {
     const { client, server } = await connect({
       root: await tempRoot(),

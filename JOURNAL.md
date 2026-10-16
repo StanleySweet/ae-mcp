@@ -5,6 +5,15 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-16
 
+- Follow-up to #149: animation principles now reach **MCP callers**, not just
+  repo agents. `packages/server/src/index.ts` imports
+  `docs/agents/animation-principles.md` as text (esbuild `loader: { '.md': 'text' }`
+  in `bundle/pack.ts`, ambient `md.d.ts` for tsc) and passes it through a new
+  `ServerOptions.instructions` to `McpServer`, so every client receives it in the
+  `initialize` result (`client.getInstructions()`). Single source: the md file.
+  Tests: plumbing unit test in `server.test.ts`, packed-bundle assertion in
+  `bundle/smoke.test.ts`. No test imports `index.ts`, so vitest never sees the md
+  import. User guide notes it under First run.
 - Installed the ae-mcp MCP into **opencode** against the **production** bundle
   instead of the tsx source run: `~/.config/opencode/opencode.json` now launches
   `node /Users/stan/Dev/ae-mcp/dist/staging/server/index.js` — the esbuild artifact

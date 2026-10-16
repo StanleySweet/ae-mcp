@@ -59,6 +59,10 @@ With AE open, ask Claude to run the `check_setup` tool. It reports five checks:
 Any failing check carries a `fix` hint. When the four gating checks are green,
 ask Claude to list the tools it can see.
 
+On connect the server also sends Claude its animation principles (keyframes vs
+expressions, naming, easing, safety), so motion edits follow one consistent
+ruleset without you pasting any context.
+
 ## Uninstall
 
 Open AE-MCP Setup and click **Uninstall**. It removes the bridge payload, the

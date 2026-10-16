@@ -22,7 +22,7 @@ Code map: `docs/agents/code-map.md` — file:line map of tool registration, brid
 
 ### Animation principles
 
-Before proposing or editing motion in a user's project, load `docs/agents/animation-principles.md` — how to treat keyframes vs expressions, naming, parenting, easing and safety when driving AE.
+Before proposing or editing motion in a user's project, load `docs/agents/animation-principles.md` — how to treat keyframes vs expressions, naming, parenting, easing and safety when driving AE. Same file is served to MCP clients as the server's `instructions`, so callers get it without the source checked out.
 
 ## Documentation discipline
 

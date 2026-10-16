@@ -23,6 +23,7 @@ export async function packBundle(outDir: string): Promise<string> {
     platform: 'node',
     format: 'esm',
     target: 'node22',
+    loader: { '.md': 'text' },
   });
 
   cpSync(join(here, 'manifest.json'), join(staging, 'manifest.json'));

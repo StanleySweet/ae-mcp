@@ -14,10 +14,12 @@ import { createQueueConsumer, FakeProject, observeHandlers } from '@ae-mcp/fake-
 
 export interface SmokeResult {
   toolNames: string[];
+  /** Server instructions received on initialize, when the server provides them. */
+  instructions?: string;
 }
 
 /** Packs the bundle, unpacks it, then starts the packaged server against the fake
-bridge and returns the tools it lists. */
+bridge and returns the tools it lists plus its initialize instructions. */
 export async function runSmoke(): Promise<SmokeResult> {
   const base = await mkdtemp(join(tmpdir(), 'ae-mcp-smoke-'));
   const aeRoot = join(base, 'ae-mcp');
@@ -39,7 +41,7 @@ export async function runSmoke(): Promise<SmokeResult> {
       }),
     );
     const { tools } = await client.listTools();
-    return { toolNames: tools.map((tool) => tool.name) };
+    return { toolNames: tools.map((tool) => tool.name), instructions: client.getInstructions() };
   } finally {
     await client?.close();
     await consumer.stop();

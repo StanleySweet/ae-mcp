@@ -49,6 +49,8 @@ export interface ServerOptions {
   jobStore?: JobStore;
   /** Plan registry for previewed bulk edits; a fresh one is created when omitted. */
   planStore?: PlanStore<BulkStep>;
+  /** MCP `instructions` returned to the client on initialize (docs/agents/animation-principles.md). */
+  instructions?: string;
 }
 
 /** One operation invocation stored in a previewed bulk plan. */
@@ -121,7 +123,10 @@ export function capArray<T>(
 }
 
 export function createServer(options: ServerOptions = {}): McpServer {
-  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+  const server = new McpServer(
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    { instructions: options.instructions },
+  );
   const root = options.root ?? queueRoot();
   const maxResultBytes = options.maxResultBytes ?? MAX_RESULT_BYTES;
   const operations = options.operations ?? defaultOperationRegistry();
