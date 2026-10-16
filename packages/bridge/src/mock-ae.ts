@@ -504,7 +504,63 @@ export class MockTextLayer extends MockAVLayer {
   }
 }
 
-export class MockShapeLayer extends MockAVLayer {}
+// Shape-layer contents. Real AE 26.5 segfaults on `addProperty` with an unknown
+// match name (docs/findings/2026-10-16-shape-path-matchname-crash.md); the mock
+// throws instead so tests catch a bad name.
+// Ref: https://ae-scripting.docsforadobe.dev/matchnames/layer/shapelayer/
+const VECTOR_ITEMS: Record<string, string> = {
+  'ADBE Vector Group': 'Group',
+  'ADBE Vector Shape - Group': 'Path',
+  'ADBE Vector Shape - Rect': 'Rectangle',
+  'ADBE Vector Shape - Ellipse': 'Ellipse',
+  'ADBE Vector Shape - Star': 'Polystar',
+  'ADBE Vector Graphic - Fill': 'Fill',
+  'ADBE Vector Graphic - Stroke': 'Stroke',
+};
+
+export class MockVectorsGroup extends MockPropertyGroup {
+  canAddProperty(name: string): boolean {
+    return Object.prototype.hasOwnProperty.call(VECTOR_ITEMS, name);
+  }
+
+  // Typed MockEffect to satisfy the base signature; only the group shape matters.
+  addProperty(matchName: string): MockEffect {
+    if (!this.canAddProperty(matchName)) {
+      throw new Error('mock AE: cannot add unknown vector item ' + matchName);
+    }
+    const item = this.add(new MockEffect(VECTOR_ITEMS[matchName], matchName));
+    if (matchName === 'ADBE Vector Group') {
+      item.add(new MockVectorsGroup('Contents', 'ADBE Vectors Group'));
+    } else if (matchName === 'ADBE Vector Shape - Group') {
+      item.add(new MockProperty('Path', 'ADBE Vector Shape', null));
+    } else if (matchName === 'ADBE Vector Shape - Rect') {
+      item.add(new MockProperty('Size', 'ADBE Vector Rect Size', [100, 100]));
+    } else if (matchName === 'ADBE Vector Shape - Ellipse') {
+      item.add(new MockProperty('Size', 'ADBE Vector Ellipse Size', [100, 100]));
+    } else if (matchName === 'ADBE Vector Graphic - Fill') {
+      item.add(new MockProperty('Color', 'ADBE Vector Fill Color', [1, 0, 0, 1]));
+    } else if (matchName === 'ADBE Vector Graphic - Stroke') {
+      item.add(new MockProperty('Color', 'ADBE Vector Stroke Color', [1, 1, 1, 1]));
+      item.add(new MockProperty('Stroke Width', 'ADBE Vector Stroke Width', 2));
+    }
+    return item;
+  }
+}
+
+// Ref: https://ae-scripting.docsforadobe.dev/other/shape/
+export class MockShape {
+  vertices: number[][] = [];
+  inTangents: number[][] = [];
+  outTangents: number[][] = [];
+  closed = true;
+}
+
+export class MockShapeLayer extends MockAVLayer {
+  constructor(name: string, matchName: string) {
+    super(name, matchName);
+    this.add(new MockVectorsGroup('Contents', 'ADBE Root Vectors Group'));
+  }
+}
 
 export class MockCameraLayer extends MockLayer {}
 
@@ -941,6 +997,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     AVLayer: MockAVLayer,
     TextLayer: MockTextLayer,
     ShapeLayer: MockShapeLayer,
+    Shape: MockShape,
     CameraLayer: MockCameraLayer,
     LightLayer: MockLightLayer,
     MarkerValue: MockMarkerValue,

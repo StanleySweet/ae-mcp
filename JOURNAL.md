@@ -5,6 +5,19 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-16
 
+- **AE crash on `shape.add type:"path"` diagnosed and fixed (uncommitted).** It was
+  reproduced live from Claude Code through the installed mcpb server. The crash
+  report puts the fault in `addProperty` → `BEEp_MakeUniqueNameForStream` (null
+  deref). The cause was the nonexistent match name `'ADBE Vector Shape - Path'`;
+  the correct one is `ADBE Vector Shape - Group`. Fix: the `AEMCP_MATCH` table plus
+  `aemcpAddProperty` (`canAddProperty` guard), shape contents addressed by match
+  name, `match-names.test.ts` to keep literals out of the code,
+  `shape-handlers.test.ts`, and mock `MockVectorsGroup`/`MockShape`. `npm run
+  check` green (494 TS, 81 C#). See
+  `docs/findings/2026-10-16-shape-path-matchname-crash.md`. Not yet re-tested on
+  live AE: that needs a rebuilt payload installed. Open: `mask.add` still uses
+  display names (no documented atom match name).
+
 - **E11-8 `chore(release): v1.0.0`** — cut v1.0.0. Bumped the three shipped
   versions to 1.0.0: root `package.json` (drives the Setup app + dmg name),
   `bundle/manifest.json` (extension version; `bundle/manifest.test.ts` keeps it

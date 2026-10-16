@@ -1,3 +1,49 @@
+// Every AE match name the bridge uses, in one place. A misspelled match name
+// passed to addProperty segfaults AE 26.5 instead of throwing
+// (docs/findings/2026-10-16-shape-path-matchname-crash.md), so the bridge never
+// writes an 'ADBE …' literal outside this table; match-names.test.ts enforces it
+// and checks each value against the scripting guide's match-name pages.
+// Ref: https://ae-scripting.docsforadobe.dev/matchnames/layer/avlayer/
+// Ref: https://ae-scripting.docsforadobe.dev/matchnames/layer/shapelayer/
+// Ref: https://ae-scripting.docsforadobe.dev/matchnames/layer/textlayer/
+// Ref: https://ae-scripting.docsforadobe.dev/matchnames/effects/firstparty/
+var AEMCP_MATCH = {
+    TRANSFORM: 'ADBE Transform Group',
+    ANCHOR_POINT: 'ADBE Anchor Point',
+    POSITION: 'ADBE Position',
+    EFFECTS: 'ADBE Effect Parade',
+    MASKS: 'ADBE Mask Parade',
+    MARKER: 'ADBE Marker',
+    TEXT_PROPERTIES: 'ADBE Text Properties',
+    TEXT_DOCUMENT: 'ADBE Text Document',
+    SLIDER_CONTROL: 'ADBE Slider Control',
+    SHAPE_ROOT: 'ADBE Root Vectors Group',
+    SHAPE_GROUP: 'ADBE Vector Group',
+    SHAPE_GROUP_CONTENTS: 'ADBE Vectors Group',
+    SHAPE_PATH: 'ADBE Vector Shape - Group',
+    SHAPE_PATH_VALUE: 'ADBE Vector Shape',
+    SHAPE_RECT: 'ADBE Vector Shape - Rect',
+    SHAPE_RECT_SIZE: 'ADBE Vector Rect Size',
+    SHAPE_ELLIPSE: 'ADBE Vector Shape - Ellipse',
+    SHAPE_ELLIPSE_SIZE: 'ADBE Vector Ellipse Size',
+    SHAPE_FILL: 'ADBE Vector Graphic - Fill',
+    SHAPE_FILL_COLOR: 'ADBE Vector Fill Color',
+    SHAPE_STROKE: 'ADBE Vector Graphic - Stroke',
+    SHAPE_STROKE_COLOR: 'ADBE Vector Stroke Color',
+    SHAPE_STROKE_WIDTH: 'ADBE Vector Stroke Width'
+};
+
+// The only way the bridge adds a property: ask AE (canAddProperty) whether the
+// match name is valid in this group first, and abort with INVALID_ARGS if not,
+// so a bad name never reaches addProperty.
+// Ref: https://ae-scripting.docsforadobe.dev/property/propertygroup/#propertygroupcanaddproperty
+function aemcpAddProperty(group, matchName) {
+    if (!group.canAddProperty(matchName)) {
+        aemcpAbort(aemcpErrorIssue('INVALID_ARGS', 'cannot add ' + matchName + ' to ' + group.matchName));
+    }
+    return group.addProperty(matchName);
+}
+
 // Observe handlers: read-only tools that serialize the open project.
 // Registered into the heartbeat capabilities via AEMCP.register.
 AEMCP.register('ae_project_info', function () {
@@ -865,9 +911,9 @@ AEMCP.register('layer.center', function (args) {
     for (var i = 1; i <= sel.length; i++) {
         var layer = sel[i];
         if (layer.property) {
-            var transform = layer.property('ADBE Transform Group');
+            var transform = layer.property(AEMCP_MATCH.TRANSFORM);
             if (transform) {
-                var position = transform.property('ADBE Position');
+                var position = transform.property(AEMCP_MATCH.POSITION);
                 if (position) position.setValue([comp.width / 2, comp.height / 2]);
             }
         }
@@ -894,9 +940,9 @@ AEMCP.register('layer.set_transform', function (args) {
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     if (layer.property) {
-        var transform = layer.property('ADBE Transform Group');
+        var transform = layer.property(AEMCP_MATCH.TRANSFORM);
         if (transform) {
-            var pos = transform.property('ADBE Position');
+            var pos = transform.property(AEMCP_MATCH.POSITION);
             if (pos) pos.setValue(position);
         }
     }
@@ -1250,10 +1296,10 @@ AEMCP.register('anchor.move_preserving', function (args) {
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     if (!layer.property) return { success: false, error: 'Not an AV layer' };
-    var transform = layer.property('ADBE Transform Group');
+    var transform = layer.property(AEMCP_MATCH.TRANSFORM);
     if (!transform) return { success: false, error: 'Transform not found' };
-    var anchorProp = transform.property('ADBE Anchor Point');
-    var posProp = transform.property('ADBE Position');
+    var anchorProp = transform.property(AEMCP_MATCH.ANCHOR_POINT);
+    var posProp = transform.property(AEMCP_MATCH.POSITION);
     if (!anchorProp || !posProp) return { success: false, error: 'Transform properties not found' };
     var bounds;
     try {
@@ -1459,11 +1505,11 @@ AEMCP.register('rig.null_controller', function (args) {
     }
     var nullLayer = comp.layers.addNull(comp.duration);
     nullLayer.name = name;
-    var effects = nullLayer.property('ADBE Effect Parade');
+    var effects = nullLayer.property(AEMCP_MATCH.EFFECTS);
     var sliderNames = [];
     var k, fx;
     for (k = 0; k < sliders.length; k++) {
-        fx = effects.addProperty('ADBE Slider Control');
+        fx = aemcpAddProperty(effects, AEMCP_MATCH.SLIDER_CONTROL);
         fx.name = sliders[k];
         sliderNames.push(sliders[k]);
     }
@@ -1488,7 +1534,7 @@ AEMCP.register('rig.null_controller', function (args) {
 
 // The layer's effect parade, or null when the layer has none.
 function aemcpEffectParade(layer) {
-    var parade = layer.property('ADBE Effect Parade');
+    var parade = layer.property(AEMCP_MATCH.EFFECTS);
     return aemcpIsGroup(parade) ? parade : null;
 }
 
@@ -1770,7 +1816,7 @@ AEMCP.register('marker.add', function (args) {
     if (layerIndex !== null) {
         var markerLayer = comp.layer(layerIndex);
         if (!markerLayer) return { success: false, error: 'Layer not found' };
-        markerProp = markerLayer.property('ADBE Marker');
+        markerProp = markerLayer.property(AEMCP_MATCH.MARKER);
     } else {
         markerProp = comp.markerProperty;
     }
@@ -1803,7 +1849,7 @@ AEMCP.register('marker.add_bulk', function (args) {
     if (layerIndex !== null) {
         var markerLayer = comp.layer(layerIndex);
         if (!markerLayer) return { success: false, error: 'Layer not found' };
-        markerProp = markerLayer.property('ADBE Marker');
+        markerProp = markerLayer.property(AEMCP_MATCH.MARKER);
     } else {
         markerProp = comp.markerProperty;
     }
@@ -1836,7 +1882,7 @@ AEMCP.register('marker.list', function (args) {
     if (layerIndex !== null) {
         var markerLayer = comp.layer(layerIndex);
         if (!markerLayer) return { success: false, error: 'Layer not found' };
-        markerProp = markerLayer.property('ADBE Marker');
+        markerProp = markerLayer.property(AEMCP_MATCH.MARKER);
     } else {
         markerProp = comp.markerProperty;
     }
@@ -1966,37 +2012,37 @@ AEMCP.register('shape.add', function (args) {
     }
     if (!layer) return { success: false, error: 'Shape layer not found or could not be created' };
 
-    var contents = layer.property('Contents');
-    var shapeGroup = contents.addProperty('ADBE Vector Group');
-    var groupContents = shapeGroup.property('Contents');
+    var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
+    var shapeGroup = aemcpAddProperty(contents, AEMCP_MATCH.SHAPE_GROUP);
+    var groupContents = shapeGroup.property(AEMCP_MATCH.SHAPE_GROUP_CONTENTS);
 
     if (shapeType === 'rect') {
-        var rect = groupContents.addProperty('ADBE Vector Shape - Rect');
-        if (args.size) rect.property('ADBE Vector Rect Size').setValue(args.size);
+        var rect = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_RECT);
+        if (args.size) rect.property(AEMCP_MATCH.SHAPE_RECT_SIZE).setValue(args.size);
     } else if (shapeType === 'ellipse') {
-        var ellipse = groupContents.addProperty('ADBE Vector Shape - Ellipse');
-        if (args.size) ellipse.property('ADBE Vector Ellipse Size').setValue(args.size);
+        var ellipse = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_ELLIPSE);
+        if (args.size) ellipse.property(AEMCP_MATCH.SHAPE_ELLIPSE_SIZE).setValue(args.size);
     } else {
-        var pathProp = groupContents.addProperty('ADBE Vector Shape - Path');
+        var pathProp = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_PATH);
         if (args.vertices) {
             var myShape = new Shape();
             myShape.vertices = args.vertices;
             if (args.inTangents) myShape.inTangents = args.inTangents;
             if (args.outTangents) myShape.outTangents = args.outTangents;
             if (typeof args.closed === 'boolean') myShape.closed = args.closed;
-            pathProp.property('ADBE Vector Shape').setValue(myShape);
+            pathProp.property(AEMCP_MATCH.SHAPE_PATH_VALUE).setValue(myShape);
         }
     }
 
     if (args && args.fillColor) {
-        var fill = groupContents.addProperty('ADBE Vector Graphic - Fill');
-        fill.property('ADBE Vector Fill Color').setValue(args.fillColor);
+        var fill = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_FILL);
+        fill.property(AEMCP_MATCH.SHAPE_FILL_COLOR).setValue(args.fillColor);
     }
     if (args && args.strokeColor) {
-        var stroke = groupContents.addProperty('ADBE Vector Graphic - Stroke');
-        stroke.property('ADBE Vector Stroke Color').setValue(args.strokeColor);
+        var stroke = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_STROKE);
+        stroke.property(AEMCP_MATCH.SHAPE_STROKE_COLOR).setValue(args.strokeColor);
         if (typeof args.strokeWidth === 'number') {
-            stroke.property('ADBE Vector Stroke Width').setValue(args.strokeWidth);
+            stroke.property(AEMCP_MATCH.SHAPE_STROKE_WIDTH).setValue(args.strokeWidth);
         }
     }
     return { success: true, layerIndex: layer.index };
@@ -2017,7 +2063,7 @@ AEMCP.register('shape.set', function (args) {
     if (!comp) return { success: false, error: 'Composition not found' };
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var contents = layer.property('Contents');
+    var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
     if (!contents) return { success: false, error: 'Layer contents not found' };
 
     // Traverse and update matching property
@@ -2029,9 +2075,9 @@ AEMCP.register('shape.set', function (args) {
         if (typeof args.closed === 'boolean') myShape.closed = args.closed;
         // set on first vector path found
         var group = contents.property(1);
-        if (group && group.property('Contents')) {
-            var p = group.property('Contents').property('ADBE Vector Shape - Path');
-            if (p) p.property('ADBE Vector Shape').setValue(myShape);
+        if (group && group.property(AEMCP_MATCH.SHAPE_GROUP_CONTENTS)) {
+            var p = group.property(AEMCP_MATCH.SHAPE_GROUP_CONTENTS).property(AEMCP_MATCH.SHAPE_PATH);
+            if (p) p.property(AEMCP_MATCH.SHAPE_PATH_VALUE).setValue(myShape);
         }
     }
     return { success: true };
@@ -2052,7 +2098,7 @@ AEMCP.register('shape.read', function (args) {
     if (!comp) return { success: false, error: 'Composition not found' };
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var contents = layer.property('Contents');
+    var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
     var details = { numGroups: contents ? contents.numProperties : 0 };
     return { shape: details };
 });
@@ -2611,7 +2657,7 @@ AEMCP.register('bulk.apply_effect', function (args) {
     var i, layer, parade, present;
     for (i = 0; i < indices.length; i++) {
         layer = comp.layer(indices[i]);
-        parade = layer.property('ADBE Effect Parade');
+        parade = layer.property(AEMCP_MATCH.EFFECTS);
         if (!aemcpIsGroup(parade)) {
             skipped.push({ index: indices[i], reason: 'unsupported' });
             parts.push('0');
@@ -2625,7 +2671,7 @@ AEMCP.register('bulk.apply_effect', function (args) {
         }
         changes.push({ index: indices[i], effect: effectName });
         if (!dryRun) {
-            parade.addProperty(effectName);
+            aemcpAddProperty(parade, effectName);
         }
     }
     var fingerprint = 'effect:' + effectName + '#' + aemcpBulkFingerprint(comp.name, indices, parts);

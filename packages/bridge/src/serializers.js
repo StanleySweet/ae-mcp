@@ -139,7 +139,7 @@ function aemcpSerializePropertyGroup(group) {
 }
 
 function aemcpSerializeEffects(layer) {
-    var parade = layer.property('ADBE Effect Parade');
+    var parade = layer.property(AEMCP_MATCH.EFFECTS);
     var effects = [];
     var i;
     if (!aemcpIsGroup(parade)) {
@@ -159,7 +159,7 @@ function aemcpSerializeEffects(layer) {
 }
 
 function aemcpSerializeMasks(layer) {
-    var parade = layer.property('ADBE Mask Parade');
+    var parade = layer.property(AEMCP_MATCH.MASKS);
     var masks = [];
     var i;
     if (!aemcpIsGroup(parade)) {
@@ -191,11 +191,11 @@ function aemcpSerializeMarkers(layer) {
 }
 
 function aemcpSerializeText(layer) {
-    var text = layer.property('ADBE Text Properties');
+    var text = layer.property(AEMCP_MATCH.TEXT_PROPERTIES);
     if (!aemcpIsGroup(text)) {
         return null;
     }
-    var source = text.property('ADBE Text Document');
+    var source = text.property(AEMCP_MATCH.TEXT_DOCUMENT);
     if (!source || typeof source.value !== 'object' || source.value === null) {
         return null;
     }
@@ -257,7 +257,7 @@ function aemcpSerializeLayer(layer) {
         out.sourceId = layer.source ? layer.source.id : null;
         out.sourceName = layer.source ? layer.source.name : null;
     }
-    var transform = layer.property('ADBE Transform Group');
+    var transform = layer.property(AEMCP_MATCH.TRANSFORM);
     if (aemcpIsGroup(transform)) {
         out.transform = aemcpSerializePropertyGroup(transform);
     }
