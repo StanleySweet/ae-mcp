@@ -53,6 +53,8 @@ export interface ServerOptions {
   planStore?: PlanStore<BulkStep>;
   /** MCP `instructions` returned to the client on initialize (docs/agents/animation-principles.md). */
   instructions?: string;
+  /** How long `ae_render_frame` waits for AE to finish writing the PNG (test seam). */
+  frameWait?: FrameWait;
 }
 
 /** One operation invocation stored in a previewed bulk plan. */
@@ -107,22 +109,53 @@ async function shrinkPng(file: string, maxEdge: number): Promise<string | null> 
   }
 }
 
+/** How long to wait for AE to finish writing a rendered frame. */
+export type FrameWait = { timeoutMs: number; intervalMs: number };
+
+const DEFAULT_FRAME_WAIT: FrameWait = { timeoutMs: 15_000, intervalMs: 100 };
+
+// Every complete PNG ends with this 12-byte IEND chunk (length 0, "IEND", CRC).
+const PNG_IEND = Buffer.from([0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]);
+
+/** Polls until `file` is a complete PNG. `CompItem.saveFrameToPng` returns a
+DeferredCall that resolves only "once the file has been written", so the bridge
+reports the path before AE has written it (#176). */
+async function waitForCompletePng(file: string, wait: FrameWait): Promise<Buffer | null> {
+  const deadline = Date.now() + wait.timeoutMs;
+  for (;;) {
+    try {
+      const buffer = await readFile(file);
+      if (buffer.length >= PNG_IEND.length && buffer.subarray(buffer.length - PNG_IEND.length).equals(PNG_IEND)) {
+        return buffer;
+      }
+    } catch {
+      // Not created yet; keep waiting.
+    }
+    if (Date.now() >= deadline) {
+      return null;
+    }
+    await new Promise((done) => setTimeout(done, wait.intervalMs));
+  }
+}
+
 export async function readRenderedFrame(
   root: string,
   file: string,
   maxBytes: number,
   downscale?: FrameDownscale,
+  wait: FrameWait = DEFAULT_FRAME_WAIT,
 ): Promise<{ ok: true; data: string } | { ok: false; message: string }> {
   const renderDir = resolve(root, 'render');
   const target = resolve(file);
   if (target !== renderDir && !target.startsWith(renderDir + sep)) {
     return { ok: false, message: `refusing to read outside the render directory: ${file}` };
   }
-  let buffer: Buffer;
-  try {
-    buffer = await readFile(target);
-  } catch (error) {
-    return { ok: false, message: `could not read rendered frame: ${(error as Error).message}` };
+  let buffer = await waitForCompletePng(target, wait);
+  if (!buffer) {
+    return {
+      ok: false,
+      message: `rendered frame was not finished writing after ${wait.timeoutMs} ms: ${file}`,
+    };
   }
   if (buffer.length > maxBytes && downscale) {
     const smaller = await downscale(target);
@@ -462,8 +495,12 @@ export function createServer(options: ServerOptions = {}): McpServer {
         );
       }
       const maxEdge = args.maxEdge ?? MAX_RENDER_EDGE;
-      const read = await readRenderedFrame(root, value.file, MAX_RENDER_BYTES, (file) =>
-        shrinkPng(file, maxEdge),
+      const read = await readRenderedFrame(
+        root,
+        value.file,
+        MAX_RENDER_BYTES,
+        (file) => shrinkPng(file, maxEdge),
+        options.frameWait,
       );
       if (!read.ok) {
         return text(makeError('SCRIPT_ERROR', read.message), true);

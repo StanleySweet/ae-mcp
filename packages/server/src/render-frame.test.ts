@@ -21,6 +21,9 @@ const FAKE_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
   'base64',
 );
+// The 12-byte IEND chunk every complete PNG ends with; readRenderedFrame waits for it.
+const PNG_END = FAKE_PNG.subarray(FAKE_PNG.length - 12);
+const bigFrame = (size: number): Buffer => Buffer.concat([Buffer.alloc(size, 1), PNG_END]);
 
 type RenderHandler = (root: string) => HandlerMap;
 
@@ -37,7 +40,7 @@ async function connect(
   await consumer.start();
   const aeClient = createAEClient({ transport: new FileQueueTransport(root, 10), root });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createServer({ root, client: aeClient });
+  const server = createServer({ root, client: aeClient, frameWait: { timeoutMs: 200, intervalMs: 10 } });
   await server.connect(serverTransport);
   const client = new Client({ name: 'test-client', version: '0.0.0' });
   await client.connect(clientTransport);
@@ -187,7 +190,7 @@ describe('ae_render_frame tool', () => {
     const [first] = result.content as Array<{ type: string; text: string }>;
     const error = errorSchema.parse(JSON.parse(first!.text));
     expect(error.code).toBe('SCRIPT_ERROR');
-    expect(error.message).toContain('could not read rendered frame');
+    expect(error.message).toContain('not finished writing');
   });
 
   it('accepts a maxEdge argument', async () => {
@@ -214,7 +217,7 @@ describe('readRenderedFrame', () => {
   }
 
   it('downscales an oversized frame through the supplied resizer', async () => {
-    const { root, file } = await renderDirWith('big.png', Buffer.alloc(100, 1));
+    const { root, file } = await renderDirWith('big.png', bigFrame(100));
     const smaller = join(root, 'render', 'small.png');
     await writeFile(smaller, FAKE_PNG);
 
@@ -225,7 +228,7 @@ describe('readRenderedFrame', () => {
   });
 
   it('reports a frame that stays too large when the resizer declines', async () => {
-    const { root, file } = await renderDirWith('big.png', Buffer.alloc(100, 1));
+    const { root, file } = await renderDirWith('big.png', bigFrame(100));
 
     const read = await readRenderedFrame(root, file, 10, async () => null);
 
@@ -240,5 +243,35 @@ describe('readRenderedFrame', () => {
 
     expect(read.ok).toBe(true);
     expect((read as { data: string }).data).toBe(FAKE_PNG.toString('base64'));
+  });
+
+  // saveFrameToPng returns before AE has written the file (#176).
+  it('waits for a frame AE is still writing', async () => {
+    const { root, file } = await renderDirWith('late.png', FAKE_PNG.subarray(0, 10));
+    setTimeout(() => void writeFile(file, FAKE_PNG), 50);
+
+    const read = await readRenderedFrame(root, file, 10_000, undefined, { timeoutMs: 2_000, intervalMs: 10 });
+
+    expect(read.ok).toBe(true);
+    expect((read as { data: string }).data).toBe(FAKE_PNG.toString('base64'));
+  });
+
+  it('waits for a frame that does not exist yet', async () => {
+    const { root } = await renderDirWith('other.png', FAKE_PNG);
+    const file = join(root, 'render', 'later.png');
+    setTimeout(() => void writeFile(file, FAKE_PNG), 50);
+
+    const read = await readRenderedFrame(root, file, 10_000, undefined, { timeoutMs: 2_000, intervalMs: 10 });
+
+    expect(read.ok).toBe(true);
+  });
+
+  it('times out on a frame that never completes', async () => {
+    const { root, file } = await renderDirWith('stuck.png', FAKE_PNG.subarray(0, 10));
+
+    const read = await readRenderedFrame(root, file, 10_000, undefined, { timeoutMs: 50, intervalMs: 10 });
+
+    expect(read.ok).toBe(false);
+    expect((read as { message: string }).message).toContain('not finished writing');
   });
 });
