@@ -20,6 +20,10 @@ Single-context: `CONTEXT.md` at the root (created lazily), ADRs in `docs/decisio
 
 Code map: `docs/agents/code-map.md` — file:line map of tool registration, bridge dispatch, registries and test harnesses. Read before exploring; update when code changes.
 
+### Animation principles
+
+Before proposing or editing motion in a user's project, load `docs/agents/animation-principles.md` — how to treat keyframes vs expressions, naming, parenting, easing and safety when driving AE.
+
 ## Documentation discipline
 
 ### Write down what you learn, before you finish
