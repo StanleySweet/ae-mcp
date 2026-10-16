@@ -9,7 +9,7 @@ the rest of the docs use. Rewritten in place as state changes; history lives in
 After Effects for Claude — an MCP server that lets Claude Desktop see and edit the
 After Effects project the user has open. macOS only.
 
-v1.0.0 is released: pushing a `v*` tag runs `release.yml`, which publishes the
+v1.1.0 is released (v1.0.0 before it; the 1.1.0 contract changes are in ADR-0007): pushing a `v*` tag runs `release.yml`, which publishes the
 `.mcpb`, the Setup app for arm64 and x64, and `SHA256SUMS.txt`.
 
 ## Shape

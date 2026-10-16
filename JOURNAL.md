@@ -5,6 +5,11 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.1.0`**: bumped `package.json`, `bundle/manifest.json` and
+  `SERVER_VERSION`, then tagged `v1.1.0`. It ships #175–#186. Minor rather than major:
+  the 17 MCP tools are unchanged, and the operations changed under ADR-0007 are
+  discovered at runtime through `ae_catalog`.
+
 - **Repo audit → #178–#186, all fixed and closed** (ADR-0007 records the contract
   changes; Decider: Stan). `render.frame` lost its `file` argument (#178, a
   read-only op could overwrite any file). The AE app name now comes from
