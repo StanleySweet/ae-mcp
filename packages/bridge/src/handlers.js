@@ -1188,6 +1188,16 @@ function aemcpWriteKeys(prop, keys) {
     }
 }
 
+// Swap a key's in and out sides (interpolation and temporal ease), as a reversed motion needs.
+function aemcpSwapKeySides(key) {
+    var t = key.inType;
+    key.inType = key.outType;
+    key.outType = t;
+    t = key.inEase;
+    key.inEase = key.outEase;
+    key.outEase = t;
+}
+
 function aemcpKeyTimes(keys) {
     var times = [];
     var i;
@@ -1219,7 +1229,9 @@ function aemcpNumberArg(args, name) {
 
 // Move every key of a property in place (read all, remove all, write back),
 // mapping each time through transform(time, firstTime, lastTime).
-function aemcpRetimeKeys(args, transform) {
+// When mirrored is true (reverse), each key also swaps its in and out sides,
+// so the motion plays backwards with the same ease shape.
+function aemcpRetimeKeys(args, transform, mirrored) {
     var comp = aemcpRequireComp(aemcpCompKey(args));
     var layer = comp.layer(args && args.index ? args.index : 1);
     if (!layer) {
@@ -1232,6 +1244,9 @@ function aemcpRetimeKeys(args, transform) {
     var i;
     for (i = 0; i < keys.length; i++) {
         keys[i].time = transform(keys[i].time, first, last);
+        if (mirrored) {
+            aemcpSwapKeySides(keys[i]);
+        }
     }
     for (i = prop.numKeys; i >= 1; i--) {
         prop.removeKey(i);
@@ -1275,7 +1290,7 @@ AEMCP.register('keyframe.offset', function (args) {
 
 // Mirror key times within [first, last].
 AEMCP.register('keyframe.reverse', function (args) {
-    return aemcpRetimeKeys(args, function (t, first, last) { return first + last - t; });
+    return aemcpRetimeKeys(args, function (t, first, last) { return first + last - t; }, true);
 });
 
 // Scale key times around the first key.

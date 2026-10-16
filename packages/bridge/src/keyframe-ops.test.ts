@@ -74,7 +74,19 @@ describe('keyframe.reverse', () => {
     invoke(ctx, 'keyframe.reverse', { comp: 'Main', index: 1, property: 'ADBE Opacity' });
     expect(times(a)).toEqual([1, 3, 4]);
     expect(values(a)).toEqual([40, 20, 10]);
-    expect(a.keyInTemporalEase(2)[0].influence).toBe(80);
+  });
+
+  it('swaps in and out interpolation and temporal ease on each key', async () => {
+    const { ctx, a } = await setup();
+    keyed(a);
+    a.setInterpolationTypeAtKey(2, MockKeyframeInterpolationType.LINEAR, MockKeyframeInterpolationType.BEZIER);
+    invoke(ctx, 'keyframe.reverse', { comp: 'Main', index: 1, property: 'ADBE Opacity' });
+    // Key 2 (time 2) mirrors to time 3, now sitting at index 2.
+    expect(times(a)).toEqual([1, 3, 4]);
+    expect(a.keyInInterpolationType(2)).toBe(MockKeyframeInterpolationType.BEZIER);
+    expect(a.keyOutInterpolationType(2)).toBe(MockKeyframeInterpolationType.LINEAR);
+    expect(a.keyInTemporalEase(2)[0].influence).toBe(25);
+    expect(a.keyOutTemporalEase(2)[0].influence).toBe(80);
   });
 });
 
