@@ -31,6 +31,7 @@ Version 1.1 · 2026-10-09 · Owner: you · Status: ready for Sprint 0
 8. Bridge code (`packages/bridge`) is ExtendScript ES3: `var` only; no arrow functions, template strings, `let`/`const`, trailing commas, and no native `JSON`, `forEach`, `map`, `filter` or `indexOf` (use the polyfills from E3-1).
 9. Runtime dependencies are limited to `@modelcontextprotocol/sdk` and zod. Adding another needs an ADR.
 10. A change to public behavior updates `docs/` in the same commit. Code targets macOS only: no Windows paths and no cross-platform abstractions.
+11. Address After Effects properties, groups and effects by **match name** (`ADBE Opacity`, `ADBE Transform Group`), never by a localized display name. Display names follow the AE UI language (`fr_FR` shows `Opacité`, `Echelle`, `Transformer`); match names are stable across locales and releases. Where a lookup accepts a path, a `/`-separated sequence of match names resolves. See `docs/findings/2026-10-16-localized-property-names.md`.
 
 ## 3. Definitions
 

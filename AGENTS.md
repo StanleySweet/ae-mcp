@@ -73,6 +73,7 @@ For each task, in order:
 
 Other rules:
 
+- Address AE properties, groups and effects by **match name** (`ADBE Opacity`, `ADBE Transform Group`), never by a localized display name — names follow the AE UI language (`fr_FR` shows `Opacité`, `Echelle`), match names do not. See BACKLOG §2 rule 11 and `docs/findings/2026-10-16-localized-property-names.md`.
 - If you forgot a `Closes #N` footer on already-committed-but-unpushed work, rewrite those local commits (rebase/cherry-pick replay) to add it; keep a `backup/…` branch first. Never rewrite pushed history.
 - Keep `docs/` current in the same commit when public behavior changes.
 - No TODO without an issue ID.
