@@ -608,8 +608,8 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(
-    operation('batch.run', 'batch', 'Run many operations as one undo group.', {
-      schema: { ops: { type: 'array', items: { type: 'object' } } },
+    operation('batch.run', 'batch', 'Run many operations as one undo group. If a step fails after a changing step succeeded, the whole batch is rolled back (Edit > Undo) unless atomic is false.', {
+      schema: { ops: { type: 'array', items: { type: 'object' } }, atomic: { type: 'boolean' } },
     }),
   );
 

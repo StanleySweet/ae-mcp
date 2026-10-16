@@ -194,6 +194,61 @@ describe('bridge batch.run', () => {
     expect(ae.undoGroups).toHaveLength(1);
   });
 
+  describe('atomic rollback (#189)', () => {
+    async function run(args: Record<string, unknown>) {
+      const { driver, ae, ctx } = await setup();
+      vm.runInContext(
+        'AEMCP.HANDLERS["a.ok"] = function () { return 1; };' +
+          'AEMCP.HANDLERS["a.boom"] = function () { throw new Error("kaboom"); };',
+        ctx,
+      );
+      await driver.sendJob({
+        protocolVersion: 1,
+        id: 'batch-rb',
+        tool: 'batch.run',
+        args,
+        deadline: Date.now() + 5000,
+      });
+      return { result: await driver.waitForResult('batch-rb'), ae };
+    }
+
+    it('undoes once, after the group ended, when a mutating step preceded the failure', async () => {
+      const { result, ae } = await run({
+        ops: [{ op: 'a.ok' }, { op: 'a.boom' }],
+        mutating: [true, true],
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        error: {
+          code: 'SCRIPT_ERROR',
+          message: 'batch rolled back after ops[1] (a.boom) failed: Error: kaboom',
+        },
+      });
+      expect(ae.executedCommands).toEqual([16]);
+      expect(ae.app.inUndoGroup()).toBe(false);
+      expect(ae.undoGroups).toHaveLength(1);
+    });
+
+    it('does not undo when only read-only steps preceded the failure', async () => {
+      const { result, ae } = await run({
+        ops: [{ op: 'a.ok' }, { op: 'a.boom' }],
+        mutating: [false, true],
+      });
+      expect(result).toMatchObject({ ok: false, error: { message: 'Error: kaboom' } });
+      expect(ae.executedCommands).toEqual([]);
+    });
+
+    it('does not undo when atomic is false', async () => {
+      const { result, ae } = await run({
+        ops: [{ op: 'a.ok' }, { op: 'a.boom' }],
+        mutating: [true, true],
+        atomic: false,
+      });
+      expect(result).toMatchObject({ ok: false, error: { message: 'Error: kaboom' } });
+      expect(ae.executedCommands).toEqual([]);
+    });
+  });
+
   // A handler's {success:false} used to come back as ok and let the batch
   // carry on (#181).
   it('stops at a sub-op that returns success: false and reports it as an error', async () => {

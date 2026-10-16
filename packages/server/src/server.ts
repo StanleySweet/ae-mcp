@@ -754,7 +754,18 @@ export function createServer(options: ServerOptions = {}): McpServer {
         }
         incrementInfo = increment.info;
       }
-      const result = await callRaw(definition.name, validation.args);
+      // The bridge undoes only after a step that changes the project, so the
+      // flags come from the registry, never from the client.
+      const bridgeArgs =
+        definition.name === 'batch.run'
+          ? {
+              ...validation.args,
+              mutating: (validation.args.ops as Array<{ op: string }>).map(
+                (sub) => operations.get(sub.op)?.readOnly === false,
+              ),
+            }
+          : validation.args;
+      const result = await callRaw(definition.name, bridgeArgs);
       if (!result.ok) {
         return toResult(result);
       }

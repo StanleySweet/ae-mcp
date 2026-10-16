@@ -38,6 +38,7 @@ function registry(): OperationRegistry {
     destructive: false,
     schema: {
       ops: { type: 'array', items: { type: 'object' } },
+      atomic: { type: 'boolean' },
     },
   });
   return registry;
@@ -220,6 +221,41 @@ describe('E13-3 destructive guard', () => {
     });
     expect(result.isError).toBe(false);
     expect(calls).toEqual(['project.increment_save', 'batch.run']);
+  });
+
+  it('sends server-computed mutating flags with batch.run', async () => {
+    const calls: string[] = [];
+    const seen: unknown[] = [];
+    const operations = registry();
+    operations.register({
+      name: 'layer.info',
+      category: 'layer',
+      description: 'Read a layer.',
+      readOnly: true,
+      destructive: false,
+      schema: { index: { type: 'number' } },
+    });
+    const { client, close } = await connectServer(project(), calls, {
+      operations,
+      extraHandlers: {
+        'layer.info': () => ({}),
+        'batch.run': (args: unknown) => {
+          seen.push(args);
+          return { results: [] };
+        },
+      },
+    });
+    closes.push(close);
+
+    const result = await call(client, 'batch.run', {
+      ops: [
+        { op: 'layer.info', args: { index: 1 } },
+        { op: 'layer.rename', args: { index: 1, name: 'Hero' } },
+      ],
+      atomic: false,
+    });
+    expect(result.isError).toBe(false);
+    expect(seen).toEqual([expect.objectContaining({ atomic: false, mutating: [false, true] })]);
   });
 
   it('increments exactly once for a batch.run with several destructive sub-operations', async () => {

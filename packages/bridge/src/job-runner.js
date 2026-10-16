@@ -83,6 +83,12 @@ function aemcpInvoke(tool, args, deadline) {
         app.endUndoGroup();
         AEMCP_BUSY = false;
     }
+    // batch.run asks for a rollback; Undo only reverts the whole batch once its
+    // group has ended. Ref: https://ae-scripting.docsforadobe.dev/general/application/#appexecutecommand
+    if (!outcome.ok && outcome.issue.rollback) {
+        delete outcome.issue.rollback;
+        app.executeCommand(16);
+    }
     return outcome;
 }
 
@@ -182,9 +188,13 @@ AEMCP.busy = function () {
 
 // batch.run: one undo group for many sub-ops. aemcpInvoke already opened the
 // group for 'batch.run'; each sub-op runs via aemcpRunHandler (no nested group).
+// When a step fails after a mutating one succeeded (args.mutating, set by the
+// server) and args.atomic is not false, the issue is flagged `rollback` and
+// aemcpInvoke undoes the batch after ending its group (ADR-0008).
 AEMCP.register('batch.run', function (args) {
     var ops = args && args.ops ? args.ops : [];
     var results = [];
+    var changed = false;
     var i, sub, outcome;
     for (i = 0; i < ops.length; i++) {
         sub = ops[i];
@@ -193,7 +203,14 @@ AEMCP.register('batch.run', function (args) {
         }
         outcome = aemcpRunHandler(sub.op, sub.args);
         if (!outcome.ok) {
+            if (args.atomic !== false && changed) {
+                outcome.issue.message = 'batch rolled back after ops[' + i + '] (' + sub.op + ') failed: ' + outcome.issue.message;
+                outcome.issue.rollback = true;
+            }
             aemcpAbort(outcome.issue);
+        }
+        if (args.mutating && args.mutating[i] === true) {
+            changed = true;
         }
         results.push(outcome.value);
     }
