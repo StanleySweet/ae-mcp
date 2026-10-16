@@ -228,3 +228,70 @@ describe('anchor.move_preserving', () => {
     expect(transformProp(layer, 'ADBE Position').value).toEqual([400, 300]);
   });
 });
+
+describe('expression.snippet', () => {
+  it('applies a named snippet to the property expression', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const scale = layerWithScale(ae);
+
+    const out = invoke(ctx, 'expression.snippet', {
+      comp: 'Main',
+      index: 1,
+      property: 'Scale',
+      snippet: 'wiggle',
+    });
+
+    expect(out.value).toMatchObject({ success: true, snippet: 'wiggle', enabled: true });
+    expect(scale.expression).toBe('wiggle(5, 20)');
+    expect(scale.expressionEnabled).toBe(true);
+  });
+
+  it.each(['wiggle', 'loop', 'delay', 'overshoot'])(
+    'applies the %s snippet and defaults to layer 1',
+    async (snippet) => {
+      const { ctx, ae } = await payloadContext();
+      createComp(ctx);
+      const scale = layerWithScale(ae);
+
+      const out = invoke(ctx, 'expression.snippet', {
+        comp: 'Main',
+        property: 'Scale',
+        snippet,
+      });
+
+      expect(out.value).toMatchObject({ success: true, snippet, enabled: true });
+      expect(scale.expression.length).toBeGreaterThan(0);
+      expect(scale.expressionEnabled).toBe(true);
+    },
+  );
+
+  it('reports an unknown snippet name', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const scale = layerWithScale(ae);
+
+    const out = invoke(ctx, 'expression.snippet', {
+      comp: 'Main',
+      property: 'Scale',
+      snippet: 'bounce',
+    });
+
+    expect(out.value).toEqual({ success: false, error: 'Unknown snippet: bounce' });
+    expect(scale.expression).toBe('');
+  });
+
+  it('reports a missing property', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    layerWithScale(ae);
+
+    const out = invoke(ctx, 'expression.snippet', {
+      comp: 'Main',
+      property: 'Opacity',
+      snippet: 'loop',
+    });
+
+    expect(out.value).toEqual({ success: false, error: 'Property not found' });
+  });
+});

@@ -105,4 +105,6 @@ A property whose value comes from an expression (for example one added by a pres
 `keyframe.ease_preset`, `anchor.move_preserving`, `effect.set_property` or `effect.set_keyframe` against such a property, the result carries a
 `warning` naming the property and the expression, so Claude can edit the driving control
 instead. `ae_expression_report` lists every expression-driven property on a comp's layers.
+`expression.snippet` applies a named expression snippet (`wiggle`, `loop`, `delay`,
+`overshoot`) to a property by setting `Property.expression` directly.
 

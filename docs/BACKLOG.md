@@ -365,7 +365,7 @@ script entry point, so there is nothing to apply. Story 14.5 covers the need ins
 
 - **E14-12** feat(ops): ease.preset for selected keyframes (ease in, ease out, overshoot) ✅ 2026-10-16, landed as the `keyframe.ease_preset` op (an op's name prefix must equal its category, `operations.test.ts`), closes #143.
 - **E14-13** feat(ops): anchor.move_preserving for nine anchor positions ✅ 2026-10-16, landed as the `anchor.move_preserving` op (nine position names + literal point), closes #144.
-- **E14-14** feat(ops): expression.snippet library (wiggle, loop, delay, overshoot)
+- **E14-14** feat(ops): expression.snippet library (wiggle, loop, delay, overshoot) ✅ 2026-10-16, landed as the `expression.snippet` op (four named snippets applied via `Property.expression`), closes #145.
 - **E14-15** feat(ops): rig.null_controller linking layers to a null with sliders
 
 Delay and stagger reuse E9-6.

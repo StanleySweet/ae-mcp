@@ -1350,6 +1350,48 @@ AEMCP.register('expression.check_errors', function (args) {
     return { errors: errors };
 });
 
+// E14-14: apply a named expression snippet to a layer property.
+// Expression language ref: https://ae-expressions.docsforadobe.dev/objects/property/
+// wiggle/loopOut/valueAtTime are documented forms; overshoot is an original
+// damped-sine spring built from velocityAtTime + Math (rule 5: no vendor code).
+AEMCP.register('expression.snippet', function (args) {
+    var snippetName = args && args.snippet ? args.snippet : null;
+    var snippets = {
+        wiggle: 'wiggle(5, 20)',
+        loop: 'loopOut("cycle")',
+        delay: 'valueAtTime(time - 0.5)',
+        overshoot: 'if (numKeys > 1) { t = time - key(numKeys).time; if (t > 0) { value + velocityAtTime(key(numKeys).time - thisComp.frameDuration) * 0.3 * Math.sin(t * 12) * Math.exp(-t * 6); } else { value; } } else { value; }'
+    };
+    var code = snippets[snippetName];
+    if (!code) {
+        return { success: false, error: 'Unknown snippet: ' + snippetName };
+    }
+    var compName = args && args.comp ? args.comp : null;
+    var propertyName = args && args.property ? args.property : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var prop = aemcpResolveProperty(layer, propertyName);
+    if (!prop) return { success: false, error: 'Property not found' };
+    // Setting expression auto-enables it when the string is valid (guide), but
+    // enable explicitly so the mock and real AE agree.
+    prop.expression = code;
+    prop.expressionEnabled = true;
+    return { success: true, snippet: snippetName, expression: code, enabled: prop.expressionEnabled };
+});
+
 // Effect operation handlers (mutating, run via ae_do).
 AEMCP.register('effect.apply', function (args) {
     var compName = args && args.comp ? args.comp : null;

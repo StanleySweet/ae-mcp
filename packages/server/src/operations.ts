@@ -214,6 +214,16 @@ export function defaultOperationRegistry(): OperationRegistry {
     readOnly: true,
     schema: { comp, property: propertyName },
   }));
+  register(
+    operation('expression.snippet', 'expression', 'Apply a named expression snippet (wiggle, loop, delay, overshoot) to a property.', {
+      schema: {
+        comp,
+        index: layerIndex,
+        property: propertyName,
+        snippet: { type: 'string', enum: ['wiggle', 'loop', 'delay', 'overshoot'] },
+      },
+    }),
+  );
 
   // Effect (targets layer 1 unless the handler reads an index).
   register(operation('effect.apply', 'effect', 'Apply an effect to layer 1.', {

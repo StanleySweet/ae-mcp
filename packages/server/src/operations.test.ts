@@ -37,6 +37,7 @@ const BRIDGE_OPS = [
   'expression.set',
   'expression.clear',
   'expression.check_errors',
+  'expression.snippet',
   'effect.apply',
   'effect.list_on_layer',
   'effect.list_available',
