@@ -945,8 +945,25 @@ AEMCP.register('layer.bounds', function (args) {
     }
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var bounds = layer.bounds ? layer.bounds() : { left: 0, top: 0, right: comp.width, bottom: comp.height };
-    return { left: bounds.left, top: bounds.top, right: bounds.right, bottom: bounds.bottom };
+    if (typeof layer.sourceRectAtTime !== 'function') {
+        return { success: false, error: 'Layer does not report bounds: ' + layer.name };
+    }
+    var time = args && typeof args.time === 'number' ? args.time : (layer.time || 0);
+    // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#sourcerectattime
+    // The rect is in layer space; map both corners through sourcePointToComp to
+    // report a comp-space box (scale/rotation/parenting are folded in by AE).
+    // Ref: https://ae-scripting.docsforadobe.dev/layer/avlayer/#avlayersourcepointtocomp
+    var rect = layer.sourceRectAtTime(time, true);
+    var topLeft = layer.sourcePointToComp([rect.left, rect.top]);
+    var bottomRight = layer.sourcePointToComp([rect.left + rect.width, rect.top + rect.height]);
+    return {
+        left: topLeft[0],
+        top: topLeft[1],
+        right: bottomRight[0],
+        bottom: bottomRight[1],
+        width: rect.width,
+        height: rect.height
+    };
 });
 
 // A property carrying an expression ignores direct value or keyframe edits: the
@@ -964,6 +981,7 @@ function aemcpWithExpressionWarning(prop, result) {
 AEMCP.register('property.get', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.name ? args.name : null;
+    var layerIndex = args && args.index ? args.index : 1;
     var project = app.project;
     var comp;
     for (var i = 1; i <= project.numItems; i++) {
@@ -976,9 +994,9 @@ AEMCP.register('property.get', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layer(1);
+    var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
+    var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
     return { name: prop.name, value: prop.value };
 });
@@ -1015,7 +1033,9 @@ AEMCP.register('property.list', function (args) {
 AEMCP.register('property.set', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.name ? args.name : null;
-    var value = args && args.value ? args.value : null;
+    // 0, [], "" and false are valid values, so test presence, not truthiness.
+    var value = args && args.value !== undefined ? args.value : null;
+    var layerIndex = args && args.index ? args.index : 1;
     var project = app.project;
     var comp;
     for (var i = 1; i <= project.numItems; i++) {
@@ -1028,9 +1048,9 @@ AEMCP.register('property.set', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layer(1);
+    var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
+    var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
     prop.setValue(value);
     return aemcpWithExpressionWarning(prop, { success: true });
@@ -1041,7 +1061,8 @@ AEMCP.register('keyframe.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && args.index ? args.index : 1;
     var time = args && args.time ? args.time : 0;
-    var value = args && args.value ? args.value : [0, 0];
+    // 0 is a valid keyframe value (e.g. opacity off), so test presence, not truthiness.
+    var value = args && args.value !== undefined ? args.value : [0, 0];
     var propertyName = args && args.property ? args.property : null;
     var project = app.project;
     var comp;
@@ -1280,10 +1301,14 @@ AEMCP.register('anchor.move_preserving', function (args) {
 });
 
 // Expression operation handlers (mutating, run via ae_do).
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpression
 AEMCP.register('expression.set', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.property ? args.property : null;
-    var value = args && args.value ? args.value : null;
+    // An empty string is a valid expression (it clears the driver), so test
+    // presence, not truthiness.
+    var value = args && args.value !== undefined ? args.value : null;
+    var layerIndex = args && args.index ? args.index : 1;
     var project = app.project;
     var comp;
     for (var i = 1; i <= project.numItems; i++) {
@@ -1296,17 +1321,21 @@ AEMCP.register('expression.set', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layer(1);
+    var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
+    var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
-    prop.setValue(value);
-    return { success: true };
+    // Setting a valid expression auto-enables it; enable explicitly so the mock
+    // and real AE agree.
+    prop.expression = value;
+    prop.expressionEnabled = value !== '';
+    return { success: true, expression: prop.expression, enabled: prop.expressionEnabled };
 });
 
 AEMCP.register('expression.clear', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.property ? args.property : null;
+    var layerIndex = args && args.index ? args.index : 1;
     var project = app.project;
     var comp;
     for (var i = 1; i <= project.numItems; i++) {
@@ -1319,17 +1348,19 @@ AEMCP.register('expression.clear', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layer(1);
+    var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
+    var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
-    prop.setValue(null);
-    return { success: true };
+    prop.expression = '';
+    prop.expressionEnabled = false;
+    return { success: true, enabled: prop.expressionEnabled };
 });
 
 AEMCP.register('expression.check_errors', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.property ? args.property : null;
+    var layerIndex = args && args.index ? args.index : 1;
     var project = app.project;
     var comp;
     for (var i = 1; i <= project.numItems; i++) {
@@ -1342,12 +1373,12 @@ AEMCP.register('expression.check_errors', function (args) {
     if (!comp) {
         return { success: false, error: 'Composition not found' };
     }
-    var layer = comp.layer(1);
+    var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var prop = layer.property(propertyName);
+    var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
-    var errors = prop.check_errors ? prop.check_errors() : [];
-    return { errors: errors };
+    // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpressionerror
+    return { success: true, error: prop.expressionError || '' };
 });
 
 // E14-14: apply a named expression snippet to a layer property.
@@ -1522,7 +1553,7 @@ AEMCP.register('effect.list_available', function (args) {
 AEMCP.register('effect.set_property', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.property ? args.property : null;
-    var value = args && args.value ? args.value : null;
+    var value = args && args.value !== undefined ? args.value : null;
     var project = app.project;
     var comp;
     for (var i = 1; i <= project.numItems; i++) {
@@ -1547,7 +1578,7 @@ AEMCP.register('effect.set_keyframe', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && args.index ? args.index : 1;
     var time = args && args.time ? args.time : 0;
-    var value = args && args.value ? args.value : null;
+    var value = args && args.value !== undefined ? args.value : null;
     var propertyName = args && args.property ? args.property : null;
     var project = app.project;
     var comp;
@@ -1980,6 +2011,51 @@ AEMCP.register('shape.read', function (args) {
     return { shape: details };
 });
 
+// Map a friendly justification name to the ParagraphJustification enum.
+// Ref: https://ae-scripting.docsforadobe.dev/text/textdocument/#textdocumentjustification
+function aemcpJustificationValue(name) {
+    if (name === 'left') return ParagraphJustification.LEFT_JUSTIFY;
+    if (name === 'center') return ParagraphJustification.CENTER_JUSTIFY;
+    if (name === 'right') return ParagraphJustification.RIGHT_JUSTIFY;
+    if (name === 'justify') return ParagraphJustification.FULL_JUSTIFY_LASTLINE_LEFT;
+    return null;
+}
+
+// Map a ParagraphJustification enum value back to a friendly name.
+function aemcpJustificationName(value) {
+    if (value === ParagraphJustification.CENTER_JUSTIFY) return 'center';
+    if (value === ParagraphJustification.RIGHT_JUSTIFY) return 'right';
+    if (value === ParagraphJustification.FULL_JUSTIFY_LASTLINE_LEFT ||
+        value === ParagraphJustification.FULL_JUSTIFY_LASTLINE_RIGHT ||
+        value === ParagraphJustification.FULL_JUSTIFY_LASTLINE_CENTER ||
+        value === ParagraphJustification.FULL_JUSTIFY_LASTLINE_FULL) {
+        return 'justify';
+    }
+    return 'left';
+}
+
+// Copy every present style argument onto a TextDocument. Returns { changed } or
+// { error } so callers only setValue when something actually changed.
+// Ref: https://ae-scripting.docsforadobe.dev/text/textdocument/
+function aemcpApplyTextStyle(textDoc, args) {
+    var changed = false;
+    if (args.text !== undefined) { textDoc.text = args.text; changed = true; }
+    if (args.fontSize !== undefined) { textDoc.fontSize = args.fontSize; changed = true; }
+    if (args.fillColor !== undefined) { textDoc.fillColor = args.fillColor; changed = true; }
+    if (args.font !== undefined) { textDoc.font = args.font; changed = true; }
+    if (args.tracking !== undefined) { textDoc.tracking = args.tracking; changed = true; }
+    if (args.leading !== undefined) { textDoc.leading = args.leading; changed = true; }
+    if (args.justification !== undefined) {
+        var justification = aemcpJustificationValue(args.justification);
+        if (justification === null) {
+            return { error: 'Unknown justification: ' + args.justification };
+        }
+        textDoc.justification = justification;
+        changed = true;
+    }
+    return { changed: changed };
+}
+
 AEMCP.register('text.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var textString = args && args.text ? args.text : 'Text';
@@ -1994,13 +2070,11 @@ AEMCP.register('text.add', function (args) {
     }
     if (!comp) return { success: false, error: 'Composition not found' };
     var textLayer = comp.layers.addText(textString);
-    if (args && args.fontSize) {
-        var textProp = textLayer.property('Source Text');
-        var textDoc = textProp.value;
-        textDoc.fontSize = args.fontSize;
-        if (args.fillColor) textDoc.fillColor = args.fillColor;
-        textProp.setValue(textDoc);
-    }
+    var textProp = textLayer.property('Source Text');
+    var textDoc = textProp.value;
+    var result = aemcpApplyTextStyle(textDoc, args || {});
+    if (result.error) return { success: false, error: result.error };
+    if (result.changed) textProp.setValue(textDoc);
     return { success: true, layerIndex: textLayer.index };
 });
 
@@ -2022,10 +2096,9 @@ AEMCP.register('text.set', function (args) {
     var textProp = layer.property('Source Text');
     if (!textProp) return { success: false, error: 'Source Text not found' };
     var textDoc = textProp.value;
-    if (args.text) textDoc.text = args.text;
-    if (args.fontSize) textDoc.fontSize = args.fontSize;
-    if (args.fillColor) textDoc.fillColor = args.fillColor;
-    textProp.setValue(textDoc);
+    var result = aemcpApplyTextStyle(textDoc, args || {});
+    if (result.error) return { success: false, error: result.error };
+    if (result.changed) textProp.setValue(textDoc);
     return { success: true };
 });
 
@@ -2050,7 +2123,12 @@ AEMCP.register('text.read', function (args) {
     return {
         text: textDoc.text,
         fontSize: textDoc.fontSize,
-        font: textDoc.font
+        font: textDoc.font,
+        fontFamily: textDoc.fontFamily,
+        fontStyle: textDoc.fontStyle,
+        justification: aemcpJustificationName(textDoc.justification),
+        tracking: textDoc.tracking,
+        leading: textDoc.leading
     };
 });
 

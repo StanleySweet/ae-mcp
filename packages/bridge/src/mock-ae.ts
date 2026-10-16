@@ -238,9 +238,23 @@ export class MockKeyframeEase {
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#keyframeinterpolationtype
 export const MockKeyframeInterpolationType = { LINEAR: 1, BEZIER: 2, HOLD: 3 };
 
+// Ref: https://ae-scripting.docsforadobe.dev/text/textdocument/#textdocumentjustification
+export const MockParagraphJustification = {
+  LEFT_JUSTIFY: 7413,
+  RIGHT_JUSTIFY: 7414,
+  CENTER_JUSTIFY: 7415,
+  FULL_JUSTIFY_LASTLINE_LEFT: 7416,
+  FULL_JUSTIFY_LASTLINE_RIGHT: 7417,
+  FULL_JUSTIFY_LASTLINE_CENTER: 7418,
+  FULL_JUSTIFY_LASTLINE_FULL: 7419,
+  MULTIPLE_JUSTIFICATIONS: 7420,
+};
+
 export class MockProperty {
   expressionEnabled = false;
   expression = '';
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpressionerror
+  expressionError = '';
   readonly keys: { time: number; value: unknown }[] = [];
   // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyselectedkeys
   selectedKeys: number[] = [];
@@ -456,7 +470,17 @@ export class MockAVLayer extends MockLayer {
   }
 }
 
-export class MockTextLayer extends MockAVLayer {}
+export class MockTextLayer extends MockAVLayer {
+  // Real AE resolves `layer.property('Source Text')` into the text properties
+  // group; mirror that shortcut so handlers can address it directly.
+  property(indexOrName: number | string): MockProperty | MockPropertyGroup | null {
+    if (indexOrName === 'Source Text' || indexOrName === 'ADBE Text Document') {
+      const text = super.property('ADBE Text Properties') as MockPropertyGroup | null;
+      return text ? text.property(indexOrName) : null;
+    }
+    return super.property(indexOrName);
+  }
+}
 
 export class MockShapeLayer extends MockAVLayer {}
 
@@ -535,6 +559,11 @@ export class MockLayerCollection {
         text: sourceText ?? '',
         fontSize: 72,
         font: 'ArialMT',
+        fontFamily: 'Arial',
+        fontStyle: 'Regular',
+        justification: MockParagraphJustification.LEFT_JUSTIFY,
+        tracking: 0,
+        leading: 0,
         fillColor: [1, 1, 1],
       }),
     );
@@ -889,6 +918,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     MarkerValue: MockMarkerValue,
     KeyframeEase: MockKeyframeEase,
     KeyframeInterpolationType: MockKeyframeInterpolationType,
+    ParagraphJustification: MockParagraphJustification,
     RQItemStatus,
     File: function (path: string): MockFile {
       return new MockFile(ae, path);

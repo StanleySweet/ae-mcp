@@ -13,6 +13,7 @@ import {
   MockShapeLayer,
   MockAVLayer,
   MockProperty,
+  MockPropertyGroup,
   runInMockAE,
 } from './mock-ae.js';
 
@@ -201,6 +202,223 @@ describe('expression-driver warnings', () => {
 
     expect(out.value).toEqual({ success: true });
   });
+
+  it('sets a value of 0 instead of treating it as missing', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const opacity = new MockProperty('Opacity', 'ADBE Opacity', 100);
+    layer.add(opacity);
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'property.set', { comp: 'Main', name: 'Opacity', value: 0 });
+
+    expect(out.value).toEqual({ success: true });
+    expect(opacity.value).toBe(0);
+  });
+});
+
+describe('property layer index', () => {
+  it('reads the property on the requested layer, not layer 1', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const first = new MockAVLayer('First', 'Layer');
+    first.add(new MockProperty('Opacity', 'ADBE Opacity', 100));
+    comp.addLayer(first);
+    const second = new MockAVLayer('Second', 'Layer');
+    second.add(new MockProperty('Opacity', 'ADBE Opacity', 25));
+    comp.addLayer(second);
+
+    const out = invoke(ctx, 'property.get', { comp: 'Main', index: 2, name: 'Opacity' });
+
+    expect(out.value).toEqual({ name: 'Opacity', value: 25 });
+  });
+
+  it('writes the property on the requested layer', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    comp.addLayer(new MockAVLayer('First', 'Layer'));
+    const second = new MockAVLayer('Second', 'Layer');
+    const opacity = new MockProperty('Opacity', 'ADBE Opacity', 100);
+    second.add(opacity);
+    comp.addLayer(second);
+
+    const out = invoke(ctx, 'property.set', { comp: 'Main', index: 2, name: 'Opacity', value: 0 });
+
+    expect(out.value).toEqual({ success: true });
+    expect(opacity.value).toBe(0);
+  });
+
+  it('resolves a nested property by its slash path', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+    const position = new MockProperty('Position', 'ADBE Position', [10, 20]);
+    transform.add(position);
+    layer.add(transform);
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'property.get', { comp: 'Main', index: 1, name: 'Transform/Position' });
+
+    expect(out.value).toEqual({ name: 'Position', value: [10, 20] });
+  });
+});
+
+describe('expression handlers', () => {
+  it('sets and enables an expression on the requested layer', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const first = new MockAVLayer('First', 'Layer');
+    first.add(new MockProperty('Position', 'ADBE Position', [0, 0]));
+    comp.addLayer(first);
+    const second = new MockAVLayer('Second', 'Layer');
+    const position = new MockProperty('Position', 'ADBE Position', [0, 0]);
+    second.add(position);
+    comp.addLayer(second);
+
+    const out = invoke(ctx, 'expression.set', {
+      comp: 'Main',
+      index: 2,
+      property: 'Position',
+      value: 'wiggle(2, 30)',
+    });
+
+    expect(out.value).toEqual({ success: true, expression: 'wiggle(2, 30)', enabled: true });
+    expect(position.expression).toBe('wiggle(2, 30)');
+    expect(position.expressionEnabled).toBe(true);
+  });
+
+  it('clears and disables the expression', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const position = new MockProperty('Position', 'ADBE Position', [0, 0]);
+    position.expression = 'wiggle(2, 30)';
+    position.expressionEnabled = true;
+    layer.add(position);
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'expression.clear', { comp: 'Main', index: 1, property: 'Position' });
+
+    expect(out.value).toEqual({ success: true, enabled: false });
+    expect(position.expression).toBe('');
+    expect(position.expressionEnabled).toBe(false);
+  });
+
+  it('reports the expression error and an empty string when healthy', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const position = new MockProperty('Position', 'ADBE Position', [0, 0]);
+    layer.add(position);
+    comp.addLayer(layer);
+
+    expect(
+      invoke(ctx, 'expression.check_errors', { comp: 'Main', index: 1, property: 'Position' }).value,
+    ).toEqual({ success: true, error: '' });
+
+    position.expressionError = 'missing ;';
+    expect(
+      invoke(ctx, 'expression.check_errors', { comp: 'Main', index: 1, property: 'Position' }).value,
+    ).toEqual({ success: true, error: 'missing ;' });
+  });
+});
+
+describe('text handlers', () => {
+  it('applies a fill color even without a font size', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+
+    invoke(ctx, 'text.add', { comp: 'Main', text: 'Hi', fillColor: [1, 0, 0] });
+
+    const layer = (ae.project.item(1) as MockCompItem).layer(1) as MockTextLayer;
+    const doc = (layer.property('Source Text') as MockProperty).value as { fillColor: number[] };
+    expect(doc.fillColor).toEqual([1, 0, 0]);
+  });
+
+  it('sets and reads back font, justification, tracking and leading', async () => {
+    const { ctx } = await payloadContext();
+    createComp(ctx);
+    invoke(ctx, 'text.add', { comp: 'Main', text: 'Hi' });
+
+    invoke(ctx, 'text.set', {
+      comp: 'Main',
+      layerIndex: 1,
+      font: 'TimesNewRomanPSMT',
+      justification: 'center',
+      tracking: 50,
+      leading: 100,
+    });
+
+    const out = invoke(ctx, 'text.read', { comp: 'Main', layerIndex: 1 });
+
+    expect(out.value).toMatchObject({
+      text: 'Hi',
+      font: 'TimesNewRomanPSMT',
+      justification: 'center',
+      tracking: 50,
+      leading: 100,
+    });
+  });
+
+  it('rejects an unknown justification', async () => {
+    const { ctx } = await payloadContext();
+    createComp(ctx);
+    invoke(ctx, 'text.add', { comp: 'Main', text: 'Hi' });
+
+    const out = invoke(ctx, 'text.set', { comp: 'Main', layerIndex: 1, justification: 'sideways' });
+
+    expect(out.value).toMatchObject({ success: false });
+    expect((out.value as { error: string }).error).toContain('sideways');
+  });
+});
+
+describe('layer.bounds', () => {
+  it('reports the layer bounds box, not the comp rect', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    layer.width = 200;
+    layer.height = 100;
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'layer.bounds', { comp: 'Main', index: 1 });
+
+    expect(out.value).toEqual({
+      left: -100,
+      top: -50,
+      right: 100,
+      bottom: 50,
+      width: 200,
+      height: 100,
+    });
+  });
+
+  it('is not the comp rect even when the layer fills the comp', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    layer.width = 40;
+    layer.height = 20;
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'layer.bounds', { comp: 'Main', index: 1 }) as {
+      value: { left: number; top: number; right: number; bottom: number };
+    };
+
+    expect(out.value.right).toBe(20);
+    expect(out.value.bottom).toBe(10);
+  });
 });
 
 describe('marker handlers', () => {
@@ -282,6 +500,28 @@ describe('keyframe handlers', () => {
     });
     expect(removed.value).toEqual({ success: true });
     expect(scale.numKeys).toBe(0);
+  });
+
+  it('keys a value of 0 instead of substituting the [0, 0] default', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const opacity = new MockProperty('Opacity', 'ADBE Opacity', 100);
+    layer.add(opacity);
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'keyframe.add', {
+      comp: 'Main',
+      index: 1,
+      time: 1,
+      value: 0,
+      property: 'Opacity',
+    });
+
+    expect(out.value).toMatchObject({ success: true });
+    expect(opacity.numKeys).toBe(1);
+    expect(opacity.keyValue(1)).toBe(0);
   });
 
   it('set_easing passes one KeyframeEase per value dimension', async () => {

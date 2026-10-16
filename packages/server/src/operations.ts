@@ -146,22 +146,22 @@ export function defaultOperationRegistry(): OperationRegistry {
     destructive: true,
     schema: { comp, index: layerIndex },
   }));
-  register(operation('layer.bounds', 'layer', 'Report a layer bounds box.', {
+  register(operation('layer.bounds', 'layer', 'Report a layer bounds box in composition space.', {
     readOnly: true,
-    schema: { comp, index: layerIndex },
+    schema: { comp, index: layerIndex, time: { type: 'number' } },
   }));
 
   // Property.
-  register(operation('property.get', 'property', 'Read a layer 1 property value.', {
+  register(operation('property.get', 'property', 'Read a property value from a layer.', {
     readOnly: true,
-    schema: { comp, name: propertyName },
+    schema: { comp, index: layerIndex, name: propertyName },
   }));
   register(operation('property.list', 'property', 'List layer properties.', {
     readOnly: true,
     schema: { comp },
   }));
-  register(operation('property.set', 'property', 'Set a layer 1 property value.', {
-    schema: { comp, name: propertyName, value: {} },
+  register(operation('property.set', 'property', 'Set a property value on a layer.', {
+    schema: { comp, index: layerIndex, name: propertyName, value: {} },
   }));
 
   // Keyframe.
@@ -204,15 +204,15 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
 
   // Expression.
-  register(operation('expression.set', 'expression', 'Set an expression on a layer 1 property.', {
-    schema: { comp, property: propertyName, value: {} },
+  register(operation('expression.set', 'expression', 'Set an expression on a layer property.', {
+    schema: { comp, index: layerIndex, property: propertyName, value: {} },
   }));
-  register(operation('expression.clear', 'expression', 'Clear the expression on a layer 1 property.', {
-    schema: { comp, property: propertyName },
+  register(operation('expression.clear', 'expression', 'Clear the expression on a layer property.', {
+    schema: { comp, index: layerIndex, property: propertyName },
   }));
-  register(operation('expression.check_errors', 'expression', 'Check a layer 1 property expression errors.', {
+  register(operation('expression.check_errors', 'expression', 'Check a layer property expression for errors.', {
     readOnly: true,
-    schema: { comp, property: propertyName },
+    schema: { comp, index: layerIndex, property: propertyName },
   }));
   register(
     operation('expression.snippet', 'expression', 'Apply a named expression snippet (wiggle, loop, delay, overshoot) to a property.', {
@@ -365,14 +365,33 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Text.
   register(operation('text.add', 'text', 'Add a text layer with optional styling.', {
-    schema: { comp, text: comp, fontSize: { type: 'number' }, fillColor: { type: 'array' } },
+    schema: {
+      comp,
+      text: comp,
+      fontSize: { type: 'number' },
+      fillColor: { type: 'array' },
+      font: { type: 'string' },
+      justification: { type: 'string', enum: ['left', 'center', 'right', 'justify'] },
+      tracking: { type: 'number' },
+      leading: { type: 'number' },
+    },
   }));
   register(
-    operation('text.set', 'text', 'Set text, font size or color on an existing text layer.', {
-      schema: { comp, layerIndex, text: comp, fontSize: { type: 'number' }, fillColor: { type: 'array' } },
+    operation('text.set', 'text', 'Set text and styling on an existing text layer.', {
+      schema: {
+        comp,
+        layerIndex,
+        text: comp,
+        fontSize: { type: 'number' },
+        fillColor: { type: 'array' },
+        font: { type: 'string' },
+        justification: { type: 'string', enum: ['left', 'center', 'right', 'justify'] },
+        tracking: { type: 'number' },
+        leading: { type: 'number' },
+      },
     }),
   );
-  register(operation('text.read', 'text', 'Read text from a text layer.', {
+  register(operation('text.read', 'text', 'Read text and styling from a text layer.', {
     readOnly: true,
     schema: { comp, layerIndex },
   }));
