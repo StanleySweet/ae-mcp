@@ -41,7 +41,7 @@ describe('buildAeContext', () => {
   });
 
   it('reports disconnected with a fix when there is no heartbeat', async () => {
-    const context = await buildAeContext(await queueRoot(false));
+    const context = await buildAeContext(await queueRoot(false), { isAeRunning: async () => true });
     expect(context.connected).toBe(false);
     expect(context.fix).toMatch(/Open After Effects/);
   });

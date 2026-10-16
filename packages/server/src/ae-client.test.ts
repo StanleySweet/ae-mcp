@@ -147,7 +147,8 @@ describe('ae client', () => {
       name: 'broken',
       call: () => Promise.reject(new Error('boom')),
     };
-    const client = createAEClient({ transport, root: '/unused' });
+    // Stub the process check: CI has no After Effects running (#198).
+    const client = createAEClient({ transport, root: '/unused', isAeRunning: async () => true });
     const result = await client.call('echo');
     if (result.ok) {
       throw new Error(`expected a failure, got ${JSON.stringify(result)}`);
