@@ -52,6 +52,22 @@ public sealed class SetupService
             return new RepairResult(false, core.Checks);
         }
 
+        // A step can report success yet leave a missing or stale file, so re-read
+        // both targets and compare them with the bundled content before going on.
+        var verified = new[]
+        {
+            await InstallVerify.PayloadAsync(_root, payload),
+            await InstallVerify.LoaderAsync(resolved, loader),
+        };
+        var mismatches = verified.Where(result => !result.Ok).ToList();
+        if (mismatches.Count > 0)
+        {
+            var failed = new List<InstallerCheck>(core.Checks);
+            failed.AddRange(mismatches.Select(result =>
+                new InstallerCheck(result.Id, InstallerCheck.FailStatus, result.Reason)));
+            return new RepairResult(false, failed);
+        }
+
         var scriptingPref = await ScriptingPref.EnsureScriptingPrefAsync(resolved.AppName);
         var extension = await InstallMcpb.HandToClaudeAsync(McpbPath, environment.ClaudeDesktop);
         var checks = new List<InstallerCheck>(core.Checks) { scriptingPref, extension };
