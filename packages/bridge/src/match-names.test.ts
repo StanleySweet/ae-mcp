@@ -18,6 +18,7 @@ const DOCUMENTED = new Set([
   'ADBE Transform Group',
   'ADBE Anchor Point',
   'ADBE Position',
+  'ADBE Opacity',
   'ADBE Effect Parade',
   'ADBE Mask Parade',
   'ADBE Marker',

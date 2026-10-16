@@ -274,10 +274,10 @@ describe('expression.snippet', () => {
     const out = invoke(ctx, 'expression.snippet', {
       comp: 'Main',
       property: 'Scale',
-      snippet: 'bounce',
+      snippet: 'spin',
     });
 
-    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Unknown snippet: bounce' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Unknown snippet: spin' });
     expect(scale.expression).toBe('');
   });
 

@@ -620,9 +620,18 @@ export class MockShape {
   closed = true;
 }
 
+/** Real AE layers always carry a Transform group; give shape/text layers Position and Opacity. */
+function addTransform(layer: MockLayer): void {
+  const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+  transform.add(new MockProperty('Position', 'ADBE Position', [0, 0]));
+  transform.add(new MockProperty('Opacity', 'ADBE Opacity', 100));
+  layer.add(transform);
+}
+
 export class MockShapeLayer extends MockAVLayer {
   constructor(name: string, matchName: string) {
     super(name, matchName);
+    addTransform(this);
     this.add(new MockVectorsGroup('Contents', 'ADBE Root Vectors Group'));
   }
 }
@@ -744,6 +753,7 @@ export class MockLayerCollection {
       }),
     );
     layer.add(textProperties);
+    addTransform(layer);
     return this.comp.addLayer(layer);
   }
 

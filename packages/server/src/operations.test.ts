@@ -45,6 +45,8 @@ const BRIDGE_OPS = [
   'expression.clear',
   'expression.check_errors',
   'expression.snippet',
+  'text.animate',
+  'template.lower_third',
   'rig.null_controller',
   'effect.apply',
   'effect.list_on_layer',

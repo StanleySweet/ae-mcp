@@ -11,6 +11,7 @@ var AEMCP_MATCH = {
     TRANSFORM: 'ADBE Transform Group',
     ANCHOR_POINT: 'ADBE Anchor Point',
     POSITION: 'ADBE Position',
+    OPACITY: 'ADBE Opacity',
     EFFECTS: 'ADBE Effect Parade',
     MASKS: 'ADBE Mask Parade',
     // Not in the scripting guide; read from live fr_FR AE 26.5 (#177).
@@ -1379,15 +1380,47 @@ AEMCP.register('expression.check_errors', function (args) {
 // Expression language ref: https://ae-expressions.docsforadobe.dev/objects/property/
 // wiggle/loopOut/valueAtTime are documented forms; overshoot is an original
 // damped-sine spring built from velocityAtTime + Math (rule 5: no vendor code).
+// A numeric snippet parameter: `def` when absent, else a finite number >= min.
+function aemcpSnippetNumber(args, key, def, min) {
+    var v = args && args[key] !== undefined ? args[key] : def;
+    if (typeof v !== 'number' || !isFinite(v) || v < min) {
+        aemcpAbortArgs(key + ' must be a number >= ' + min);
+    }
+    return v;
+}
+
+// Expression source for a snippet name, or null when unknown. bounce/inertia
+// are original velocityAtTime + Math formulas; time_counter/countdown render
+// the comp time as text (Source Text expressions).
+function aemcpSnippetCode(name, args) {
+    if (name === 'wiggle') return 'wiggle(5, 20)';
+    if (name === 'loop') return 'loopOut("cycle")';
+    if (name === 'delay') return 'valueAtTime(time - 0.5)';
+    if (name === 'overshoot') {
+        return 'if (numKeys > 1) { t = time - key(numKeys).time; if (t > 0) { value + velocityAtTime(key(numKeys).time - thisComp.frameDuration) * 0.3 * Math.sin(t * 12) * Math.exp(-t * 6); } else { value; } } else { value; }';
+    }
+    if (name === 'loop_pingpong') return 'loopOut("pingpong")';
+    if (name === 'bounce') {
+        var amp = aemcpSnippetNumber(args, 'amplitude', 0.1, 0);
+        var freq = aemcpSnippetNumber(args, 'frequency', 2, 0.001);
+        var decay = aemcpSnippetNumber(args, 'decay', 5, 0);
+        return 'n = 0; if (numKeys > 0) { n = nearestKey(time).index; if (key(n).time > time) n--; } if (n == 0) { value; } else { t = time - key(n).time; value + velocityAtTime(key(n).time - thisComp.frameDuration / 10) * ' + amp + ' * Math.sin(' + freq + ' * t * 2 * Math.PI) / Math.exp(' + decay + ' * t); }';
+    }
+    if (name === 'inertia') {
+        return 'if (numKeys > 1 && time > key(numKeys).time) { t = time - key(numKeys).time; value + velocityAtTime(key(numKeys).time - thisComp.frameDuration / 10) * (1 - Math.exp(-4 * t)) / 4; } else { value; }';
+    }
+    if (name === 'time_counter') {
+        return 'Math.floor(time * ' + aemcpSnippetNumber(args, 'rate', 1, 0.001) + ').toString()';
+    }
+    if (name === 'countdown') {
+        return 'Math.max(0, Math.ceil(' + aemcpSnippetNumber(args, 'from', 10, 0) + ' - time)).toString()';
+    }
+    return null;
+}
+
 AEMCP.register('expression.snippet', function (args) {
     var snippetName = args && args.snippet ? args.snippet : null;
-    var snippets = {
-        wiggle: 'wiggle(5, 20)',
-        loop: 'loopOut("cycle")',
-        delay: 'valueAtTime(time - 0.5)',
-        overshoot: 'if (numKeys > 1) { t = time - key(numKeys).time; if (t > 0) { value + velocityAtTime(key(numKeys).time - thisComp.frameDuration) * 0.3 * Math.sin(t * 12) * Math.exp(-t * 6); } else { value; } } else { value; }'
-    };
-    var code = snippets[snippetName];
+    var code = aemcpSnippetCode(snippetName, args);
     if (!code) {
         return { success: false, error: 'Unknown snippet: ' + snippetName };
     }
@@ -1404,6 +1437,76 @@ AEMCP.register('expression.snippet', function (args) {
     prop.expression = code;
     prop.expressionEnabled = true;
     return { success: true, snippet: snippetName, expression: code, enabled: prop.expressionEnabled };
+});
+
+// #192: expression-based text animation presets (no text-animator addProperty).
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpression
+// Ref: https://ae-expressions.docsforadobe.dev/globals/ (linear, ease, inPoint)
+AEMCP.register('text.animate', function (args) {
+    var preset = args && args.preset ? args.preset : null;
+    var duration = aemcpSnippetNumber(args, 'duration', 1, 0.001);
+    var comp = aemcpRequireComp(args && args.comp ? args.comp : null);
+    var layer = comp.layer(args && args.index ? args.index : 1);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    var span = 'inPoint, inPoint + ' + duration;
+    var prop, code;
+    if (preset === 'typewriter') {
+        // Ref: https://ae-scripting.docsforadobe.dev/layer/textlayer/
+        if (!(layer instanceof TextLayer)) return { success: false, error: 'typewriter needs a text layer' };
+        prop = layer.property(AEMCP_MATCH.TEXT_PROPERTIES).property(AEMCP_MATCH.TEXT_DOCUMENT);
+        code = 's = value.toString(); s.substr(0, Math.floor(linear(time, ' + span + ', 0, s.length)));';
+    } else if (preset === 'fade_in') {
+        prop = layer.property(AEMCP_MATCH.TRANSFORM).property(AEMCP_MATCH.OPACITY);
+        code = 'linear(time, ' + span + ', 0, 100)';
+    } else if (preset === 'slide_up') {
+        prop = layer.property(AEMCP_MATCH.TRANSFORM).property(AEMCP_MATCH.POSITION);
+        code = 'd = ease(time, ' + span + ', 50, 0); value + ' + (layer.threeDLayer ? '[0, d, 0]' : '[0, d]');
+    } else {
+        return { success: false, error: 'Unknown preset: ' + preset };
+    }
+    prop.expression = code;
+    prop.expressionEnabled = true;
+    return { success: true, preset: preset, property: prop.matchName, expression: code, duration: duration };
+});
+
+// #192: lower third = bar (shape.add) + title/subtitle (text.add), each sliding
+// in with eased Position keyframes. One undo group (the job's).
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetvalueattime
+AEMCP.register('template.lower_third', function (args) {
+    var title = args && typeof args.title === 'string' && args.title !== '' ? args.title : null;
+    if (title === null) aemcpAbortArgs('title is required');
+    var duration = aemcpSnippetNumber(args, 'duration', 4, 1);
+    var compKey = args && args.comp ? args.comp : null;
+    var comp = aemcpRequireComp(compKey);
+    var x = comp.width * 0.08;
+    var y = comp.height * 0.8;
+    var barWidth = comp.width * 0.4;
+    var made = [];
+    var r = AEMCP.HANDLERS['shape.add']({ comp: compKey, type: 'rect', size: [barWidth, 110], fillColor: [0.1, 0.1, 0.1], layerName: 'Lower Third Bar' });
+    made.push({ layer: comp.layer(r.layerIndex), pos: [x + barWidth / 2 - 20, y - 25] });
+    r = AEMCP.HANDLERS['text.add']({ comp: compKey, text: title, fontSize: 48, fillColor: [1, 1, 1], justification: 'left' });
+    made.push({ layer: comp.layer(r.layerIndex), pos: [x, y - 10] });
+    if (args.subtitle) {
+        r = AEMCP.HANDLERS['text.add']({ comp: compKey, text: args.subtitle, fontSize: 28, fillColor: [0.8, 0.8, 0.8], justification: 'left' });
+        made.push({ layer: comp.layer(r.layerIndex), pos: [x, y + 25] });
+    }
+    var i, m, position, easeIn, easeOut, indices = [];
+    for (i = 0; i < made.length; i++) {
+        m = made[i];
+        m.layer.outPoint = m.layer.inPoint + duration;
+        position = m.layer.property(AEMCP_MATCH.TRANSFORM).property(AEMCP_MATCH.POSITION);
+        position.setValueAtTime(m.layer.inPoint, [m.pos[0] - barWidth, m.pos[1]]);
+        position.setValueAtTime(m.layer.inPoint + 0.5, m.pos);
+        // Easy-ease both keys, influence only (as keyframe.ease_preset); a
+        // spatial property takes a single KeyframeEase per direction.
+        // Ref: https://ae-scripting.docsforadobe.dev/other/keyframeease/
+        easeIn = [new KeyframeEase(0, 66.67)];
+        easeOut = [new KeyframeEase(0, 66.67)];
+        position.setTemporalEaseAtKey(1, easeIn, easeOut);
+        position.setTemporalEaseAtKey(2, easeIn, easeOut);
+        indices.push(m.layer.index);
+    }
+    return { success: true, layers: indices };
 });
 
 // E14-15: build a controller null with slider controls and parent layers to it.

@@ -16,6 +16,7 @@ export const operationCategories = [
   'mask',
   'shape',
   'text',
+  'template',
   'audio',
   'render',
   'font',

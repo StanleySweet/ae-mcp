@@ -273,12 +273,20 @@ export function defaultOperationRegistry(): OperationRegistry {
     schema: { comp, index: layerIndex, property: propertyName },
   }));
   register(
-    operation('expression.snippet', 'expression', 'Apply a named expression snippet (wiggle, loop, delay, overshoot) to a property.', {
+    operation('expression.snippet', 'expression', 'Apply a named expression snippet to a property: wiggle, loop, delay, overshoot, loop_pingpong, inertia, bounce (amplitude 0.1, frequency 2, decay 5), time_counter (Source Text, rate 1/s), countdown (Source Text, from seconds, default 10).', {
       schema: {
         comp,
         index: layerIndex,
         property: propertyName,
-        snippet: { type: 'string', enum: ['wiggle', 'loop', 'delay', 'overshoot'] },
+        snippet: {
+          type: 'string',
+          enum: ['wiggle', 'loop', 'delay', 'overshoot', 'loop_pingpong', 'inertia', 'bounce', 'time_counter', 'countdown'],
+        },
+        amplitude: { type: 'number' },
+        frequency: { type: 'number' },
+        decay: { type: 'number' },
+        rate: { type: 'number' },
+        from: { type: 'number' },
       },
     }),
   );
@@ -426,6 +434,17 @@ export function defaultOperationRegistry(): OperationRegistry {
   }));
 
   // Text.
+  register(operation('text.animate', 'text', 'Animate a layer with an expression preset: typewriter (text layer, Source Text), fade_in (Opacity) or slide_up (Position), over duration seconds (default 1) from the layer in point.', {
+    schema: {
+      comp,
+      index: layerIndex,
+      preset: { type: 'string', enum: ['typewriter', 'fade_in', 'slide_up'] },
+      duration: { type: 'number' },
+    },
+  }));
+  register(operation('template.lower_third', 'template', 'Build a lower third (bar, title, optional subtitle) sliding in with eased Position keyframes; returns the created layer indices. duration is the on-screen time in seconds (default 4).', {
+    schema: { comp, title: { type: 'string' }, subtitle: { type: 'string' }, duration: { type: 'number' } },
+  }));
   register(operation('text.add', 'text', 'Add a text layer with optional styling.', {
     schema: {
       comp,
