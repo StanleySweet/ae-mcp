@@ -9,6 +9,7 @@ import {
   type JobMessage,
   type ResultMessage,
 } from '@ae-mcp/protocol';
+import { isAeRunning as defaultIsAeRunning } from './ae-process.js';
 import { describeDialog, listDialogs, type AeDialog } from './dialogs.js';
 import { detectStall } from './stall.js';
 import type { Transport } from './transport.js';
@@ -36,6 +37,8 @@ export interface AEClientOptions {
   retry?: AE_BUSYRetryOptions | false;
   /** Dialogs open in AE, asked after a timeout or stall; default reads System Events. */
   checkDialogs?: () => Promise<AeDialog[]>;
+  /** Whether an After Effects process is running; default checks with `pgrep`. */
+  isAeRunning?: () => Promise<boolean>;
 }
 
 export interface AEClient {
@@ -93,6 +96,16 @@ export function createAEClient(options: AEClientOptions): AEClient {
       return found.ok ? found.value : [];
     });
 
+  const isAeRunning = options.isAeRunning ?? (() => defaultIsAeRunning());
+  // A failing process check is not evidence either way: treat it as running.
+  const aeNotRunning = async (): Promise<boolean> =>
+    (await isAeRunning().catch(() => true)) === false;
+  const notRunningResult = (): ResultMessage => ({
+    protocolVersion: PROTOCOL_VERSION,
+    ok: false,
+    error: makeError('AE_NOT_RUNNING', 'After Effects is not running.'),
+  });
+
   const purgeStale = async (): Promise<number> => {
     const cutoff = now() - staleMs;
     return (
@@ -106,6 +119,9 @@ export function createAEClient(options: AEClientOptions): AEClient {
       const result = await options.transport.call(job);
       if (result.ok || (result.error.code !== 'TIMEOUT' && result.error.code !== 'BRIDGE_NOT_LOADED')) {
         return result;
+      }
+      if (await aeNotRunning()) {
+        return notRunningResult();
       }
       const stall = await detectStall(options.root, {
         now,
@@ -138,6 +154,9 @@ export function createAEClient(options: AEClientOptions): AEClient {
         },
       };
     } catch (error) {
+      if (await aeNotRunning()) {
+        return notRunningResult();
+      }
       return {
         protocolVersion: PROTOCOL_VERSION,
         ok: false,

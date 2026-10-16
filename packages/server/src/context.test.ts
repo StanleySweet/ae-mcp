@@ -45,4 +45,23 @@ describe('buildAeContext', () => {
     expect(context.connected).toBe(false);
     expect(context.fix).toMatch(/Open After Effects/);
   });
+
+  it('reports aeRunning false with a launch fix when no process is running', async () => {
+    const context = await buildAeContext(await queueRoot(false), {
+      isAeRunning: async () => false,
+    });
+    expect(context).toMatchObject({
+      connected: false,
+      aeRunning: false,
+      fix: 'Launch After Effects, then retry.',
+    });
+  });
+
+  it('reports aeRunning true when the process is running', async () => {
+    const context = await buildAeContext(await queueRoot(true), {
+      isAeRunning: async () => true,
+    });
+    expect(context).toMatchObject({ connected: true, aeRunning: true });
+    expect(context.fix).toBeUndefined();
+  });
 });

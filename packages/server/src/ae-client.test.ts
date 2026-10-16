@@ -90,6 +90,7 @@ describe('ae client', () => {
       root,
       timeoutMs: 40,
       checkDialogs: async () => [],
+      isAeRunning: async () => true,
     });
     const result = await client.call('echo', {});
     if (result.ok) {
@@ -97,6 +98,48 @@ describe('ae client', () => {
     }
     expect(result.error.code).toBe('TIMEOUT');
     expect(result.error.hint).toBe(errorHints.TIMEOUT);
+  });
+
+  it('returns AE_NOT_RUNNING on a timeout when no After Effects process runs', async () => {
+    const root = await queueRoot();
+    const client = createAEClient({
+      transport: new FileQueueTransport(root),
+      root,
+      timeoutMs: 40,
+      checkDialogs: async () => [],
+      isAeRunning: async () => false,
+    });
+    const result = await client.call('echo', {});
+    if (result.ok) {
+      throw new Error(`expected a failure, got ${JSON.stringify(result)}`);
+    }
+    expect(result.error.code).toBe('AE_NOT_RUNNING');
+    expect(result.error.hint).toBe(errorHints.AE_NOT_RUNNING);
+  });
+
+  it('returns AE_NOT_RUNNING when the transport throws and no process runs', async () => {
+    const transport: Transport = {
+      name: 'broken',
+      call: () => Promise.reject(new Error('boom')),
+    };
+    const client = createAEClient({ transport, root: '/unused', isAeRunning: async () => false });
+    const result = await client.call('echo');
+    expect(result).toMatchObject({ ok: false, error: { code: 'AE_NOT_RUNNING' } });
+  });
+
+  it('keeps the TIMEOUT when the process check fails', async () => {
+    const root = await queueRoot();
+    const client = createAEClient({
+      transport: new FileQueueTransport(root),
+      root,
+      timeoutMs: 40,
+      checkDialogs: async () => [],
+      isAeRunning: async () => {
+        throw new Error('pgrep unavailable');
+      },
+    });
+    const result = await client.call('echo', {});
+    expect(result).toMatchObject({ ok: false, error: { code: 'TIMEOUT' } });
   });
 
   it('maps a transport throw to BRIDGE_NOT_LOADED', async () => {
@@ -221,7 +264,12 @@ describe('ae client', () => {
         error: makeError('TIMEOUT', 'job exceeded its deadline'),
       }),
     };
-    const client = createAEClient({ transport, root, checkDialogs: async () => [] });
+    const client = createAEClient({
+      transport,
+      root,
+      checkDialogs: async () => [],
+      isAeRunning: async () => true,
+    });
     const result = await client.call('echo');
     if (result.ok) {
       throw new Error(`expected a failure, got ${JSON.stringify(result)}`);
@@ -244,6 +292,7 @@ describe('ae client', () => {
       transport,
       root,
       checkDialogs: async () => [{ title: 'Warning', texts: ['Save changes?'] }],
+      isAeRunning: async () => true,
     });
     const result = await client.call('echo');
     if (result.ok) {
@@ -270,6 +319,7 @@ describe('ae client', () => {
       checkDialogs: async () => {
         throw new Error('boom');
       },
+      isAeRunning: async () => true,
     });
     const result = await client.call('echo');
     expect(result).toMatchObject({ ok: false, error: { code: 'TIMEOUT' } });
