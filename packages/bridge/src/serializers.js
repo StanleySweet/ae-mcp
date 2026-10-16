@@ -246,7 +246,9 @@ function aemcpSerializeLayer(layer) {
         startTime: aemcpRound(layer.startTime),
         stretch: aemcpRound(layer.stretch),
         parentIndex: layer.parent ? layer.parent.index : null,
-        label: layer.label
+        label: layer.label,
+        // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layernulllayer
+        nullLayer: layer.nullLayer === true
     };
     if (layer instanceof AVLayer) {
         out.width = layer.width;
@@ -256,6 +258,10 @@ function aemcpSerializeLayer(layer) {
         out.threeDLayer = layer.threeDLayer;
         out.sourceId = layer.source ? layer.source.id : null;
         out.sourceName = layer.source ? layer.source.name : null;
+        // Ref: https://ae-scripting.docsforadobe.dev/sources/solidsource/
+        if (layer.source && layer.source.mainSource instanceof SolidSource) {
+            out.solidColor = aemcpCoerceValue(layer.source.mainSource.color);
+        }
     }
     var transform = layer.property(AEMCP_MATCH.TRANSFORM);
     if (aemcpIsGroup(transform)) {

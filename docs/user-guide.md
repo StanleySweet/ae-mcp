@@ -98,6 +98,7 @@ setting is owned by the Setup app and Claude cannot change it; the environment v
 Operations flagged destructive:
 
 - `layer.delete`, `keyframe.remove`, `effect.remove` — deletes and removals
+- `project.open` — replaces the open project; refuses unless `force: true` when the open project has unsaved changes (or that cannot be told)
 - `command.execute` — runs an arbitrary menu command
 - `bulk.remove_unused` — a bulk plan that removes or replaces items
 - `eval.run` — arbitrary ExtendScript, always destructive and off unless explicitly enabled

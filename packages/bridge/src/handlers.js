@@ -11,6 +11,8 @@ var AEMCP_MATCH = {
     TRANSFORM: 'ADBE Transform Group',
     ANCHOR_POINT: 'ADBE Anchor Point',
     POSITION: 'ADBE Position',
+    SCALE: 'ADBE Scale',
+    ROTATION: 'ADBE Rotate Z',
     OPACITY: 'ADBE Opacity',
     EFFECTS: 'ADBE Effect Parade',
     MASKS: 'ADBE Mask Parade',
@@ -63,6 +65,129 @@ AEMCP.register('project.info', function () {
 // Snapshot the whole project as JSON, for later import (project.import_json).
 AEMCP.register('project.export_json', function () {
     return AEMCP.serialize.projectSnapshot();
+});
+
+// Save the open project, or Save As when `path` is given (no dialog either way).
+// A never-saved project has nowhere to go without a path: save() would prompt.
+// Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectsave
+AEMCP.register('project.save', function (args) {
+    var path = args && args.path ? args.path : null;
+    if (path) {
+        app.project.save(new File(path));
+    } else {
+        if (!app.project.file) {
+            aemcpAbortArgs('project has never been saved: pass path');
+        }
+        app.project.save();
+    }
+    return { file: app.project.file ? app.project.file.fsName : null };
+});
+
+// Open a project file. Project.dirty is "officially undocumented" in the guide
+// (AE 17.5+), so an unreadable flag counts as dirty: refuse unless force.
+// Forcing closes the current project without saving first so AE never shows a
+// save prompt; ae_do's destructive guard already increment-saved it.
+// Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectdirty
+// Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectclose
+// Ref: https://ae-scripting.docsforadobe.dev/general/application/#appopen
+AEMCP.register('project.open', function (args) {
+    var path = args && args.path ? args.path : null;
+    if (!path) {
+        aemcpAbortArgs('path is required');
+    }
+    var file = new File(path);
+    if (!file.exists) {
+        aemcpAbortArgs('file not found: ' + path);
+    }
+    var dirty = app.project.dirty;
+    if (!(args && args.force === true) && dirty !== false) {
+        aemcpAbortArgs(typeof dirty === 'boolean'
+            ? 'the open project has unsaved changes: save it or pass force: true'
+            : 'cannot tell whether the open project has unsaved changes (Project.dirty is unavailable): pass force: true');
+    }
+    app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES);
+    var opened = app.open(file);
+    if (!opened) {
+        aemcpAbortArgs('could not open: ' + path);
+    }
+    return { file: opened.file ? opened.file.fsName : path, numItems: opened.numItems };
+});
+
+// Rebuild comps and layers from an aemcp-project/v1 snapshot (project.export_json).
+// Layers are created bottom-up so indices match. Footage, precomp and other
+// layers are reported in `skipped`; folders and footage items are not recreated.
+// Ref: https://ae-scripting.docsforadobe.dev/general/itemcollection/#itemcollectionaddcomp
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layercollection/
+var AEMCP_IMPORT_TRANSFORMS = [
+    AEMCP_MATCH.ANCHOR_POINT,
+    AEMCP_MATCH.POSITION,
+    AEMCP_MATCH.SCALE,
+    AEMCP_MATCH.ROTATION,
+    AEMCP_MATCH.OPACITY
+];
+
+function aemcpImportLayer(comp, info) {
+    var layer = null;
+    var hasSource = info.sourceId !== null && info.sourceId !== undefined;
+    if (info.type === 'TextLayer') {
+        layer = comp.layers.addText(info.text && info.text.text ? info.text.text : '');
+    } else if (info.type === 'ShapeLayer') {
+        layer = comp.layers.addShape();
+    } else if (info.type === 'AVLayer' && info.nullLayer) {
+        layer = comp.layers.addNull(comp.duration);
+    } else if (info.type === 'AVLayer' && info.solidColor) {
+        layer = comp.layers.addSolid(info.solidColor, info.sourceName || info.name,
+            info.width || comp.width, info.height || comp.height, comp.pixelAspect, comp.duration);
+    } else if (info.type === 'AVLayer' && !hasSource) {
+        layer = comp.layers.addSolid([1, 1, 1], info.name, comp.width, comp.height, comp.pixelAspect, comp.duration);
+    }
+    if (!layer) {
+        return null;
+    }
+    layer.name = info.name;
+    var transform = layer.property(AEMCP_MATCH.TRANSFORM);
+    var values = info.transform && info.transform.properties ? info.transform.properties : [];
+    var i, j;
+    for (i = 0; transform && i < values.length; i++) {
+        for (j = 0; j < AEMCP_IMPORT_TRANSFORMS.length; j++) {
+            if (values[i].matchName === AEMCP_IMPORT_TRANSFORMS[j] && values[i].value !== undefined && values[i].value !== null) {
+                var prop = transform.property(values[i].matchName);
+                if (prop) {
+                    prop.setValue(values[i].value);
+                }
+            }
+        }
+    }
+    return layer;
+}
+
+AEMCP.register('project.import_json', function (args) {
+    var snapshot = args ? args.snapshot : null;
+    if (!snapshot || snapshot.format !== 'aemcp-project/v1' || !snapshot.items || typeof snapshot.items.length !== 'number') {
+        aemcpAbortArgs('snapshot must be an aemcp-project/v1 object');
+    }
+    var comps = [];
+    var skipped = [];
+    var i, j;
+    for (i = 0; i < snapshot.items.length; i++) {
+        var item = snapshot.items[i];
+        if (item.type !== 'Composition') {
+            continue;
+        }
+        var comp = app.project.items.addComp(item.name, item.width, item.height,
+            item.pixelAspect || 1, item.duration, item.frameRate);
+        var layers = item.layers || [];
+        var made = 0;
+        for (j = layers.length - 1; j >= 0; j--) {
+            if (aemcpImportLayer(comp, layers[j])) {
+                made++;
+            } else {
+                skipped.push({ comp: item.name, layer: layers[j].name, type: layers[j].type });
+            }
+        }
+        comps.push({ name: comp.name, layers: made });
+    }
+    return { comps: comps, skipped: skipped };
 });
 
 // There is no undo method in the scripting API; the Edit > Undo menu command

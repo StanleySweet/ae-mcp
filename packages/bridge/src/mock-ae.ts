@@ -621,17 +621,10 @@ export class MockShape {
 }
 
 /** Real AE layers always carry a Transform group; give shape/text layers Position and Opacity. */
-function addTransform(layer: MockLayer): void {
-  const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
-  transform.add(new MockProperty('Position', 'ADBE Position', [0, 0]));
-  transform.add(new MockProperty('Opacity', 'ADBE Opacity', 100));
-  layer.add(transform);
-}
-
 export class MockShapeLayer extends MockAVLayer {
   constructor(name: string, matchName: string) {
     super(name, matchName);
-    addTransform(this);
+    withTransform(this);
     this.add(new MockVectorsGroup('Contents', 'ADBE Root Vectors Group'));
   }
 }
@@ -645,7 +638,13 @@ export class MockLightLayer extends MockLayer {
 // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlighttype
 export const MockLightType = { PARALLEL: 1, SPOT: 2, POINT: 3, AMBIENT: 4, ENVIRONMENT: 5 };
 
+// Ref: https://ae-scripting.docsforadobe.dev/sources/solidsource/
+export class MockSolidSource {
+  constructor(public color: number[]) {}
+}
+
 export class MockFootageItem extends MockItem {
+  mainSource: MockSolidSource | null = null;
   pixelAspect = 1;
   frameRate = 0;
   duration = 0;
@@ -674,8 +673,31 @@ export class MockImportOptions {
   constructor(public file: MockFile | null = null) {}
 }
 
+// Every real layer carries the Transform group; layers made through the
+// collection get one so handlers can set position, scale, rotation and opacity.
+function withTransform<T extends MockLayer>(layer: T): T {
+  const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+  transform.add(new MockProperty('Anchor Point', 'ADBE Anchor Point', [0, 0, 0]));
+  transform.add(new MockProperty('Position', 'ADBE Position', [0, 0, 0]));
+  transform.add(new MockProperty('Scale', 'ADBE Scale', [100, 100, 100]));
+  transform.add(new MockProperty('Rotation', 'ADBE Rotate Z', 0));
+  transform.add(new MockProperty('Opacity', 'ADBE Opacity', 100));
+  layer.add(transform);
+  return layer;
+}
+
 export class MockLayerCollection {
   constructor(private readonly comp: MockCompItem) {}
+
+  // Real AE's LayerCollection.add* puts the new layer at index 1; the mock
+  // appends unless the project opts in (older tests rely on append order).
+  private addOnTop<T extends MockLayer>(layer: T): T {
+    if (this.comp.project?.newLayersOnTop) {
+      this.comp.insertLayerAt(1, layer);
+      return layer;
+    }
+    return this.comp.addLayer(layer);
+  }
 
   get length(): number {
     return this.comp.numLayers;
@@ -689,13 +711,13 @@ export class MockLayerCollection {
       layer.width = item.width;
       layer.height = item.height;
     }
-    return this.comp.addLayer(layer);
+    return this.addOnTop(withTransform(layer));
   }
 
   addShape(): MockShapeLayer {
     const layer = new MockShapeLayer('Shape', 'Layer');
     layer.id = this.comp.nextLayerId();
-    return this.comp.addLayer(layer);
+    return this.addOnTop(layer);
   }
 
   addSolid(color: number[], name: string, width: number, height: number, pixelAspect: number, duration?: number): MockAVLayer {
@@ -707,8 +729,8 @@ export class MockLayerCollection {
     layer.source = source;
     layer.width = width;
     layer.height = height;
-    void color;
-    return this.comp.addLayer(layer);
+    source.mainSource = new MockSolidSource(color);
+    return this.addOnTop(withTransform(layer));
   }
 
   // Ref: https://ae-scripting.docsforadobe.dev/layer/layercollection/#layercollectionaddcamera
@@ -732,7 +754,7 @@ export class MockLayerCollection {
     layer.id = this.comp.nextLayerId();
     layer.nullLayer = true;
     layer.outPoint = duration ?? 0;
-    return this.comp.addLayer(layer);
+    return this.addOnTop(withTransform(layer));
   }
 
   addText(sourceText?: string): MockTextLayer {
@@ -753,8 +775,7 @@ export class MockLayerCollection {
       }),
     );
     layer.add(textProperties);
-    addTransform(layer);
-    return this.comp.addLayer(layer);
+    return this.addOnTop(withTransform(layer));
   }
 
   precompose(indices: number[], name: string, moveAllAttributes = true): MockCompItem {
@@ -935,6 +956,10 @@ export class MockRenderQueue {
 export class MockProject {
   file: MockFile | null = null;
   bitsPerChannel = 8;
+  // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectdirty
+  dirty = false;
+  newLayersOnTop = false;
+  readonly closed: number[] = [];
   activeItem: MockItem | null = null;
   selection: MockItem[] = [];
   readonly rootFolder = new MockFolderItem(0, 'Root');
@@ -983,6 +1008,14 @@ export class MockProject {
     }
   }
 
+  // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectclose
+  close(options: number): boolean {
+    this.closed.push(options);
+    this.file = null;
+    this.dirty = false;
+    return true;
+  }
+
   removeItem(item: MockItem): void {
     const index = this.all.indexOf(item);
     if (index >= 0) {
@@ -1006,6 +1039,7 @@ export class MockAE {
   readonly env: Record<string, string> = {};
   readonly project = new MockProject();
   readonly executedCommands: number[] = [];
+  readonly opened: string[] = [];
   readonly menuCommandIds: Record<string, number> = { 'Increment and Save': 3088 };
   // Ref: https://ae-scripting.docsforadobe.dev/general/application/#appeffects
   readonly effects = [
@@ -1039,6 +1073,14 @@ export class MockAE {
       }
     },
     inUndoGroup: (): boolean => this.undoDepth > 0,
+    // Ref: https://ae-scripting.docsforadobe.dev/general/application/#appopen
+    open: (file: MockFile): MockProject | null => {
+      if (!file.exists) return null;
+      this.project.file = file;
+      this.project.dirty = false;
+      this.opened.push(file.fsName);
+      return this.project;
+    },
     findMenuCommandId: (name: string): number => this.menuCommandIds[name] ?? 0,
     executeCommand: (id: number): void => {
       this.executedCommands.push(id);
@@ -1114,6 +1156,8 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     FolderItem: MockFolderItem,
     FootageItem: MockFootageItem,
     ImportOptions: MockImportOptions,
+    SolidSource: MockSolidSource,
+    CloseOptions: { DO_NOT_SAVE_CHANGES: 1612, PROMPT_TO_SAVE_CHANGES: 1613, SAVE_CHANGES: 1614 },
     AVLayer: MockAVLayer,
     TextLayer: MockTextLayer,
     ShapeLayer: MockShapeLayer,

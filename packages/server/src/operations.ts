@@ -78,6 +78,16 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(operation('project.save', 'project', 'Save the open project, or Save As when path is given (never prompts).', {
+    schema: { path: { type: 'string' } },
+  }));
+  register(operation('project.open', 'project', 'Open a project file, replacing the open project. Refuses unless force: true when the open project has unsaved changes or that cannot be told.', {
+    destructive: true,
+    schema: { path: { type: 'string' }, force: { type: 'boolean' } },
+  }));
+  register(operation('project.import_json', 'project', 'Recreate comps and solid/text/null/shape layers (with transforms) from an aemcp-project/v1 snapshot (project.export_json); other layers are reported as skipped.', {
+    schema: { snapshot: { type: 'object' } },
+  }));
   register(operation('project.undo', 'project', 'Undo the last change.'));
   register(operation('project.increment_save', 'project', 'File > Increment and Save the project.'));
 
