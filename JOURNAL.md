@@ -3,6 +3,30 @@
 Append-only progress log. Newest entry first. One entry per session or per landed
 chunk of work; don't rewrite old entries — supersede them.
 
+## 2026-10-16
+
+- Installed the ae-mcp MCP into **opencode** against the **production** bundle
+  instead of the tsx source run: `~/.config/opencode/opencode.json` now launches
+  `node /Users/stan/Dev/ae-mcp/dist/staging/server/index.js` — the esbuild artifact
+  shipped inside `dist/ae-mcp.mcpb`. Verified over stdio: 17 tools, `check_setup`
+  green (only `project_saved_version` fails — the project was never saved). The
+  queue is identical either way (`queueRoot()` = `AE_MCP_ROOT ?? ~/.ae-mcp`).
+  (`bridge_heartbeat` flapped to fail before AE was reopened — expected: the
+  heartbeat only ticks while AE runs, and it ages out after 90 s.)
+- Resumed the backlog loop. Housekeeping: closed epics **E12 (#15)** and **E13
+  (#16)** — every task under each is closed. Triage: **#149** (Animation Principles
+  agent-context) `needs-triage` → `ready-for-agent`.
+- Accepted **ADR-0002** third-party tool support (`9839b7b0`, task E14-2, closes
+  #133) from the Mac 1 results; Mac 2 stays pending on the owner's second machine —
+  the same standing ADR-0001 recorded. The ADR declares **E14-9/E14-10/E14-11
+  unsupported** (Animation Composer keeps no on-disk preset library; Motion exposes
+  no script entry point), so #140/#141/#142 were closed `wontfix` and BACKLOG §E14
+  annotated to match.
+- Frontier is now **E14-12 (#143)** `ease.preset for selected keyframes (ease in,
+  ease out, overshoot)`: its blockers (#142, #73) are closed. AE APIs looked up for
+  it — `Property.selectedKeys` (read-only int array) and `KeyframeEase(speed,
+  influence)` / `setTemporalEaseAtKey` (one ease per value dimension).
+
 ## 2026-10-15
 
 - Root-caused why Setup never prompted for admin and never installed the loader:
