@@ -154,7 +154,7 @@ describe('layer handlers', () => {
 
     const out = invoke(ctx, 'layer.add_footage', { comp: 'Main', name: 'Nope.mov' });
 
-    expect(out.value).toEqual({ success: false, error: 'Footage item not found' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Footage item not found' });
   });
 
   it('layer.delete removes the layer from the composition', async () => {
@@ -370,14 +370,8 @@ describe('effect handlers', () => {
     createComp(ctx);
     invoke(ctx, 'layer.add_shape', { comp: 'Main' });
 
-    expect(invoke(ctx, 'effect.apply', { comp: 'Main' }).value).toEqual({
-      success: false,
-      error: 'Effect required',
-    });
-    expect(invoke(ctx, 'effect.remove', { comp: 'Main', effect: 'ADBE Nope' }).value).toEqual({
-      success: false,
-      error: 'Effect not found: ADBE Nope',
-    });
+    expect(invoke(ctx, 'effect.apply', { comp: 'Main' }).issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Effect required' });
+    expect(invoke(ctx, 'effect.remove', { comp: 'Main', effect: 'ADBE Nope' }).issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Effect not found: ADBE Nope' });
   });
 });
 
@@ -488,8 +482,7 @@ describe('text handlers', () => {
 
     const out = invoke(ctx, 'text.set', { comp: 'Main', layerIndex: 1, justification: 'sideways' });
 
-    expect(out.value).toMatchObject({ success: false });
-    expect((out.value as { error: string }).error).toContain('sideways');
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: expect.stringContaining('sideways') });
   });
 });
 
@@ -701,6 +694,6 @@ describe('keyframe handlers', () => {
       easing: 'linear',
     });
 
-    expect(out.value).toEqual({ success: false, error: 'No keyframe at time 5' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'No keyframe at time 5' });
   });
 });

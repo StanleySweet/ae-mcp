@@ -194,6 +194,32 @@ describe('bridge batch.run', () => {
     expect(ae.undoGroups).toHaveLength(1);
   });
 
+  // A handler's {success:false} used to come back as ok and let the batch
+  // carry on (#181).
+  it('stops at a sub-op that returns success: false and reports it as an error', async () => {
+    const { driver, ctx } = await setup();
+    vm.runInContext(
+      'var ran = [];' +
+        'AEMCP.HANDLERS["a.ok"] = function () { ran.push("ok"); return 1; };' +
+        'AEMCP.HANDLERS["a.miss"] = function () { return { success: false, error: "Composition not found" }; };' +
+        'AEMCP.HANDLERS["a.after"] = function () { ran.push("after"); return 9; };',
+      ctx,
+    );
+    await driver.sendJob({
+      protocolVersion: 1,
+      id: 'batch-miss',
+      tool: 'batch.run',
+      args: { ops: [{ op: 'a.ok' }, { op: 'a.miss' }, { op: 'a.after' }] },
+      deadline: Date.now() + 5000,
+    });
+    const result = await driver.waitForResult('batch-miss');
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_ARGS', message: 'Composition not found' },
+    });
+    expect(vm.runInContext('ran.join(",")', ctx)).toBe('ok');
+  });
+
   it('reports an unknown sub-op with UNKNOWN_TOOL', async () => {
     const { driver } = await setup();
     await driver.sendJob({

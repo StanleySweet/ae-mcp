@@ -77,7 +77,7 @@ AEMCP.register('project.undo', function () {
 // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectsave
 AEMCP.register('project.increment_save', function () {
     if (!app.project.file) {
-        return { success: false, code: 'PROJECT_NEVER_SAVED', error: 'project has never been saved' };
+        aemcpAbort(aemcpErrorIssue('UNSAVED_PROJECT', 'project has never been saved'));
     }
     app.project.save(new File(aemcpNextIncrementPath(app.project.file.fsName)));
     return { success: true, file: app.project.file ? app.project.file.fsName : null };

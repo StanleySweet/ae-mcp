@@ -84,7 +84,7 @@ describe('keyframe.ease_preset', () => {
       preset: 'ease_in',
     });
 
-    expect(out.value).toMatchObject({ success: false, error: expect.stringContaining('selected') });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: expect.stringContaining('selected') });
     expect(scale.temporalEases).toHaveLength(0);
   });
 
@@ -102,7 +102,7 @@ describe('keyframe.ease_preset', () => {
       preset: 'bogus',
     });
 
-    expect(out.value).toEqual({ success: false, error: 'Unknown preset: bogus' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Unknown preset: bogus' });
     expect(scale.temporalEases).toHaveLength(0);
   });
 
@@ -118,7 +118,7 @@ describe('keyframe.ease_preset', () => {
       preset: 'ease_in',
     });
 
-    expect(out.value).toEqual({ success: false, error: 'Property not found: Opacity' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Property not found: Opacity' });
   });
 
   it('warns when the property is driven by an expression', async () => {
@@ -224,7 +224,7 @@ describe('anchor.move_preserving', () => {
       anchor: 'sideways',
     });
 
-    expect(out.value).toEqual({ success: false, error: 'Unknown anchor: sideways' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Unknown anchor: sideways' });
     expect(transformProp(layer, 'ADBE Position').value).toEqual([400, 300]);
   });
 });
@@ -277,7 +277,7 @@ describe('expression.snippet', () => {
       snippet: 'bounce',
     });
 
-    expect(out.value).toEqual({ success: false, error: 'Unknown snippet: bounce' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Unknown snippet: bounce' });
     expect(scale.expression).toBe('');
   });
 
@@ -292,7 +292,7 @@ describe('expression.snippet', () => {
       snippet: 'loop',
     });
 
-    expect(out.value).toEqual({ success: false, error: 'Property not found' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Property not found' });
   });
 });
 
@@ -346,7 +346,7 @@ describe('rig.null_controller', () => {
 
     const out = invoke(ctx, 'rig.null_controller', { comp: 'Nope' });
 
-    expect(out.value).toEqual({ success: false, error: 'Composition not found' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Composition not found' });
   });
 
   it('refuses to build a rig when a target layer is missing', async () => {
@@ -359,7 +359,7 @@ describe('rig.null_controller', () => {
       layers: [5],
     });
 
-    expect(out.value).toEqual({ success: false, error: 'Layer not found: 5' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Layer not found: 5' });
     const comp = ae.project.item(1) as MockCompItem;
     expect(comp.numLayers).toBe(1);
   });

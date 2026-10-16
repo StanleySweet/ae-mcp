@@ -223,6 +223,44 @@ export function createServer(options: ServerOptions = {}): McpServer {
     return client.call(tool, args);
   };
 
+  // The E13 guard: Increment and Save before a destructive operation. The bridge
+  // raises UNSAVED_PROJECT for a never-saved project (#181); any other failure is
+  // surfaced with its real message (#161).
+  const incrementBeforeDestructive = async (
+    op: string,
+  ): Promise<
+    { ok: true; info: Record<string, unknown> | null } | { ok: false; result: ToolResult }
+  > => {
+    const increment = await callRaw('project.increment_save');
+    if (!increment.ok) {
+      if (increment.error.code === 'UNSAVED_PROJECT') {
+        return {
+          ok: false,
+          result: text(
+            makeError('UNSAVED_PROJECT', `operation '${op}' is destructive and the project has never been saved`),
+            true,
+          ),
+        };
+      }
+      return {
+        ok: false,
+        result: text(
+          makeError(
+            'SCRIPT_ERROR',
+            `operation '${op}' is destructive and the pre-increment save failed: ${increment.error.message}`,
+          ),
+          true,
+        ),
+      };
+    }
+    const saved = increment.result as { file?: unknown } | null;
+    if (typeof saved?.file !== 'string') {
+      return { ok: true, info: null };
+    }
+    await persistSavedVersionPath(root, saved.file);
+    return { ok: true, info: { incrementedFile: saved.file } };
+  };
+
   const jobStore = options.jobStore ?? new JobStore();
   const planStore = options.planStore ?? new PlanStore<BulkStep>();
 
@@ -710,40 +748,11 @@ export function createServer(options: ServerOptions = {}): McpServer {
         (definition.name === 'batch.run' && batchHasDestructive(operations, validation.args.ops));
       let incrementInfo: Record<string, unknown> | null = null;
       if (needsIncrement && settings.incrementBeforeDestructive) {
-        const increment = await callRaw('project.increment_save');
+        const increment = await incrementBeforeDestructive(toolArgs.op);
         if (!increment.ok) {
-          return toResult(increment);
+          return increment.result;
         }
-        const saved = increment.result as {
-          success?: boolean;
-          file?: unknown;
-          code?: unknown;
-          error?: unknown;
-        } | null;
-        if (!saved || saved.success !== true) {
-          if (saved?.code === 'PROJECT_NEVER_SAVED') {
-            return text(
-              makeError(
-                'UNSAVED_PROJECT',
-                `operation '${toolArgs.op}' is destructive and the project has never been saved`,
-              ),
-              true,
-            );
-          }
-          const detail =
-            saved && typeof saved.error === 'string' ? saved.error : 'the increment step failed';
-          return text(
-            makeError(
-              'SCRIPT_ERROR',
-              `operation '${toolArgs.op}' is destructive and the pre-increment save failed: ${detail}`,
-            ),
-            true,
-          );
-        }
-        if (typeof saved.file === 'string') {
-          incrementInfo = { incrementedFile: saved.file };
-          await persistSavedVersionPath(root, saved.file);
-        }
+        incrementInfo = increment.info;
       }
       const result = await callRaw(definition.name, validation.args);
       if (!result.ok) {
@@ -859,40 +868,11 @@ export function createServer(options: ServerOptions = {}): McpServer {
         stepDefinition?.destructive === true && settings.incrementBeforeDestructive;
       let incrementInfo: Record<string, unknown> | null = null;
       if (needsIncrement) {
-        const increment = await callRaw('project.increment_save');
+        const increment = await incrementBeforeDestructive(step.op);
         if (!increment.ok) {
-          return toResult(increment);
+          return increment.result;
         }
-        const saved = increment.result as {
-          success?: boolean;
-          file?: unknown;
-          code?: unknown;
-          error?: unknown;
-        } | null;
-        if (!saved || saved.success !== true) {
-          if (saved?.code === 'PROJECT_NEVER_SAVED') {
-            return text(
-              makeError(
-                'UNSAVED_PROJECT',
-                `operation '${step.op}' is destructive and the project has never been saved`,
-              ),
-              true,
-            );
-          }
-          const detail =
-            saved && typeof saved.error === 'string' ? saved.error : 'the increment step failed';
-          return text(
-            makeError(
-              'SCRIPT_ERROR',
-              `operation '${step.op}' is destructive and the pre-increment save failed: ${detail}`,
-            ),
-            true,
-          );
-        }
-        if (typeof saved.file === 'string') {
-          incrementInfo = { incrementedFile: saved.file };
-          await persistSavedVersionPath(root, saved.file);
-        }
+        incrementInfo = increment.info;
       }
 
       const result = await callRaw(step.op, { ...step.args, dryRun: false });

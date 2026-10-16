@@ -1,7 +1,7 @@
 import { chmod, mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createQueueConsumer, FakeProject, observeHandlers } from '@ae-mcp/fake-bridge';
+import { createQueueConsumer, FakeProject, HandlerError, observeHandlers } from '@ae-mcp/fake-bridge';
 import { errorSchema } from '@ae-mcp/protocol';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -74,6 +74,10 @@ async function connectServer(
     ...observeHandlers(project),
     'project.increment_save': () => {
       calls.push('project.increment_save');
+      // The bridge raises UNSAVED_PROJECT / other errors instead of returning them (#181).
+      if (options.incrementResult instanceof Error) {
+        throw options.incrementResult;
+      }
       return options.incrementResult ?? { success: true, file: '/projects/P_v008.aep' };
     },
     'layer.rename': (args: unknown) => {
@@ -165,11 +169,7 @@ describe('E13-3 destructive guard', () => {
   it('refuses a destructive operation when the project has never been saved', async () => {
     const calls: string[] = [];
     const { client, close } = await connectServer(project(), calls, {
-      incrementResult: {
-        success: false,
-        code: 'PROJECT_NEVER_SAVED',
-        error: 'project has never been saved',
-      },
+      incrementResult: new HandlerError('UNSAVED_PROJECT', 'project has never been saved'),
     });
     closes.push(close);
 
@@ -183,7 +183,7 @@ describe('E13-3 destructive guard', () => {
   it('surfaces the real increment error instead of blaming an unsaved project', async () => {
     const calls: string[] = [];
     const { client, close } = await connectServer(project(), calls, {
-      incrementResult: { success: false, error: 'the installed bridge payload is stale' },
+      incrementResult: new HandlerError('SCRIPT_ERROR', 'the installed bridge payload is stale'),
     });
     closes.push(close);
 
@@ -252,11 +252,7 @@ describe('E13-3 destructive guard', () => {
   it('refuses a batch.run with a destructive sub-operation when the project has never been saved', async () => {
     const calls: string[] = [];
     const { client, close } = await connectServer(project(), calls, {
-      incrementResult: {
-        success: false,
-        code: 'PROJECT_NEVER_SAVED',
-        error: 'project has never been saved',
-      },
+      incrementResult: new HandlerError('UNSAVED_PROJECT', 'project has never been saved'),
     });
     closes.push(close);
 
@@ -357,11 +353,7 @@ describe('E13-3 destructive guard', () => {
       ...observeHandlers(project()),
       'project.increment_save': () => {
         calls.push('project.increment_save');
-        return {
-          success: false,
-          code: 'PROJECT_NEVER_SAVED',
-          error: 'project has never been saved',
-        };
+        throw new HandlerError('UNSAVED_PROJECT', 'project has never been saved');
       },
       'bulk.remove_unused': (args: unknown) => {
         calls.push('bulk.remove_unused');
@@ -423,11 +415,7 @@ describe('E13-3 destructive guard', () => {
       ...observeHandlers(proj),
       'project.increment_save': () => {
         calls.push('project.increment_save');
-        return {
-          success: false,
-          code: 'PROJECT_NEVER_SAVED',
-          error: 'project has never been saved',
-        };
+        throw new HandlerError('UNSAVED_PROJECT', 'project has never been saved');
       },
       'layer.rename': (args: unknown) => {
         calls.push('layer.rename');
@@ -565,11 +553,7 @@ describe('E13-6 guard cannot be bypassed', () => {
     const { client, close } = await connectServer(project(), calls, {
       operations: registryWithEval(),
       settings: settings({ evalEnabled: true }),
-      incrementResult: {
-        success: false,
-        code: 'PROJECT_NEVER_SAVED',
-        error: 'project has never been saved',
-      },
+      incrementResult: new HandlerError('UNSAVED_PROJECT', 'project has never been saved'),
       extraHandlers: evalHandlers(calls),
     });
     closes.push(close);

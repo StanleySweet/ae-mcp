@@ -4,6 +4,7 @@ var AEMCP_HINTS = {
     UNKNOWN_TOOL: 'Call ae_catalog to list the available tools.',
     INVALID_MESSAGE: 'Client and server protocol versions differ; restart the client after upgrading.',
     INVALID_ARGS: 'Check the tool description for the expected arguments.',
+    UNSAVED_PROJECT: 'Save the project once (File > Save) so Increment and Save can version it.',
     SCRIPT_ERROR: 'Open Window > Console in After Effects for the script error.',
     TIMEOUT: 'The job exceeded its deadline and was cancelled.'
 };
@@ -39,6 +40,14 @@ function aemcpCallHandler(handler, args) {
     }
     if (value === undefined) {
         value = null;
+    }
+    // A handler that reports {success:false, error} failed: send it as an error,
+    // not as an ok result, so ae_do flags it and batch.run stops there (#181).
+    if (value !== null && typeof value === 'object' && value.success === false) {
+        return {
+            ok: false,
+            issue: aemcpErrorIssue('INVALID_ARGS', typeof value.error === 'string' ? value.error : 'operation failed')
+        };
     }
     return { ok: true, value: value };
 }
