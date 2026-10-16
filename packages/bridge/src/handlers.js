@@ -373,7 +373,8 @@ function aemcpRenderFrameViaQueue(comp, time, file) {
 AEMCP.register('render.frame', function (args) {
     var comp = aemcpRequireComp(aemcpCompKey(args));
     var time = args && typeof args.time === 'number' ? args.time : 0;
-    var file = args && args.file ? args.file : aemcpRenderPath(comp, time);
+    // Always under the render folder: this op is read-only (#178).
+    var file = aemcpRenderPath(comp, time);
     var frame = Math.round(time * comp.frameRate);
     var method = typeof comp.saveFrameToPng === 'function' ? 'direct' : 'queue';
     if (method === 'direct') {

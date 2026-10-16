@@ -72,15 +72,14 @@ describe('render.frame', () => {
     expect(outcome.value?.file).toBe(`${home}/.ae-mcp/render/Main-0.png`);
   });
 
-  it('honours an explicit output file and sanitises the comp name', async () => {
+  // A read-only op must not write outside the render folder (#178).
+  it('ignores a file argument and sanitises the comp name', async () => {
     const { ctx, ae, home } = await payloadContext();
     ae.project.items.addComp('My Comp/01', 640, 480, 1, 4, 24);
     const custom = `${home}/out/custom.png`;
-    const first = invoke(ctx, 'render.frame', { comp: 'My Comp/01', time: 0.5, file: custom });
-    expect(first.value?.file).toBe(custom);
-    expect(ae.fs.get(custom)).toBe('PNG:My Comp/01:0.5');
-    const second = invoke(ctx, 'render.frame', { comp: 'My Comp/01', time: 0.5 });
-    expect(second.value?.file).toBe(`${home}/.ae-mcp/render/My_Comp_01-12.png`);
+    const outcome = invoke(ctx, 'render.frame', { comp: 'My Comp/01', time: 0.5, file: custom });
+    expect(outcome.value?.file).toBe(`${home}/.ae-mcp/render/My_Comp_01-12.png`);
+    expect(ae.fs.has(custom)).toBe(false);
   });
 
   it('falls back to the render queue when saveFrameToPng is unavailable', async () => {

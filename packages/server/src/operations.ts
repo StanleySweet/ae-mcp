@@ -416,7 +416,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   register(
     operation('render.frame', 'render', 'Save a single frame of a composition as a PNG.', {
       readOnly: true,
-      schema: { comp, time: { type: 'number' }, file: comp },
+      schema: { comp, time: { type: 'number' } },
     }),
   );
   register(

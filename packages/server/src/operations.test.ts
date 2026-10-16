@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultOperationRegistry } from './operations.js';
+import { defaultOperationRegistry, validateOperationArgs } from './operations.js';
 
 // Every operation the bridge registers (`packages/bridge/src/handlers.js` plus
 // `batch.run` in `job-runner.js`), minus the top-level MCP tools.
@@ -112,5 +112,11 @@ describe('server operation registry', () => {
     for (const name of destructive) {
       expect(registry.get(name)!.destructive).toBe(true);
     }
+  });
+
+  // render.frame is read-only, so it must not take an output path (#178).
+  it('rejects a file argument on render.frame', () => {
+    const schema = defaultOperationRegistry().get('render.frame')!.schema;
+    expect(validateOperationArgs(schema, { file: '/tmp/x.png' }).ok).toBe(false);
   });
 });
