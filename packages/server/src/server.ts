@@ -206,6 +206,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     clientPromise ??= selectTransport({
       root,
       appName: options.appName,
+      applicationsDir: options.applicationsDir,
       runner: options.runner,
     }).then((transport) => createAEClient({ transport, root }));
     return clientPromise;

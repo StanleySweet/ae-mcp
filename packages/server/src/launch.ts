@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import { readHeartbeat } from './heartbeat.js';
-import { aeAppName, type Runner } from './osascript-transport.js';
+import { resolveAeAppName, type Runner } from './osascript-transport.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -38,7 +38,7 @@ export async function launchAE(options: LaunchAEOptions): Promise<LaunchResult> 
   const maxAgeMs = options.heartbeatMaxAgeMs ?? 90_000;
   const timeoutMs = options.timeoutMs ?? 60_000;
   const pollMs = options.pollMs ?? 500;
-  const appName = options.appName ?? aeAppName();
+  const appName = options.appName ?? (await resolveAeAppName());
 
   if (await isFresh(options.root, maxAgeMs, now)) {
     return { status: 'ready', waitedMs: 0 };

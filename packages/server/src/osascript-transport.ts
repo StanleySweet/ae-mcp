@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { discoverAEVersions } from '@ae-mcp/core';
 import {
   PROTOCOL_VERSION,
   bridgeDir,
@@ -33,6 +34,17 @@ const defaultRunner: Runner = (command, args, options) =>
 
 export function aeAppName(): string {
   return process.env.AE_APP_NAME ?? 'Adobe After Effects 2025';
+}
+
+/** The After Effects to script: `AE_APP_NAME`, else the newest install under
+`applicationsDir`, else the default name. A fixed default left AE 2026 users on
+the file-queue fallback (#179). */
+export async function resolveAeAppName(applicationsDir?: string): Promise<string> {
+  if (process.env.AE_APP_NAME) {
+    return process.env.AE_APP_NAME;
+  }
+  const [newest] = await discoverAEVersions(applicationsDir);
+  return newest?.appName ?? aeAppName();
 }
 
 // AE runs one script at a time. When another script (a third-party panel, or
@@ -168,12 +180,14 @@ export class OsaScriptTransport implements Transport {
 export interface SelectOptions {
   root: string;
   appName?: string;
+  applicationsDir?: string;
   runner?: Runner;
 }
 
 /** Picks transport B (osascript), falling back to A (file queue) — ADR 0001. */
 export async function selectTransport(options: SelectOptions): Promise<Transport> {
-  const osa = new OsaScriptTransport(options.root, options.appName ?? aeAppName(), options.runner);
+  const appName = options.appName ?? (await resolveAeAppName(options.applicationsDir));
+  const osa = new OsaScriptTransport(options.root, appName, options.runner);
   if (await osa.available()) {
     return osa;
   }

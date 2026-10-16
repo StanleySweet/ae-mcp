@@ -1,10 +1,10 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PROTOCOL_VERSION, type JobMessage } from '@ae-mcp/protocol';
 import { describe, it, expect } from 'vitest';
 import { FileQueueTransport } from './file-queue-transport.js';
-import { OsaScriptTransport, selectTransport, type Runner } from './osascript-transport.js';
+import { OsaScriptTransport, aeAppName, resolveAeAppName, selectTransport, type Runner } from './osascript-transport.js';
 
 async function queueRoot(): Promise<string> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-osa-'));
@@ -174,5 +174,45 @@ describe('osascript transport', () => {
     const transport = await selectTransport({ root, appName: APP, runner });
     expect(transport).toBeInstanceOf(FileQueueTransport);
     expect(transport.name).toBe('file-queue');
+  });
+});
+// The default app name tracked AE 2025, so AE 2026 never got transport B (#179).
+describe('resolveAeAppName', () => {
+  async function applications(...apps: string[]): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'ae-mcp-apps-'));
+    for (const app of apps) {
+      await mkdir(join(dir, app, `${app}.app`), { recursive: true });
+    }
+    return dir;
+  }
+
+  async function withoutEnv<T>(run: () => Promise<T>): Promise<T> {
+    const saved = process.env.AE_APP_NAME;
+    delete process.env.AE_APP_NAME;
+    try {
+      return await run();
+    } finally {
+      if (saved !== undefined) process.env.AE_APP_NAME = saved;
+    }
+  }
+
+  it('targets the newest installed After Effects', async () => {
+    const dir = await applications('Adobe After Effects 2025', 'Adobe After Effects 2026');
+    expect(await withoutEnv(() => resolveAeAppName(dir))).toBe('Adobe After Effects 2026');
+  });
+
+  it('lets AE_APP_NAME override the discovered install', async () => {
+    const dir = await applications('Adobe After Effects 2026');
+    process.env.AE_APP_NAME = 'Adobe After Effects (Beta)';
+    try {
+      expect(await resolveAeAppName(dir)).toBe('Adobe After Effects (Beta)');
+    } finally {
+      delete process.env.AE_APP_NAME;
+    }
+  });
+
+  it('falls back to the default name when nothing is installed', async () => {
+    const dir = await applications();
+    expect(await withoutEnv(() => resolveAeAppName(dir))).toBe(aeAppName());
   });
 });
