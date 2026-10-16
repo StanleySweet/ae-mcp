@@ -1149,30 +1149,41 @@ AEMCP.register('property.set', function (args) {
     return aemcpWithExpressionWarning(prop, { success: true });
 });
 
-// Read every key of a property: time, value, interpolation types and temporal eases.
+// Read every key of a property: time, value, interpolation types, temporal eases
+// and, on spatial properties (Position paths), the spatial tangents (handles).
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeyininterpolationtype
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeyintemporalease
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyisspatial
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeyinspatialtangent
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeyoutspatialtangent
 function aemcpReadKeys(prop) {
     var keys = [];
-    var i;
+    var i, key;
     for (i = 1; i <= prop.numKeys; i++) {
-        keys.push({
+        key = {
             time: prop.keyTime(i),
             value: prop.keyValue(i),
             inType: prop.keyInInterpolationType(i),
             outType: prop.keyOutInterpolationType(i),
             inEase: prop.keyInTemporalEase(i),
             outEase: prop.keyOutTemporalEase(i)
-        });
+        };
+        if (prop.isSpatial) {
+            key.inTangent = prop.keyInSpatialTangent(i);
+            key.outTangent = prop.keyOutSpatialTangent(i);
+        }
+        keys.push(key);
     }
     return keys;
 }
 
-// Write keys (as read by aemcpReadKeys) onto a property, restoring interpolation and eases.
+// Write keys (as read by aemcpReadKeys) onto a property, restoring interpolation, eases
+// and, on spatial properties, spatial tangents.
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetvalueattime
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetinterpolationtypeatkey
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysettemporaleaseatkey
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertynearestkeyindex
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetspatialtangentsatkey
 function aemcpWriteKeys(prop, keys) {
     var i, key, at;
     for (i = 0; i < keys.length; i++) {
@@ -1185,10 +1196,16 @@ function aemcpWriteKeys(prop, keys) {
         } catch (e) {
             // Hold keys reject temporal eases; the interpolation type alone is enough.
         }
+        // Tangents only exist on spatial destinations; a key copied from a spatial
+        // property onto a non-spatial one has no handles to restore.
+        if (prop.isSpatial && key.inTangent && key.outTangent) {
+            prop.setSpatialTangentsAtKey(at, key.inTangent, key.outTangent);
+        }
     }
 }
 
-// Swap a key's in and out sides (interpolation and temporal ease), as a reversed motion needs.
+// Swap a key's in and out sides (interpolation, temporal ease and spatial tangent),
+// as a reversed motion needs.
 function aemcpSwapKeySides(key) {
     var t = key.inType;
     key.inType = key.outType;
@@ -1196,6 +1213,9 @@ function aemcpSwapKeySides(key) {
     t = key.inEase;
     key.inEase = key.outEase;
     key.outEase = t;
+    t = key.inTangent;
+    key.inTangent = key.outTangent;
+    key.outTangent = t;
 }
 
 function aemcpKeyTimes(keys) {

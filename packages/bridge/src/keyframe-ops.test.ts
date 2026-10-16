@@ -19,7 +19,7 @@ function invoke(ctx: vm.Context, tool: string, args: unknown): { value?: unknown
   return vm.runInContext(`AEMCP.invoke(${JSON.stringify(tool)}, ${JSON.stringify(args)}, null)`, ctx);
 }
 
-async function setup(): Promise<{ ctx: vm.Context; a: MockProperty; b: MockProperty }> {
+async function setup(): Promise<{ ctx: vm.Context; a: MockProperty; b: MockProperty; p: MockProperty; q: MockProperty }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-kf-'));
   const ae = new MockAE();
   ae.env.HOME = home;
@@ -30,12 +30,23 @@ async function setup(): Promise<{ ctx: vm.Context; a: MockProperty; b: MockPrope
   const comp = ae.project.item(1) as MockCompItem;
   const a = new MockProperty('Opacity', 'ADBE Opacity', 100);
   const b = new MockProperty('Rotation', 'ADBE Rotate Z', 0);
-  for (const prop of [a, b]) {
+  // Two spatial Position properties (layers 3 and 4) that carry hand-set tangents.
+  const p = new MockProperty('Position', 'ADBE Position', [0, 0]);
+  p.isSpatial = true;
+  const q = new MockProperty('Position', 'ADBE Position', [0, 0]);
+  q.isSpatial = true;
+  for (const prop of [a, b, p, q]) {
     const layer = new MockAVLayer('L', 'L');
     layer.add(prop);
     comp.addLayer(layer);
   }
-  return { ctx, a, b };
+  return { ctx, a, b, p, q };
+}
+
+// Position keys on a spatial property, key 2 curved by hand (in and out handles differ).
+function spatialKeyed(p: MockProperty): void {
+  p.key(1, [0, 0]).key(2, [100, 0]).key(4, [200, 0]);
+  p.setSpatialTangentsAtKey(2, [-50, 0], [50, 0]);
 }
 
 const times = (p: MockProperty): number[] => p.keys.map((k) => k.time);
@@ -65,6 +76,16 @@ describe('keyframe.offset', () => {
     const out = invoke(ctx, 'keyframe.offset', { comp: 'Main', index: 1, property: 'ADBE Opacity', seconds: 1 });
     expect(out.issue?.code).toBe('INVALID_ARGS');
   });
+
+  it('keeps spatial tangents of a hand-curved Position path', async () => {
+    const { ctx, p } = await setup();
+    spatialKeyed(p);
+    const out = invoke(ctx, 'keyframe.offset', { comp: 'Main', index: 3, property: 'ADBE Position', seconds: 1 });
+    expect(out.issue).toBeUndefined();
+    expect(times(p)).toEqual([2, 3, 5]);
+    expect(p.keyInSpatialTangent(2)).toEqual([-50, 0]);
+    expect(p.keyOutSpatialTangent(2)).toEqual([50, 0]);
+  });
 });
 
 describe('keyframe.reverse', () => {
@@ -74,6 +95,15 @@ describe('keyframe.reverse', () => {
     invoke(ctx, 'keyframe.reverse', { comp: 'Main', index: 1, property: 'ADBE Opacity' });
     expect(times(a)).toEqual([1, 3, 4]);
     expect(values(a)).toEqual([40, 20, 10]);
+  });
+
+  it('swaps the spatial tangents of a Position path', async () => {
+    const { ctx, p } = await setup();
+    spatialKeyed(p);
+    invoke(ctx, 'keyframe.reverse', { comp: 'Main', index: 3, property: 'ADBE Position' });
+    expect(times(p)).toEqual([1, 3, 4]);
+    expect(p.keyInSpatialTangent(2)).toEqual([50, 0]);
+    expect(p.keyOutSpatialTangent(2)).toEqual([-50, 0]);
   });
 
   it('swaps in and out interpolation and temporal ease on each key', async () => {
@@ -123,5 +153,33 @@ describe('keyframe.copy', () => {
     expect(b.keyInInterpolationType(2)).toBe(MockKeyframeInterpolationType.BEZIER);
     expect(b.keyOutTemporalEase(2)[0].influence).toBe(25);
     expect(times(a)).toEqual([1, 2, 4]);
+  });
+
+  it('copies spatial tangents between spatial properties', async () => {
+    const { ctx, p, q } = await setup();
+    spatialKeyed(p);
+    const out = invoke(ctx, 'keyframe.copy', {
+      comp: 'Main',
+      from: { index: 3, property: 'ADBE Position' },
+      to: { index: 4, property: 'ADBE Position' },
+      offset: 1,
+    });
+    expect(out.issue).toBeUndefined();
+    expect(times(q)).toEqual([2, 3, 5]);
+    expect(q.keyInSpatialTangent(2)).toEqual([-50, 0]);
+    expect(q.keyOutSpatialTangent(2)).toEqual([50, 0]);
+  });
+
+  it('copies a spatial path to a non-spatial property without touching tangents', async () => {
+    const { ctx, p, b } = await setup();
+    spatialKeyed(p);
+    const out = invoke(ctx, 'keyframe.copy', {
+      comp: 'Main',
+      from: { index: 3, property: 'ADBE Position' },
+      to: { index: 2, property: 'ADBE Rotate Z' },
+    });
+    expect(out.issue).toBeUndefined();
+    expect(times(b)).toEqual([1, 2, 4]);
+    expect(b.isSpatial).toBe(false);
   });
 });

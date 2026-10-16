@@ -264,7 +264,11 @@ export class MockProperty {
     outType?: number;
     inEase?: MockKeyframeEase[];
     outEase?: MockKeyframeEase[];
+    inTangent?: number[];
+    outTangent?: number[];
   }[] = [];
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyisspatial
+  isSpatial = false;
   // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyselectedkeys
   selectedKeys: number[] = [];
 
@@ -302,6 +306,35 @@ export class MockProperty {
 
   keyOutTemporalEase(index: number): MockKeyframeEase[] {
     return this.keys[index - 1].outEase ?? [new MockKeyframeEase(0, 16.67)];
+  }
+
+  // Spatial tangents exist only on spatial properties; other types throw, as in AE.
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeyinspatialtangent
+  keyInSpatialTangent(index: number): number[] {
+    this.assertSpatial('keyInSpatialTangent');
+    return [...(this.keys[index - 1].inTangent ?? this.zeroTangent())];
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeyoutspatialtangent
+  keyOutSpatialTangent(index: number): number[] {
+    this.assertSpatial('keyOutSpatialTangent');
+    return [...(this.keys[index - 1].outTangent ?? this.zeroTangent())];
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetspatialtangentsatkey
+  setSpatialTangentsAtKey(keyIndex: number, inTangent: number[], outTangent: number[] = inTangent): void {
+    this.assertSpatial('setSpatialTangentsAtKey');
+    Object.assign(this.keys[keyIndex - 1], { inTangent: [...inTangent], outTangent: [...outTangent] });
+  }
+
+  private assertSpatial(method: string): void {
+    if (!this.isSpatial) {
+      throw new Error(`${method} applies only to spatial properties`);
+    }
+  }
+
+  private zeroTangent(): number[] {
+    return Array.from({ length: this.numDimensions }, () => 0);
   }
 
   key(time: number, value: unknown): this {
