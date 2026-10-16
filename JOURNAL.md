@@ -5,6 +5,21 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **Repo audit → #178–#186, all fixed and closed** (ADR-0007 records the contract
+  changes; Decider: Stan). `render.frame` lost its `file` argument (#178, a
+  read-only op could overwrite any file). The AE app name now comes from
+  `discoverAEVersions` (#179: AE 2026 had always fallen back to the file queue).
+  `render.queue_start` was removed (#180). `{success:false}` results became
+  `INVALID_ARGS` errors and `increment_save` raises `UNSAVED_PROJECT`, with one
+  shared guard helper (#181). Each batch step gets every standalone check; this
+  also closed an `eval.run`-inside-`batch.run` bypass of the eval gate (#182).
+  Fresh deadline per AE_BUSY retry (#183). The 44 comp loops became
+  `aemcpRequireComp` (#184, −455 lines). `shape.add` takes `name` for the shape
+  and `layerName` for a new layer (#185). `ae_do` no longer appends `context`
+  (#186). `npm run check` green at each commit (513 TS, 81 C#); bridge changes
+  smoke-tested live. The server changes reach users only after the mcpb is
+  rebuilt and reinstalled.
+
 - **#176 `ae_render_frame` race fixed** (`d4948d5`). The unsaved-project theory was
   wrong. After a save the call returned an empty image instead of ENOENT, while
   the file on disk was a valid PNG. `saveFrameToPng` returns a DeferredCall before
