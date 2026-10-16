@@ -21,7 +21,7 @@ async function queueRoot(): Promise<string> {
   return root;
 }
 
-async function writeHeartbeat(root: string): Promise<string> {
+async function writeHeartbeat(root: string, capabilities: string[] = []): Promise<string> {
   await mkdir(outboxDir(root), { recursive: true, mode: 0o700 });
   const file = join(outboxDir(root), 'heartbeat.json');
   await writeFile(
@@ -31,7 +31,7 @@ async function writeHeartbeat(root: string): Promise<string> {
       bridgeVersion: '0.0.0',
       aeVersion: '26.5',
       os: 'Macintosh',
-      capabilities: [],
+      capabilities,
       busy: false,
       transport: 'osascript',
     }),
@@ -62,6 +62,7 @@ describe('runSetupChecks', () => {
     expect(checks.map((c) => c.check)).toEqual([
       'after_effects',
       'bridge_heartbeat',
+      'bridge_capabilities',
       'queue_permissions',
       'project_saved_version',
       'third_party_extensions',
@@ -117,6 +118,31 @@ describe('runSetupChecks', () => {
       applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
     });
     expect(statusOf(checks, 'bridge_heartbeat')).toBe('fail');
+  });
+
+  it('fails bridge_capabilities when the installed payload misses operations the server knows', async () => {
+    const root = await queueRoot();
+    await writeHeartbeat(root, ['project.info', 'comp.create']);
+    const checks = await runSetupChecks({
+      root,
+      applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
+      expectedOperations: ['project.info', 'comp.create', 'expression.snippet', 'rig.null_controller'],
+    });
+    expect(statusOf(checks, 'bridge_capabilities')).toBe('fail');
+    const fix = checks.find((c) => c.check === 'bridge_capabilities')?.fix ?? '';
+    expect(fix).toContain('expression.snippet');
+    expect(fix).toMatch(/Refresh the bridge/);
+  });
+
+  it('passes bridge_capabilities when the payload reports every expected operation', async () => {
+    const root = await queueRoot();
+    await writeHeartbeat(root, ['project.info', 'comp.create', 'ae_version_info']);
+    const checks = await runSetupChecks({
+      root,
+      applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
+      expectedOperations: ['project.info', 'comp.create'],
+    });
+    expect(statusOf(checks, 'bridge_capabilities')).toBe('ok');
   });
 
   it('fails queue_permissions when the queue is not 0700', async () => {

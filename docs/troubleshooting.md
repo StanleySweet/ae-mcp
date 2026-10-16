@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Start with the `check_setup` tool in Claude. It returns four checks, each `ok`
+Start with the `check_setup` tool in Claude. It returns six checks, each `ok`
 or `fail` with a `fix` hint. Find the failing row below.
 
 ## check_setup results
@@ -25,6 +25,15 @@ The bridge in After Effects has not reported in. The hint names the case:
 After Effects must be open and the loader must have run (it runs at startup).
 Quit and reopen After Effects; if it still fails, run Setup and click
 **Install** to re-lay the bridge.
+
+### `bridge_capabilities` — fail
+
+The bridge payload installed in After Effects is older than the server: it does
+not register some operation the server knows about, so `ae_do` would fail with
+an unknown-operation error for it. The `fix` names the missing operation(s).
+
+Refresh the bridge: run Setup and click **Install**, then restart After Effects
+so the new payload loads.
 
 ### `queue_permissions` — fail
 

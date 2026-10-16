@@ -59,6 +59,7 @@ describe('mcp server skeleton', () => {
     expect(checks.map((row) => row.check)).toEqual([
       'after_effects',
       'bridge_heartbeat',
+      'bridge_capabilities',
       'queue_permissions',
       'project_saved_version',
       'third_party_extensions',

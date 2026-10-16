@@ -263,6 +263,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const checks = await runSetupChecks({
         root,
         applicationsDir: options.applicationsDir,
+        expectedOperations: operations.names(),
       });
       return text(checks);
     },

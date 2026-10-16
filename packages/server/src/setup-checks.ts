@@ -19,6 +19,8 @@ export interface SetupDeps {
   homeDir?: string;
   now?: () => number;
   heartbeatMaxAgeMs?: number;
+  /** Operation names the installed bridge payload must report (the server's op registry). */
+  expectedOperations?: string[];
 }
 
 function fail(check: string, fix: string): SetupCheck {
@@ -52,6 +54,31 @@ async function heartbeatCheck(
     case 'stale':
       return fail('bridge_heartbeat', 'The bridge stopped reporting; restart After Effects.');
   }
+}
+
+async function bridgePayloadCheck(
+  root: string,
+  maxAgeMs: number,
+  now: () => number,
+  expected: string[] | undefined,
+): Promise<SetupCheck> {
+  if (!expected || expected.length === 0) {
+    return { check: 'bridge_capabilities', status: 'ok', detail: 'no operations to compare' };
+  }
+  const state = await readHeartbeat(root, maxAgeMs, now);
+  if (state.status === 'missing' || state.status === 'unreadable') {
+    return { check: 'bridge_capabilities', status: 'ok', detail: 'bridge not reporting; see bridge_heartbeat' };
+  }
+  const present = state.beat.capabilities;
+  const missing = expected.filter((name) => present.indexOf(name) === -1);
+  if (missing.length === 0) {
+    return { check: 'bridge_capabilities', status: 'ok' };
+  }
+  return fail(
+    'bridge_capabilities',
+    `The bridge payload is out of date: it is missing ${missing.length} operation(s) — ` +
+      `${missing.join(', ')}. Refresh the bridge (run Setup, then restart After Effects).`,
+  );
 }
 
 async function queueDirCheck(root: string): Promise<SetupCheck> {
@@ -111,6 +138,7 @@ export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {
   return [
     await afterEffectsCheck(deps.applicationsDir),
     await heartbeatCheck(deps.root, heartbeatMaxAgeMs, now),
+    await bridgePayloadCheck(deps.root, heartbeatMaxAgeMs, now, deps.expectedOperations),
     await queueDirCheck(deps.root),
     await projectSavedVersionCheck(deps.root),
     await extensionsCheck(deps.homeDir),

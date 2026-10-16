@@ -46,17 +46,20 @@ accept it. If nothing appears, open Claude Desktop, go to
 
 ## First run
 
-With AE open, ask Claude to run the `check_setup` tool. It reports five checks:
+With AE open, ask Claude to run the `check_setup` tool. It reports six checks:
 
 - `after_effects` — an AE 2025+ install was found.
 - `bridge_heartbeat` — the bridge reported in recently (AE is open and loaded).
+- `bridge_capabilities` — the installed bridge payload reports every operation the
+  server knows. Fails when the payload is out of date, naming the missing
+  operation(s) and the fix (refresh the bridge, then restart After Effects).
 - `queue_permissions` — `~/.ae-mcp` is `chmod 700`.
 - `project_saved_version` — the project has been saved at least once (see
   [Destructive operations](#destructive-operations)).
 - `third_party_extensions` — informational: the CEP extensions found (for
   example Animation Composer or Motion), in its `detail`. Always `ok`.
 
-Any failing check carries a `fix` hint. When the four gating checks are green,
+Any failing check carries a `fix` hint. When the five gating checks are green,
 ask Claude to list the tools it can see.
 
 On connect the server also sends Claude its animation principles (keyframes vs
