@@ -123,3 +123,24 @@ describe('shape.set', () => {
     expect(shape.vertices).toEqual([[0, 0], [50, 50], [100, 0]]);
   });
 });
+
+// The 44 copied comp lookups matched by name only and ignored the active comp (#184).
+describe('comp resolution', () => {
+  it('shape.add without comp targets the active comp', async () => {
+    const { ctx, ae } = await shapeLayerContext();
+    ae.project.activeItem = ae.project.item(1) ?? null;
+
+    const out = invoke(ctx, 'shape.add', { layerIndex: 1, type: 'ellipse' });
+
+    expect(out.ok).toBe(true);
+    expect(groupContents(ae).property('ADBE Vector Shape - Ellipse')).not.toBeNull();
+  });
+
+  it('reports a missing comp as INVALID_ARGS naming it', async () => {
+    const { ctx } = await shapeLayerContext();
+
+    const out = invoke(ctx, 'shape.add', { comp: 'Nope', layerIndex: 1, type: 'ellipse' });
+
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'composition not found: Nope' });
+  });
+});

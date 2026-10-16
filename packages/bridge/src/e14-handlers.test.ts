@@ -346,7 +346,7 @@ describe('rig.null_controller', () => {
 
     const out = invoke(ctx, 'rig.null_controller', { comp: 'Nope' });
 
-    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'Composition not found' });
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'composition not found: Nope' });
   });
 
   it('refuses to build a rig when a target layer is missing', async () => {

@@ -758,18 +758,7 @@ AEMCP.register('find', function (args) {
 AEMCP.register('layer.add_text', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var text = args && args.text ? args.text : 'Text';
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addText(text);
     layer.name = 'Text';
     return { name: layer.name, id: layer.id };
@@ -777,18 +766,7 @@ AEMCP.register('layer.add_text', function (args) {
 
 AEMCP.register('layer.add_shape', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addShape();
     layer.name = 'Shape';
     return { name: layer.name, id: layer.id };
@@ -797,18 +775,7 @@ AEMCP.register('layer.add_shape', function (args) {
 AEMCP.register('layer.add_solid', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var color = args && args.color ? args.color : [1, 1, 1];
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addSolid(color, 'Solid', comp.width, comp.height, comp.pixelAspect, comp.duration);
     layer.name = 'Solid';
     return { name: layer.name, id: layer.id };
@@ -816,18 +783,7 @@ AEMCP.register('layer.add_solid', function (args) {
 
 AEMCP.register('layer.add_adjustment', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addSolid([0.5, 0.5, 0.5], 'Adjustment', comp.width, comp.height, comp.pixelAspect, comp.duration);
     layer.name = 'Adjustment';
     layer.adjustmentLayer = true;
@@ -836,18 +792,7 @@ AEMCP.register('layer.add_adjustment', function (args) {
 
 AEMCP.register('layer.add_null', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addNull(comp.duration);
     layer.name = 'Null';
     return { name: layer.name, id: layer.id };
@@ -857,17 +802,7 @@ AEMCP.register('layer.add_footage', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var footageName = args && args.name ? args.name : null;
     var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var source = null;
     for (var j = 1; j <= project.numItems; j++) {
         var candidate = project.item(j);
@@ -886,18 +821,7 @@ AEMCP.register('layer.add_footage', function (args) {
 
 AEMCP.register('layer.center', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var sel = comp.selectedLayers;
     if (!sel) return { success: false, error: 'No layers selected' };
     for (var i = 1; i <= sel.length; i++) {
@@ -917,18 +841,7 @@ AEMCP.register('layer.set_transform', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && args.index ? args.index : 1;
     var position = args && args.position ? args.position : [comp.width / 2, comp.height / 2];
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     if (layer.property) {
@@ -945,18 +858,7 @@ AEMCP.register('layer.set_parent', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && args.index ? args.index : 1;
     var parentIndex = args && args.parent ? args.parent : 0;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     layer.parentIndex = parentIndex;
@@ -966,18 +868,7 @@ AEMCP.register('layer.set_parent', function (args) {
 AEMCP.register('layer.delete', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && args.index ? args.index : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerremove
@@ -988,18 +879,7 @@ AEMCP.register('layer.delete', function (args) {
 AEMCP.register('layer.bounds', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && args.index ? args.index : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     if (typeof layer.sourceRectAtTime !== 'function') {
@@ -1039,18 +919,7 @@ AEMCP.register('property.get', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.name ? args.name : null;
     var layerIndex = args && args.index ? args.index : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
@@ -1077,18 +946,7 @@ AEMCP.register('property.set', function (args) {
     // 0, [], "" and false are valid values, so test presence, not truthiness.
     var value = args && args.value !== undefined ? args.value : null;
     var layerIndex = args && args.index ? args.index : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
@@ -1105,18 +963,7 @@ AEMCP.register('keyframe.add', function (args) {
     // 0 is a valid keyframe value (e.g. opacity off), so test presence, not truthiness.
     var value = args && args.value !== undefined ? args.value : [0, 0];
     var propertyName = args && args.property ? args.property : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
@@ -1130,18 +977,7 @@ AEMCP.register('keyframe.remove', function (args) {
     var layerIndex = args && args.index ? args.index : 1;
     var time = args && args.time ? args.time : 0;
     var propertyName = args && args.property ? args.property : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
@@ -1162,18 +998,7 @@ AEMCP.register('keyframe.set_easing', function (args) {
     var time = args && args.time ? args.time : 0;
     var easing = args && args.easing ? args.easing : 'linear';
     var propertyName = args && args.property ? args.property : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
@@ -1226,16 +1051,7 @@ AEMCP.register('keyframe.ease_preset', function (args) {
     var curves = { ease_in: [66.67, 0.1], ease_out: [0.1, 66.67], overshoot: [0.1, 85] };
     var curve = curves[preset];
     if (!curve) return { success: false, error: 'Unknown preset: ' + preset };
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
@@ -1275,16 +1091,7 @@ AEMCP.register('anchor.move_preserving', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && args.index ? args.index : 1;
     var anchor = args && args.anchor !== undefined ? args.anchor : 'center';
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     if (!layer.property) return { success: false, error: 'Not an AV layer' };
@@ -1350,18 +1157,7 @@ AEMCP.register('expression.set', function (args) {
     // presence, not truthiness.
     var value = args && args.value !== undefined ? args.value : null;
     var layerIndex = args && args.index ? args.index : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
@@ -1377,18 +1173,7 @@ AEMCP.register('expression.clear', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.property ? args.property : null;
     var layerIndex = args && args.index ? args.index : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
@@ -1402,18 +1187,7 @@ AEMCP.register('expression.check_errors', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.property ? args.property : null;
     var layerIndex = args && args.index ? args.index : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
@@ -1441,18 +1215,7 @@ AEMCP.register('expression.snippet', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.property ? args.property : null;
     var layerIndex = args && args.index ? args.index : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
@@ -1473,18 +1236,7 @@ AEMCP.register('rig.null_controller', function (args) {
     var name = args && args.name ? args.name : 'Controller';
     var sliders = args && args.sliders ? args.sliders : [];
     var layerIndices = args && args.layers ? args.layers : [];
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     // Resolve targets before mutating so a bad index leaves the comp untouched.
     var targets = [];
     var j, tl;
@@ -1553,18 +1305,7 @@ AEMCP.register('effect.apply', function (args) {
     if (!effectName) {
         return { success: false, error: 'Effect required' };
     }
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var parade = aemcpEffectParade(layer);
@@ -1582,18 +1323,7 @@ AEMCP.register('effect.apply', function (args) {
 AEMCP.register('effect.list_on_layer', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && args.index ? args.index : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var parade = aemcpEffectParade(layer);
@@ -1641,18 +1371,7 @@ AEMCP.register('effect.set_property', function (args) {
     if (!propertyName) {
         return { success: false, error: 'Property required' };
     }
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var parade = aemcpEffectParade(layer);
@@ -1677,18 +1396,7 @@ AEMCP.register('effect.set_keyframe', function (args) {
     if (!propertyName) {
         return { success: false, error: 'Property required' };
     }
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var parade = aemcpEffectParade(layer);
@@ -1707,18 +1415,7 @@ AEMCP.register('effect.remove', function (args) {
     if (!effectName) {
         return { success: false, error: 'Effect required' };
     }
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var parade = aemcpEffectParade(layer);
@@ -1733,18 +1430,7 @@ AEMCP.register('preset.apply_ffx', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && args.index ? args.index : 1;
     var presetPath = args && args.path ? args.path : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     if (!presetPath) return { success: false, error: 'Preset path required' };
@@ -1792,18 +1478,7 @@ AEMCP.register('marker.add', function (args) {
     var time = args && typeof args.time === 'number' ? args.time : 0;
     var comment = args && args.comment ? args.comment : '';
     var duration = args && typeof args.duration === 'number' ? args.duration : 0;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var markerProp;
     if (layerIndex !== null) {
         var markerLayer = comp.layer(layerIndex);
@@ -1825,18 +1500,7 @@ AEMCP.register('marker.add_bulk', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
     var markers = args && args.markers ? args.markers : [];
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var markerProp;
     if (layerIndex !== null) {
         var markerLayer = comp.layer(layerIndex);
@@ -1858,18 +1522,7 @@ AEMCP.register('marker.add_bulk', function (args) {
 AEMCP.register('marker.list', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) {
-        return { success: false, error: 'Composition not found' };
-    }
+    var comp = aemcpRequireComp(compName);
     var markerProp;
     if (layerIndex !== null) {
         var markerLayer = comp.layer(layerIndex);
@@ -1900,16 +1553,7 @@ AEMCP.register('marker.list', function (args) {
 AEMCP.register('mask.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var masks = layer.property(AEMCP_MATCH.MASKS);
@@ -1930,16 +1574,7 @@ AEMCP.register('mask.set', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var maskIndex = args && typeof args.maskIndex === 'number' ? args.maskIndex : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var masks = layer.property(AEMCP_MATCH.MASKS);
@@ -1959,16 +1594,7 @@ AEMCP.register('mask.read', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var maskIndex = args && typeof args.maskIndex === 'number' ? args.maskIndex : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var masks = layer.property(AEMCP_MATCH.MASKS);
@@ -1987,16 +1613,7 @@ AEMCP.register('shape.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
     var shapeType = args && args.type ? args.type : 'path'; // 'path', 'rect', 'ellipse'
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer;
     if (layerIndex !== null) {
         layer = comp.layer(layerIndex);
@@ -2047,16 +1664,7 @@ AEMCP.register('shape.add', function (args) {
 AEMCP.register('shape.set', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
@@ -2082,16 +1690,7 @@ AEMCP.register('shape.set', function (args) {
 AEMCP.register('shape.read', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
@@ -2147,16 +1746,7 @@ function aemcpApplyTextStyle(textDoc, args) {
 AEMCP.register('text.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var textString = args && args.text ? args.text : 'Text';
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var textLayer = comp.layers.addText(textString);
     var textProp = textLayer.property('Source Text');
     var textDoc = textProp.value;
@@ -2169,16 +1759,7 @@ AEMCP.register('text.add', function (args) {
 AEMCP.register('text.set', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var textProp = layer.property('Source Text');
@@ -2193,16 +1774,7 @@ AEMCP.register('text.set', function (args) {
 AEMCP.register('text.read', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var textProp = layer.property('Source Text');
@@ -2226,16 +1798,7 @@ AEMCP.register('audio.set_levels', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var levels = args && args.levels ? args.levels : [0, 0];
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var audioLevels = layer.property('Audio Levels');
@@ -2247,16 +1810,7 @@ AEMCP.register('audio.set_levels', function (args) {
 AEMCP.register('audio.info', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var hasAudio = layer.hasAudio;
@@ -2273,16 +1827,7 @@ AEMCP.register('audio.peaks_to_markers', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var peaks = args && args.peaks ? args.peaks : [];
-    var project = app.project;
-    var comp;
-    for (var i = 1; i <= project.numItems; i++) {
-        var item = project.item(i);
-        if (item instanceof CompItem && item.name === compName) {
-            comp = item;
-            break;
-        }
-    }
-    if (!comp) return { success: false, error: 'Composition not found' };
+    var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
     var markerProp = layer.property('Marker');
