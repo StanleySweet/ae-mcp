@@ -226,6 +226,31 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  const keyTarget = {
+    type: 'object',
+    properties: { index: layerIndex, property: propertyName },
+    required: ['index', 'property'],
+  };
+  register(
+    operation('keyframe.copy', 'keyframe', 'Copy every keyframe (time, value, interpolation, temporal ease) onto another property.', {
+      schema: { comp, from: keyTarget, to: keyTarget, offset: { type: 'number' } },
+    }),
+  );
+  register(
+    operation('keyframe.offset', 'keyframe', 'Shift every keyframe of a property by a number of seconds, keeping easing.', {
+      schema: { comp, index: layerIndex, property: propertyName, seconds: { type: 'number' } },
+    }),
+  );
+  register(
+    operation('keyframe.reverse', 'keyframe', 'Mirror the keyframe times of a property within its first-to-last span.', {
+      schema: { comp, index: layerIndex, property: propertyName },
+    }),
+  );
+  register(
+    operation('keyframe.scale_time', 'keyframe', 'Scale keyframe times around the first key by a factor greater than 0.', {
+      schema: { comp, index: layerIndex, property: propertyName, factor: { type: 'number' } },
+    }),
+  );
   register(
     operation('anchor.move_preserving', 'anchor', 'Move the anchor point while keeping the layer visually in place.', {
       schema: {

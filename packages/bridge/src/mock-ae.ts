@@ -255,7 +255,14 @@ export class MockProperty {
   expression = '';
   // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpressionerror
   expressionError = '';
-  readonly keys: { time: number; value: unknown }[] = [];
+  readonly keys: {
+    time: number;
+    value: unknown;
+    inType?: number;
+    outType?: number;
+    inEase?: MockKeyframeEase[];
+    outEase?: MockKeyframeEase[];
+  }[] = [];
   // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyselectedkeys
   selectedKeys: number[] = [];
 
@@ -275,6 +282,24 @@ export class MockProperty {
 
   keyValue(index: number): unknown {
     return this.keys[index - 1].value;
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeyininterpolationtype
+  keyInInterpolationType(index: number): number {
+    return this.keys[index - 1].inType ?? MockKeyframeInterpolationType.LINEAR;
+  }
+
+  keyOutInterpolationType(index: number): number {
+    return this.keys[index - 1].outType ?? MockKeyframeInterpolationType.LINEAR;
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeyintemporalease
+  keyInTemporalEase(index: number): MockKeyframeEase[] {
+    return this.keys[index - 1].inEase ?? [new MockKeyframeEase(0, 16.67)];
+  }
+
+  keyOutTemporalEase(index: number): MockKeyframeEase[] {
+    return this.keys[index - 1].outEase ?? [new MockKeyframeEase(0, 16.67)];
   }
 
   key(time: number, value: unknown): this {
@@ -301,6 +326,15 @@ export class MockProperty {
     this.keys.splice(index - 1, 1);
   }
 
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertynearestkeyindex
+  nearestKeyIndex(time: number): number {
+    let best = 1;
+    this.keys.forEach((k, i) => {
+      if (Math.abs(k.time - time) < Math.abs(this.keys[best - 1].time - time)) best = i + 1;
+    });
+    return best;
+  }
+
   // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertynumdimensions
   get numDimensions(): number {
     return Array.isArray(this.value) ? this.value.length : 1;
@@ -313,17 +347,19 @@ export class MockProperty {
     outEase: MockKeyframeEase[];
   }[] = [];
 
-  setInterpolationTypeAtKey(keyIndex: number, inType: number, outType: number): void {
+  setInterpolationTypeAtKey(keyIndex: number, inType: number, outType: number = inType): void {
     this.interpolationTypes.push({ keyIndex, inType, outType });
+    Object.assign(this.keys[keyIndex - 1], { inType, outType });
   }
 
   // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysettemporaleaseatkey
   setTemporalEaseAtKey(
     keyIndex: number,
     inEase: MockKeyframeEase[],
-    outEase: MockKeyframeEase[],
+    outEase: MockKeyframeEase[] = inEase,
   ): void {
     this.temporalEases.push({ keyIndex, inEase, outEase });
+    Object.assign(this.keys[keyIndex - 1], { inEase, outEase });
   }
 
   setValue(value: unknown): void {

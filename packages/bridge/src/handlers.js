@@ -996,6 +996,144 @@ AEMCP.register('property.set', function (args) {
     return aemcpWithExpressionWarning(prop, { success: true });
 });
 
+// Read every key of a property: time, value, interpolation types and temporal eases.
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeyininterpolationtype
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertykeyintemporalease
+function aemcpReadKeys(prop) {
+    var keys = [];
+    var i;
+    for (i = 1; i <= prop.numKeys; i++) {
+        keys.push({
+            time: prop.keyTime(i),
+            value: prop.keyValue(i),
+            inType: prop.keyInInterpolationType(i),
+            outType: prop.keyOutInterpolationType(i),
+            inEase: prop.keyInTemporalEase(i),
+            outEase: prop.keyOutTemporalEase(i)
+        });
+    }
+    return keys;
+}
+
+// Write keys (as read by aemcpReadKeys) onto a property, restoring interpolation and eases.
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetvalueattime
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetinterpolationtypeatkey
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysettemporaleaseatkey
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertynearestkeyindex
+function aemcpWriteKeys(prop, keys) {
+    var i, key, at;
+    for (i = 0; i < keys.length; i++) {
+        key = keys[i];
+        prop.setValueAtTime(key.time, key.value);
+        at = prop.nearestKeyIndex(key.time);
+        prop.setInterpolationTypeAtKey(at, key.inType, key.outType);
+        try {
+            prop.setTemporalEaseAtKey(at, key.inEase, key.outEase);
+        } catch (e) {
+            // Hold keys reject temporal eases; the interpolation type alone is enough.
+        }
+    }
+}
+
+function aemcpKeyTimes(keys) {
+    var times = [];
+    var i;
+    for (i = 0; i < keys.length; i++) {
+        times.push(keys[i].time);
+    }
+    return times;
+}
+
+// Resolve a property that has at least one key, or abort with INVALID_ARGS.
+function aemcpRequireKeyedProperty(layer, path) {
+    var prop = typeof path === 'string' && path !== '' ? aemcpResolveProperty(layer, path) : null;
+    if (!prop || typeof prop.numKeys !== 'number') {
+        aemcpAbortArgs('property not found: ' + path);
+    }
+    if (prop.numKeys === 0) {
+        aemcpAbortArgs('property has no keyframes: ' + path);
+    }
+    return prop;
+}
+
+function aemcpNumberArg(args, name) {
+    var v = args ? args[name] : undefined;
+    if (typeof v !== 'number' || v !== v) {
+        aemcpAbortArgs(name + ' must be a number');
+    }
+    return v;
+}
+
+// Move every key of a property in place (read all, remove all, write back),
+// mapping each time through transform(time, firstTime, lastTime).
+function aemcpRetimeKeys(args, transform) {
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var layer = comp.layer(args && args.index ? args.index : 1);
+    if (!layer) {
+        aemcpAbortArgs('layer not found: ' + (args && args.index));
+    }
+    var prop = aemcpRequireKeyedProperty(layer, args && args.property);
+    var keys = aemcpReadKeys(prop);
+    var first = keys[0].time;
+    var last = keys[keys.length - 1].time;
+    var i;
+    for (i = 0; i < keys.length; i++) {
+        keys[i].time = transform(keys[i].time, first, last);
+    }
+    for (i = prop.numKeys; i >= 1; i--) {
+        prop.removeKey(i);
+    }
+    aemcpWriteKeys(prop, keys);
+    return { success: true, keys: keys.length, times: aemcpKeyTimes(keys) };
+}
+
+// Copy every key (time, value, interpolation, temporal ease) onto another property.
+AEMCP.register('keyframe.copy', function (args) {
+    var comp = aemcpRequireComp(aemcpCompKey(args));
+    var from = args && args.from;
+    var to = args && args.to;
+    if (!from || !to) {
+        aemcpAbortArgs('from and to are required');
+    }
+    var offset = args.offset === undefined ? 0 : aemcpNumberArg(args, 'offset');
+    var srcLayer = comp.layer(from.index || 1);
+    var dstLayer = comp.layer(to.index || 1);
+    if (!srcLayer || !dstLayer) {
+        aemcpAbortArgs('layer not found');
+    }
+    var src = aemcpRequireKeyedProperty(srcLayer, from.property);
+    var dst = typeof to.property === 'string' && to.property !== '' ? aemcpResolveProperty(dstLayer, to.property) : null;
+    if (!dst || typeof dst.setValueAtTime !== 'function') {
+        aemcpAbortArgs('property not found: ' + to.property);
+    }
+    var keys = aemcpReadKeys(src);
+    var i;
+    for (i = 0; i < keys.length; i++) {
+        keys[i].time += offset;
+    }
+    aemcpWriteKeys(dst, keys);
+    return { success: true, keys: keys.length, times: aemcpKeyTimes(keys) };
+});
+
+AEMCP.register('keyframe.offset', function (args) {
+    var seconds = aemcpNumberArg(args, 'seconds');
+    return aemcpRetimeKeys(args, function (t) { return t + seconds; });
+});
+
+// Mirror key times within [first, last].
+AEMCP.register('keyframe.reverse', function (args) {
+    return aemcpRetimeKeys(args, function (t, first, last) { return first + last - t; });
+});
+
+// Scale key times around the first key.
+AEMCP.register('keyframe.scale_time', function (args) {
+    var factor = aemcpNumberArg(args, 'factor');
+    if (factor <= 0) {
+        aemcpAbortArgs('factor must be greater than 0');
+    }
+    return aemcpRetimeKeys(args, function (t, first) { return first + (t - first) * factor; });
+});
+
 // Keyframe operation handlers (mutating, run via ae_do).
 AEMCP.register('keyframe.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
@@ -2515,14 +2653,10 @@ AEMCP.register('bulk.stagger', function (args) {
                 parts.push(comp.name + ':' + indices[i] + '=0');
                 continue;
             }
-            var fromTimes = [];
-            var values = [];
+            var keyData = aemcpReadKeys(prop);
+            var fromTimes = aemcpKeyTimes(keyData);
             var toTimes = [];
             var k;
-            for (k = 1; k <= n; k++) {
-                fromTimes.push(prop.keyTime(k));
-                values.push(prop.keyValue(k));
-            }
             for (k = 0; k < fromTimes.length; k++) {
                 toTimes.push(fromTimes[k] + delta);
             }
@@ -2534,8 +2668,9 @@ AEMCP.register('bulk.stagger', function (args) {
                         prop.removeKey(k);
                     }
                     for (k = 0; k < toTimes.length; k++) {
-                        prop.setValueAtTime(toTimes[k], values[k]);
+                        keyData[k].time = toTimes[k];
                     }
+                    aemcpWriteKeys(prop, keyData);
                 }
             }
         } else {
