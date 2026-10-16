@@ -13,6 +13,9 @@ var AEMCP_MATCH = {
     POSITION: 'ADBE Position',
     EFFECTS: 'ADBE Effect Parade',
     MASKS: 'ADBE Mask Parade',
+    // Not in the scripting guide; read from live fr_FR AE 26.5 (#177).
+    MASK_ATOM: 'ADBE Mask Atom',
+    MASK_SHAPE: 'ADBE Mask Shape',
     MARKER: 'ADBE Marker',
     TEXT_PROPERTIES: 'ADBE Text Properties',
     TEXT_DOCUMENT: 'ADBE Text Document',
@@ -1920,16 +1923,16 @@ AEMCP.register('mask.add', function (args) {
     if (!comp) return { success: false, error: 'Composition not found' };
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var masks = layer.property('Masks');
+    var masks = layer.property(AEMCP_MATCH.MASKS);
     if (!masks) return { success: false, error: 'Masks property not found' };
-    var newMask = masks.addProperty('Mask');
+    var newMask = aemcpAddProperty(masks, AEMCP_MATCH.MASK_ATOM);
     if (args && args.vertices) {
         var shape = new Shape();
         shape.vertices = args.vertices;
         if (args.inTangents) shape.inTangents = args.inTangents;
         if (args.outTangents) shape.outTangents = args.outTangents;
         if (typeof args.closed === 'boolean') shape.closed = args.closed;
-        newMask.property('maskShape').setValue(shape);
+        newMask.property(AEMCP_MATCH.MASK_SHAPE).setValue(shape);
     }
     return { success: true, maskIndex: newMask.propertyIndex };
 });
@@ -1950,9 +1953,10 @@ AEMCP.register('mask.set', function (args) {
     if (!comp) return { success: false, error: 'Composition not found' };
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var mask = layer.property('Masks') ? layer.property('Masks').property(maskIndex) : null;
+    var masks = layer.property(AEMCP_MATCH.MASKS);
+    var mask = masks ? masks.property(maskIndex) : null;
     if (!mask) return { success: false, error: 'Mask not found' };
-    var maskShapeProp = mask.property('maskShape');
+    var maskShapeProp = mask.property(AEMCP_MATCH.MASK_SHAPE);
     var shape = maskShapeProp.value;
     if (args.vertices) shape.vertices = args.vertices;
     if (args.inTangents) shape.inTangents = args.inTangents;
@@ -1978,9 +1982,10 @@ AEMCP.register('mask.read', function (args) {
     if (!comp) return { success: false, error: 'Composition not found' };
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var mask = layer.property('Masks') ? layer.property('Masks').property(maskIndex) : null;
+    var masks = layer.property(AEMCP_MATCH.MASKS);
+    var mask = masks ? masks.property(maskIndex) : null;
     if (!mask) return { success: false, error: 'Mask not found' };
-    var shape = mask.property('maskShape').value;
+    var shape = mask.property(AEMCP_MATCH.MASK_SHAPE).value;
     return {
         vertices: shape.vertices,
         inTangents: shape.inTangents,

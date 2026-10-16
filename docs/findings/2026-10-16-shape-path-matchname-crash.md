@@ -60,3 +60,22 @@ assignment match the `else` branch of `if rect / else if ellipse / else` in
   display name `'Masks'`. The scripting guide documents `ADBE Mask Parade` but no
   match name for a mask atom or its path, so the call was left as it was rather
   than changed from memory.
+
+## Update 2026-10-17: mask match names read from live AE (#177)
+
+The open mask item above is resolved. A mask added on fr_FR AE 26.5 and read back
+with `ae_layer_info` reported:
+
+| concept | display name (fr_FR) | matchName |
+| --- | --- | --- |
+| mask group | Masques | `ADBE Mask Parade` (documented) |
+| one mask | Masque 1 | `ADBE Mask Atom` |
+| mask path | Tracé du masque | `ADBE Mask Shape` |
+| feather | Contour progressif du masque | `ADBE Mask Feather` |
+| opacity | Opacité de masque | `ADBE Mask Opacity` |
+| expansion | Expansion de masque | `ADBE Mask Offset` |
+
+The mask ops now use `AEMCP_MATCH.MASKS` / `MASK_ATOM` / `MASK_SHAPE`, and
+`mask.add` goes through `aemcpAddProperty`. When the scripting guide is silent, a
+name read back from a running AE counts as verified. `match-names.test.ts` keeps
+those names in a separate `READ_FROM_LIVE_AE` list so their origin stays visible.

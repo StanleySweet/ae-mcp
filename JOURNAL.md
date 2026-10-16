@@ -3,6 +3,19 @@
 Append-only progress log. Newest entry first. One entry per session or per landed
 chunk of work; don't rewrite old entries — supersede them.
 
+## 2026-10-17
+
+- **#176 `ae_render_frame` race fixed** (`d4948d5`). The unsaved-project theory was
+  wrong. After a save the call returned an empty image instead of ENOENT, while
+  the file on disk was a valid PNG. `saveFrameToPng` returns a DeferredCall before
+  AE writes the file, so the server now polls for a complete PNG (`IEND`) before
+  reading it. It takes effect for the user only after the mcpb server is rebuilt
+  and reinstalled.
+- **#177 mask ops on match names.** Mask atom/path match names were read from
+  live AE (`ADBE Mask Atom`, `ADBE Mask Shape`) because the guide does not list
+  them; the handlers now use `AEMCP_MATCH` plus `aemcpAddProperty`. The new mock
+  `MockMaskParade` uses fr_FR display names, so display-name lookups fail in tests.
+
 ## 2026-10-16
 
 - **#175 shipped and verified live** (`0b230d8`, CI green). With the rebuilt

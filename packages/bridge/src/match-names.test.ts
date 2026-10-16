@@ -40,6 +40,11 @@ const DOCUMENTED = new Set([
   'ADBE Vector Stroke Width',
 ]);
 
+// Match names the scripting guide does not list, read from live AE instead
+// (ae_layer_info on fr_FR AE 26.5, docs/findings/2026-10-16-shape-path-matchname-crash.md).
+// Only add to this list after reading the name back from a running AE.
+const READ_FROM_LIVE_AE = new Set(['ADBE Mask Atom', 'ADBE Mask Shape']);
+
 const BRIDGE_SOURCES = ['job-runner.js', 'serializers.js', 'handlers.js'];
 
 function source(file: string): string {
@@ -58,8 +63,10 @@ function matchTable(): Record<string, string> {
 }
 
 describe('AEMCP_MATCH', () => {
-  it('holds only match names documented in the scripting guide', () => {
-    const undocumented = Object.values(matchTable()).filter((name) => !DOCUMENTED.has(name));
+  it('holds only match names documented in the scripting guide or read from live AE', () => {
+    const undocumented = Object.values(matchTable()).filter(
+      (name) => !DOCUMENTED.has(name) && !READ_FROM_LIVE_AE.has(name),
+    );
     expect(undocumented).toEqual([]);
   });
 

@@ -344,6 +344,11 @@ export class MockPropertyGroup {
     return this.children.length;
   }
 
+  // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybasepropertyindex
+  get propertyIndex(): number {
+    return this.parentGroup ? this.parentGroup.children.indexOf(this) + 1 : 0;
+  }
+
   property(indexOrName: number | string): MockProperty | MockPropertyGroup | null {
     if (typeof indexOrName === 'number') {
       return this.children[indexOrName - 1] ?? null;
@@ -544,6 +549,30 @@ export class MockVectorsGroup extends MockPropertyGroup {
       item.add(new MockProperty('Stroke Width', 'ADBE Vector Stroke Width', 2));
     }
     return item;
+  }
+}
+
+// A layer's Masks group with the display names fr_FR AE 26.5 reported live
+// ("Masques", "Masque 1", "Tracé du masque"), so a handler that looks masks up
+// by English display name fails here as it would there. Match names were read
+// from live AE: the scripting guide lists only ADBE Mask Parade.
+export class MockMaskParade extends MockPropertyGroup {
+  constructor() {
+    super('Masques', 'ADBE Mask Parade');
+  }
+
+  canAddProperty(name: string): boolean {
+    return name === 'ADBE Mask Atom';
+  }
+
+  // Typed MockEffect to satisfy the base signature; only the group shape matters.
+  addProperty(matchName: string): MockEffect {
+    if (!this.canAddProperty(matchName)) {
+      throw new Error('mock AE: cannot add ' + matchName + ' to the mask parade');
+    }
+    const atom = this.add(new MockEffect('Masque ' + (this.numProperties + 1), 'ADBE Mask Atom'));
+    atom.add(new MockProperty('Tracé du masque', 'ADBE Mask Shape', new MockShape()));
+    return atom;
   }
 }
 
