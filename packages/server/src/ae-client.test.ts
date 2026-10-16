@@ -151,6 +151,26 @@ describe('ae client', () => {
     expect(sleeps).toEqual([100, 200]);
   });
 
+  // A busy osascript call returns after 120 s; reusing the first job's 30 s
+  // deadline made every retry expire before it ran (#183).
+  it('gives each AE_BUSY retry a fresh deadline', async () => {
+    const transport = new RecordingTransport();
+    transport.enqueue(busy());
+    transport.enqueue(ok('done'));
+    let clock = 0;
+    const client = createAEClient({
+      transport,
+      root: '/unused',
+      timeoutMs: 1000,
+      now: () => clock,
+      retry: { attempts: 2, baseDelayMs: 100, sleep: async () => void (clock += 5000) },
+    });
+
+    await client.call('echo');
+
+    expect(transport.jobs.map((job) => job.deadline)).toEqual([1000, 6000]);
+  });
+
   it('gives up after the retry budget and returns the AE_BUSY error', async () => {
     const transport = new RecordingTransport();
     transport.enqueue(busy());

@@ -130,19 +130,22 @@ export function createAEClient(options: AEClientOptions): AEClient {
     purgeStale,
     async call(tool: string, args: unknown = null): Promise<ResultMessage> {
       await purgeStale().catch(() => undefined);
-      const job: JobMessage = {
+      const id = newId();
+      // A fresh deadline per attempt: a busy osascript call only returns after
+      // its 120 s timeout, so a reused deadline would already be past (#183).
+      const job = (): JobMessage => ({
         protocolVersion: PROTOCOL_VERSION,
-        id: newId(),
+        id,
         tool,
         args,
         deadline: now() + timeoutMs,
-      };
-      let result = await attempt(job);
+      });
+      let result = await attempt(job());
       if (retry !== null) {
         for (let i = 1; i < retry.attempts && !result.ok && result.error.code === 'AE_BUSY'; i++) {
           const delay = Math.min(retry.maxDelayMs, retry.baseDelayMs * 2 ** (i - 1));
           await retry.sleep(delay);
-          result = await attempt(job);
+          result = await attempt(job());
         }
       }
       return result;
