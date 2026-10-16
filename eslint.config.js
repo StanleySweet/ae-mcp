@@ -12,6 +12,7 @@ export default [
       'coverage',
       '**/out',
       '.tmp',
+      '.claude',
       '**/spike/**/*.jsx',
       'packages/bridge/src/*.js',
       // Native Setup app: a .NET project. Its only .jsx/.js are generated copies
