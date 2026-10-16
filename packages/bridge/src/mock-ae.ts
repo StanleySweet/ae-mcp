@@ -347,7 +347,12 @@ export class MockPropertyGroup {
   }
 
   addProperty(matchName: string): MockEffect {
-    return this.add(new MockEffect(matchName, matchName));
+    const effect = this.add(new MockEffect(matchName, matchName));
+    // A Slider Control exposes its value as "ADBE Slider Control-0001".
+    if (matchName === 'ADBE Slider Control') {
+      effect.add(new MockProperty('Slider', 'ADBE Slider Control-0001', 0));
+    }
+    return effect;
   }
 }
 

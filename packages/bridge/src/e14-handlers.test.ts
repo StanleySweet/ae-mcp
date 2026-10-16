@@ -295,3 +295,72 @@ describe('expression.snippet', () => {
     expect(out.value).toEqual({ success: false, error: 'Property not found' });
   });
 });
+
+describe('rig.null_controller', () => {
+  it('creates a null with slider controls and parents the given layers', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    layerWithScale(ae);
+    layerWithScale(ae);
+
+    const out = invoke(ctx, 'rig.null_controller', {
+      comp: 'Main',
+      name: 'Ctrl',
+      sliders: ['Amount', 'Delay'],
+      layers: [1, 2],
+    });
+
+    expect(out.value).toMatchObject({
+      success: true,
+      nullIndex: 3,
+      name: 'Ctrl',
+      sliders: ['Amount', 'Delay'],
+      linked: [1, 2],
+    });
+    const comp = ae.project.item(1) as MockCompItem;
+    const nullLayer = comp.layer(3) as MockAVLayer;
+    expect(nullLayer.nullLayer).toBe(true);
+    const effects = nullLayer.property('ADBE Effect Parade') as MockPropertyGroup;
+    expect(effects.numProperties).toBe(2);
+    expect(comp.layer(1)!.parent).toBe(nullLayer);
+    expect(comp.layer(2)!.parent).toBe(nullLayer);
+  });
+
+  it('creates a bare controller null when no sliders or layers are given', async () => {
+    const { ctx } = await payloadContext();
+    createComp(ctx);
+
+    const out = invoke(ctx, 'rig.null_controller', { comp: 'Main' });
+
+    expect(out.value).toMatchObject({
+      success: true,
+      nullIndex: 1,
+      name: 'Controller',
+      sliders: [],
+      linked: [],
+    });
+  });
+
+  it('reports a missing composition', async () => {
+    const { ctx } = await payloadContext();
+
+    const out = invoke(ctx, 'rig.null_controller', { comp: 'Nope' });
+
+    expect(out.value).toEqual({ success: false, error: 'Composition not found' });
+  });
+
+  it('refuses to build a rig when a target layer is missing', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    layerWithScale(ae);
+
+    const out = invoke(ctx, 'rig.null_controller', {
+      comp: 'Main',
+      layers: [5],
+    });
+
+    expect(out.value).toEqual({ success: false, error: 'Layer not found: 5' });
+    const comp = ae.project.item(1) as MockCompItem;
+    expect(comp.numLayers).toBe(1);
+  });
+});

@@ -1392,6 +1392,59 @@ AEMCP.register('expression.snippet', function (args) {
     return { success: true, snippet: snippetName, expression: code, enabled: prop.expressionEnabled };
 });
 
+// E14-15: build a controller null with slider controls and parent layers to it.
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layercollection/#layercollectionaddnull
+// Ref: https://ae-scripting.docsforadobe.dev/property/propertygroup/#propertygroupaddproperty
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerparent
+AEMCP.register('rig.null_controller', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var name = args && args.name ? args.name : 'Controller';
+    var sliders = args && args.sliders ? args.sliders : [];
+    var layerIndices = args && args.layers ? args.layers : [];
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) {
+        return { success: false, error: 'Composition not found' };
+    }
+    // Resolve targets before mutating so a bad index leaves the comp untouched.
+    var targets = [];
+    var j, tl;
+    for (j = 0; j < layerIndices.length; j++) {
+        tl = comp.layer(layerIndices[j]);
+        if (!tl) {
+            return { success: false, error: 'Layer not found: ' + layerIndices[j] };
+        }
+        targets.push(tl);
+    }
+    var nullLayer = comp.layers.addNull(comp.duration);
+    nullLayer.name = name;
+    var effects = nullLayer.property('ADBE Effect Parade');
+    var sliderNames = [];
+    var k, fx;
+    for (k = 0; k < sliders.length; k++) {
+        fx = effects.addProperty('ADBE Slider Control');
+        fx.name = sliders[k];
+        sliderNames.push(sliders[k]);
+    }
+    for (j = 0; j < targets.length; j++) {
+        targets[j].parent = nullLayer;
+    }
+    return {
+        success: true,
+        nullIndex: nullLayer.index,
+        name: name,
+        sliders: sliderNames,
+        linked: layerIndices
+    };
+});
+
 // Effect operation handlers (mutating, run via ae_do).
 AEMCP.register('effect.apply', function (args) {
     var compName = args && args.comp ? args.comp : null;

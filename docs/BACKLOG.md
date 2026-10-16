@@ -366,7 +366,7 @@ script entry point, so there is nothing to apply. Story 14.5 covers the need ins
 - **E14-12** feat(ops): ease.preset for selected keyframes (ease in, ease out, overshoot) ✅ 2026-10-16, landed as the `keyframe.ease_preset` op (an op's name prefix must equal its category, `operations.test.ts`), closes #143.
 - **E14-13** feat(ops): anchor.move_preserving for nine anchor positions ✅ 2026-10-16, landed as the `anchor.move_preserving` op (nine position names + literal point), closes #144.
 - **E14-14** feat(ops): expression.snippet library (wiggle, loop, delay, overshoot) ✅ 2026-10-16, landed as the `expression.snippet` op (four named snippets applied via `Property.expression`), closes #145.
-- **E14-15** feat(ops): rig.null_controller linking layers to a null with sliders
+- **E14-15** feat(ops): rig.null_controller linking layers to a null with sliders ✅ 2026-10-16, landed as the `rig.null_controller` op (controller null + slider controls + parenting), closes #146.
 
 Delay and stagger reuse E9-6.
 
@@ -500,7 +500,7 @@ Sources: kumo = [kumoproductions/mcp-aftereffects](https://github.com/kumoproduc
 
 **Top-level MCP tools:** `check_setup`, `ae_context`, `ae_project_info`, `ae_comp_info`, `ae_layer_info`, `ae_expression_report`, `ae_version_info`, `get_selection`, `find`, `ae_catalog`, `ae_do`, `ae_render_frame`, `ae_render`, `job_status`, `job_cancel`, `ae_save_project`, plus the bulk tools from E9 (`ae_plan` and `ae_apply`, which preview and apply any `bulk` operation).
 
-Added in v1.1: `project.increment_save` (E13); `thirdparty.apply_preset`, `thirdparty.search`, `ease.preset`, `anchor.move_preserving`, `expression.snippet` and `rig.null_controller` (E14). All operations flagged destructive go through the E13 guard.
+Added in v1.1: `project.increment_save` (E13); `keyframe.ease_preset`, `anchor.move_preserving`, `expression.snippet` and `rig.null_controller` (E14). All operations flagged destructive go through the E13 guard.
 
 ## 9. Manual checklist on real AE (tag [HUMAN])
 

@@ -107,4 +107,7 @@ A property whose value comes from an expression (for example one added by a pres
 instead. `ae_expression_report` lists every expression-driven property on a comp's layers.
 `expression.snippet` applies a named expression snippet (`wiggle`, `loop`, `delay`,
 `overshoot`) to a property by setting `Property.expression` directly.
+`rig.null_controller` builds a controller rig in one step: it creates a null, adds a
+Slider Control effect per requested slider name, and parents the given layers to the
+null.
 

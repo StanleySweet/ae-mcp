@@ -225,6 +225,18 @@ export function defaultOperationRegistry(): OperationRegistry {
     }),
   );
 
+  // Rig.
+  register(
+    operation('rig.null_controller', 'rig', 'Create a controller null with slider controls and parent layers to it.', {
+      schema: {
+        comp,
+        name: { type: 'string' },
+        sliders: { type: 'array' },
+        layers: { type: 'array' },
+      },
+    }),
+  );
+
   // Effect (targets layer 1 unless the handler reads an index).
   register(operation('effect.apply', 'effect', 'Apply an effect to layer 1.', {
     schema: { comp, property: propertyName, value: {} },

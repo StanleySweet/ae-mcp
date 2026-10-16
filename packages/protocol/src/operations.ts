@@ -10,6 +10,7 @@ export const operationCategories = [
   'expression',
   'effect',
   'preset',
+  'rig',
   'marker',
   'mask',
   'shape',
