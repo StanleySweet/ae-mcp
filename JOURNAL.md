@@ -5,6 +5,13 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-16
 
+- **#175 shipped and verified live** (`0b230d8`, CI green). With the rebuilt
+  payload hot-loaded into `~/.ae-mcp/bridge/current.jsx`, the Almond path
+  `shape.add` that had crashed AE twice succeeded on AE 26.5, followed by a
+  two-ellipse `batch.run` (`shape.read` → 3 groups). Seen in passing:
+  `ae_render_frame` on that unsaved project returned `ENOENT` for
+  `~/.ae-mcp/render/HANG_TEST-0.png`. Not investigated.
+
 - **AE crash on `shape.add type:"path"` diagnosed and fixed (uncommitted).** It was
   reproduced live from Claude Code through the installed mcpb server. The crash
   report puts the fault in `addProperty` → `BEEp_MakeUniqueNameForStream` (null
