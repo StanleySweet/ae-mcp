@@ -333,12 +333,13 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Shape.
   register(
-    operation('shape.add', 'shape', 'Add a shape to a shape layer.', {
+    operation('shape.add', 'shape', 'Add a shape (path, rect or ellipse) to a shape layer; name labels the shape, layerName names a layer created when layerIndex is omitted.', {
       schema: {
         comp,
         layerIndex,
         type: { type: 'string', enum: ['path', 'rect', 'ellipse'] },
-        name: comp,
+        name: { type: 'string' },
+        layerName: { type: 'string' },
         size: { type: 'array' },
         vertices: { type: 'array' },
         inTangents: { type: 'array' },

@@ -2002,12 +2002,14 @@ AEMCP.register('shape.add', function (args) {
         layer = comp.layer(layerIndex);
     } else {
         layer = comp.layers.addShape();
-        if (args && args.name) layer.name = args.name;
+        if (args && args.layerName) layer.name = args.layerName;
     }
     if (!layer) return { success: false, error: 'Shape layer not found or could not be created' };
 
     var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
     var shapeGroup = aemcpAddProperty(contents, AEMCP_MATCH.SHAPE_GROUP);
+    // `name` labels the shape itself; `layerName` names a layer created here (#185).
+    if (args && args.name) shapeGroup.name = args.name;
     var groupContents = shapeGroup.property(AEMCP_MATCH.SHAPE_GROUP_CONTENTS);
 
     if (shapeType === 'rect') {

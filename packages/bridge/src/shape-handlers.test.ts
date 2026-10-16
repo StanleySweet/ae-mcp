@@ -86,6 +86,30 @@ describe('shape.add', () => {
   });
 });
 
+// `name` used to be ignored on an existing layer, or given to the new layer (#185).
+describe('shape.add naming', () => {
+  it('names the shape group, not the layer', async () => {
+    const { ctx, ae } = await shapeLayerContext();
+
+    invoke(ctx, 'shape.add', { comp: 'Main', layerIndex: 1, type: 'ellipse', name: 'Iris' });
+
+    expect(firstGroup(ae).name).toBe('Iris');
+    expect((ae.project.item(1) as MockCompItem).layer(1)?.name).toBe('Shape');
+  });
+
+  it('names a layer it creates with layerName', async () => {
+    const { ctx, ae } = await shapeLayerContext();
+
+    const out = invoke(ctx, 'shape.add', { comp: 'Main', type: 'ellipse', name: 'Pupil', layerName: 'Eye' });
+
+    const index = (out.value as { layerIndex: number }).layerIndex;
+    const layer = (ae.project.item(1) as MockCompItem).layer(index) as unknown as MockPropertyGroup & { name: string };
+    expect(layer.name).toBe('Eye');
+    const root = layer.property('ADBE Root Vectors Group') as MockPropertyGroup;
+    expect((root.property(1) as MockPropertyGroup).name).toBe('Pupil');
+  });
+});
+
 describe('shape.set', () => {
   it('updates the first freeform path', async () => {
     const { ctx, ae } = await shapeLayerContext();
