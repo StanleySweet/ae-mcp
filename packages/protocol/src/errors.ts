@@ -16,6 +16,7 @@ export const errorCodes = [
   'UNKNOWN_PLAN',
   'PLAN_EXPIRED',
   'PLAN_CHANGED',
+  'DIALOG_OPEN',
 ] as const;
 
 export type ErrorCode = (typeof errorCodes)[number];
@@ -39,6 +40,8 @@ export const errorHints: Record<ErrorCode, string> = {
   UNKNOWN_PLAN: 'Call ae_plan again to preview the change and get a fresh planId.',
   PLAN_EXPIRED: 'Plans expire after 10 minutes; call ae_plan again and apply right away.',
   PLAN_CHANGED: 'The project changed since the plan was made; call ae_plan again to re-preview.',
+  DIALOG_OPEN:
+    'A dialog is open in After Effects; read it with ae_dialogs and dismiss it, or close it by hand, then retry.',
 };
 
 export function makeError(

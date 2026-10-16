@@ -123,3 +123,15 @@ instead. `ae_expression_report` lists every expression-driven property on a comp
 Slider Control effect per requested slider name, and parents the given layers to the
 null.
 
+
+## Modal dialogs
+
+A dialog open in After Effects blocks every script, so calls would only time out. When a
+call times out and a dialog is open, the error is `DIALOG_OPEN` and carries the dialog's
+title and text. `ae_dialogs` with `action: "list"` (the default) shows the open dialogs;
+`action: "dismiss"` presses the frontmost dialog's Cancel button, or Escape when it has
+none. It never presses Save or Don't Save, so it cannot save or lose work.
+
+This needs the Accessibility permission for the app that runs the MCP server (for
+example Claude Desktop): System Settings > Privacy & Security > Accessibility. Without
+it `ae_dialogs` returns that instruction, and timeouts keep their usual message.

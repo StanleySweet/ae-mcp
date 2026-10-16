@@ -29,7 +29,7 @@ export type Runner = (
   options: { encoding: 'utf8'; timeout?: number },
 ) => Promise<RunResult>;
 
-const defaultRunner: Runner = (command, args, options) =>
+export const defaultRunner: Runner = (command, args, options) =>
   execFileAsync(command, args, options) as Promise<RunResult>;
 
 export function aeAppName(): string {

@@ -15,6 +15,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
 import { buildAeContext } from './context.js';
+import { dismissFrontDialog, listDialogs } from './dialogs.js';
 import { JobStore } from './jobs.js';
 import {
   closestNames,
@@ -633,6 +634,27 @@ export function createServer(options: ServerOptions = {}): McpServer {
       runs.set(jobId, { cancel: handle.cancel, done });
       void done.finally(() => runs.delete(jobId));
       return text({ jobId });
+    },
+  );
+
+  server.registerTool(
+    'ae_dialogs',
+    {
+      description:
+        "List the modal dialogs open in After Effects (title and text), or dismiss the frontmost one. A dialog blocks every other tool. 'dismiss' presses Cancel (or Escape) and never Save or Don't Save. Needs Accessibility permission for the MCP client.",
+      inputSchema: { action: z.enum(['list', 'dismiss']).default('list') },
+    },
+    async (args) => {
+      if (args.action === 'dismiss') {
+        const dismissed = await dismissFrontDialog(options.runner);
+        return dismissed.ok
+          ? text({ dismissed: dismissed.value })
+          : text(makeError('SCRIPT_ERROR', dismissed.message), true);
+      }
+      const listed = await listDialogs(options.runner);
+      return listed.ok
+        ? text({ dialogs: listed.value })
+        : text(makeError('SCRIPT_ERROR', listed.message), true);
     },
   );
 

@@ -9,6 +9,7 @@ import {
   type JobMessage,
   type ResultMessage,
 } from '@ae-mcp/protocol';
+import { describeDialog, listDialogs, type AeDialog } from './dialogs.js';
 import { detectStall } from './stall.js';
 import type { Transport } from './transport.js';
 
@@ -33,6 +34,8 @@ export interface AEClientOptions {
   newId?: () => string;
   /** Retry `AE_BUSY` (another script running) with exponential backoff; false disables it. */
   retry?: AE_BUSYRetryOptions | false;
+  /** Dialogs open in AE, asked after a timeout or stall; default reads System Events. */
+  checkDialogs?: () => Promise<AeDialog[]>;
 }
 
 export interface AEClient {
@@ -83,6 +86,13 @@ export function createAEClient(options: AEClientOptions): AEClient {
             ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))),
         };
 
+  const checkDialogs =
+    options.checkDialogs ??
+    (async (): Promise<AeDialog[]> => {
+      const found = await listDialogs();
+      return found.ok ? found.value : [];
+    });
+
   const purgeStale = async (): Promise<number> => {
     const cutoff = now() - staleMs;
     return (
@@ -101,6 +111,19 @@ export function createAEClient(options: AEClientOptions): AEClient {
         now,
         maxAgeMs: options.heartbeatMaxAgeMs,
       });
+      if (result.error.code === 'TIMEOUT' || stall.stalled) {
+        const [dialog] = await checkDialogs().catch((): AeDialog[] => []);
+        if (dialog !== undefined) {
+          return {
+            protocolVersion: PROTOCOL_VERSION,
+            ok: false,
+            error: makeError(
+              'DIALOG_OPEN',
+              `After Effects is blocked by a dialog: ${describeDialog(dialog)}`,
+            ),
+          };
+        }
+      }
       if (!stall.stalled) {
         return result;
       }

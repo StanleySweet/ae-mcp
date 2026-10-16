@@ -89,6 +89,7 @@ describe('ae client', () => {
       transport: new FileQueueTransport(root),
       root,
       timeoutMs: 40,
+      checkDialogs: async () => [],
     });
     const result = await client.call('echo', {});
     if (result.ok) {
@@ -220,12 +221,57 @@ describe('ae client', () => {
         error: makeError('TIMEOUT', 'job exceeded its deadline'),
       }),
     };
-    const client = createAEClient({ transport, root });
+    const client = createAEClient({ transport, root, checkDialogs: async () => [] });
     const result = await client.call('echo');
     if (result.ok) {
       throw new Error(`expected a failure, got ${JSON.stringify(result)}`);
     }
     expect(result.error.message).toMatch(/modal dialog/);
     expect(result.error.hint).toMatch(/Close the dialog/);
+  });
+
+  it('returns DIALOG_OPEN with the dialog text when a timeout finds a dialog', async () => {
+    const root = await queueRoot();
+    const transport: Transport = {
+      name: 'timeout',
+      call: async () => ({
+        protocolVersion: PROTOCOL_VERSION,
+        ok: false,
+        error: makeError('TIMEOUT', 'job exceeded its deadline'),
+      }),
+    };
+    const client = createAEClient({
+      transport,
+      root,
+      checkDialogs: async () => [{ title: 'Warning', texts: ['Save changes?'] }],
+    });
+    const result = await client.call('echo');
+    if (result.ok) {
+      throw new Error(`expected a failure, got ${JSON.stringify(result)}`);
+    }
+    expect(result.error.code).toBe('DIALOG_OPEN');
+    expect(result.error.message).toContain('Warning - Save changes?');
+    expect(result.error.hint).toBe(errorHints.DIALOG_OPEN);
+  });
+
+  it('keeps the TIMEOUT when the dialog check fails', async () => {
+    const root = await queueRoot();
+    const transport: Transport = {
+      name: 'timeout',
+      call: async () => ({
+        protocolVersion: PROTOCOL_VERSION,
+        ok: false,
+        error: makeError('TIMEOUT', 'job exceeded its deadline'),
+      }),
+    };
+    const client = createAEClient({
+      transport,
+      root,
+      checkDialogs: async () => {
+        throw new Error('boom');
+      },
+    });
+    const result = await client.call('echo');
+    expect(result).toMatchObject({ ok: false, error: { code: 'TIMEOUT' } });
   });
 });
