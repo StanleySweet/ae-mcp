@@ -40,8 +40,18 @@ chunk of work; don't rewrite old entries — supersede them.
   named snippets (`wiggle`, `loop`, `delay`, `overshoot`) applied via
   `Property.expression` + `Property.expressionEnabled`. Snippets are the documented
   expression forms; `overshoot` is an original damped-sine spring built from
-  `velocityAtTime` + `Math` (no vendor code, rule 5). Next frontier: **E14-15
-  (#146)** `rig.null_controller`, blocked by #145 (now closed).
+  `velocityAtTime` + `Math` (no vendor code, rule 5).
+- Landed **E14-15 (#146)** as the `rig.null_controller` op (`eb745c4`) — creates
+  a controller null (`LayerCollection.addNull`), adds one `ADBE Slider Control`
+  effect per requested name via `ADBE Effect Parade.addProperty`, and parents the
+  given layers with `Layer.parent` (targets resolved before mutating so a bad index
+  leaves the comp untouched). New `rig` operation category. Also corrected the
+  stale v1.1 op list in BACKLOG (it still named the never-built
+  `thirdparty.apply_preset`/`thirdparty.search` and the wrong `ease.preset` name).
+- **Epic E14 (#17) closed** — every task issue under it is closed (E14-9/10/11
+  `wontfix` per ADR-0002). The Animation Principles slice shipped as E14-12..15.
+- Frontier: the backlog loop is now blocked on the [HUMAN] task **E11-7 (#126)**
+  (clean-Mac install run), which blocks **E11-8 (#127)** and epic **E11 (#14)**.
 
 ## 2026-10-15
 
