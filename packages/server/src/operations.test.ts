@@ -74,6 +74,8 @@ const BRIDGE_OPS = [
   'command.find',
   'command.list',
   'command.execute',
+  'project.import_file',
+  'footage.replace',
   'bulk.rename',
   'bulk.set_property',
   'bulk.apply_effect',

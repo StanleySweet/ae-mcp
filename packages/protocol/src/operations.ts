@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const operationCategories = [
   'project',
+  'footage',
   'comp',
   'layer',
   'property',

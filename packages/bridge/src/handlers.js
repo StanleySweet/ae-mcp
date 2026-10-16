@@ -2833,3 +2833,50 @@ AEMCP.register('bulk.resize_comp', function (args) {
 });
 
 
+
+// Import files into the project. Every file is checked first: one missing file
+// aborts with INVALID_ARGS and nothing is imported. An optional `folder` names
+// a root project folder (created if missing) that receives the new items.
+// Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectimportfile
+// Ref: https://ae-scripting.docsforadobe.dev/other/importoptions/
+// Ref: https://ae-scripting.docsforadobe.dev/item/item/#itemparentfolder
+AEMCP.register('project.import_file', function (args) {
+    var paths = args && args.paths ? args.paths : [];
+    if (args && typeof args.path === 'string') {
+        paths = paths.concat([args.path]);
+    }
+    if (paths.length === 0) {
+        aemcpAbortArgs('path or paths is required');
+    }
+    var i, items = [], item, folder = null;
+    for (i = 0; i < paths.length; i++) {
+        if (typeof paths[i] !== 'string' || !new File(paths[i]).exists) {
+            aemcpAbortArgs('file not found: ' + paths[i]);
+        }
+    }
+    if (args.folder !== undefined && args.folder !== '') {
+        folder = aemcpFindFolder(args.folder) || app.project.items.addFolder(args.folder);
+    }
+    for (i = 0; i < paths.length; i++) {
+        item = app.project.importFile(new ImportOptions(new File(paths[i])));
+        if (folder !== null) {
+            item.parentFolder = folder;
+        }
+        items.push({ id: item.id, name: item.name, type: aemcpItemType(item) });
+    }
+    return { items: items };
+});
+
+// Swap the source file of a footage item matched by id number or exact name.
+// Ref: https://ae-scripting.docsforadobe.dev/item/footageitem/#footageitemreplace
+AEMCP.register('footage.replace', function (args) {
+    var item = args ? aemcpFindItem(args.item) : null;
+    if (item === null || !(item instanceof FootageItem)) {
+        aemcpAbortArgs('footage item not found: ' + (args ? args.item : ''));
+    }
+    if (typeof args.path !== 'string' || !new File(args.path).exists) {
+        aemcpAbortArgs('file not found: ' + args.path);
+    }
+    item.replace(new File(args.path));
+    return { id: item.id, name: item.name };
+});

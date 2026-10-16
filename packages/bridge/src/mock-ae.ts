@@ -615,6 +615,18 @@ export class MockFootageItem extends MockItem {
   ) {
     super(id, name);
   }
+
+  // FootageItem.replace(file): swaps the main source for the given file.
+  // Ref: https://ae-scripting.docsforadobe.dev/item/footageitem/#footageitemreplace
+  replace(file: MockFile): void {
+    this.file = file;
+    this.footageMissing = false;
+  }
+}
+
+// Ref: https://ae-scripting.docsforadobe.dev/other/importoptions/
+export class MockImportOptions {
+  constructor(public file: MockFile | null = null) {}
 }
 
 export class MockLayerCollection {
@@ -894,6 +906,17 @@ export class MockProject {
     return this.all[index - 1];
   }
 
+  // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectimportfile
+  importFile(options: MockImportOptions): MockFootageItem {
+    if (!options.file || !options.file.exists) {
+      throw new Error('mock AE: unable to import ' + (options.file ? options.file.path : 'no file'));
+    }
+    const item = new MockFootageItem(this.allocateId(), options.file.name, 1920, 1080);
+    item.file = options.file;
+    this.add(item);
+    return item;
+  }
+
   allocateId(): number {
     this.idCounter += 1;
     return 1000 + this.idCounter;
@@ -1044,6 +1067,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     CompItem: MockCompItem,
     FolderItem: MockFolderItem,
     FootageItem: MockFootageItem,
+    ImportOptions: MockImportOptions,
     AVLayer: MockAVLayer,
     TextLayer: MockTextLayer,
     ShapeLayer: MockShapeLayer,

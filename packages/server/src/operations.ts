@@ -61,6 +61,23 @@ export function defaultOperationRegistry(): OperationRegistry {
   register(operation('project.report_usage', 'project', 'Report unused items and footage with a missing source file.', {
     readOnly: true,
   }));
+  register(
+    operation('project.import_file', 'project', 'Import one or more files into the project, optionally into a folder.', {
+      schema: {
+        path: { type: 'string' },
+        paths: { type: 'array', items: { type: 'string' } },
+        folder: { type: 'string' },
+      },
+    }),
+  );
+  register(
+    operation('footage.replace', 'footage', 'Replace the source file of a footage item.', {
+      schema: {
+        item: { oneOf: [{ type: 'number' }, { type: 'string' }] },
+        path: { type: 'string' },
+      },
+    }),
+  );
   register(operation('project.undo', 'project', 'Undo the last change.'));
   register(operation('project.increment_save', 'project', 'File > Increment and Save the project.'));
 
