@@ -9,6 +9,9 @@ the rest of the docs use. Rewritten in place as state changes; history lives in
 After Effects for Claude — an MCP server that lets Claude Desktop see and edit the
 After Effects project the user has open. macOS only.
 
+v1.0.0 is released: pushing a `v*` tag runs `release.yml`, which publishes the
+`.mcpb`, the Setup app for arm64 and x64, and `SHA256SUMS.txt`.
+
 ## Shape
 
 - `packages/server` — the MCP server. Registers the tools (`ae_do`, `ae_plan`,
