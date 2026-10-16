@@ -243,6 +243,23 @@ describe('E7-2 policy engine', () => {
     expect(calls).toEqual([]);
   });
 
+  // Batch steps used to skip argument validation (#182).
+  it('refuses a batch.run whose sub-operation has invalid arguments', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, DEFAULT_SETTINGS);
+    closes.push(close);
+
+    const result = await call(client, 'ae_do', {
+      op: 'batch.run',
+      args: { ops: [{ op: 'layer.rename', args: { index: 'one', name: 'Hero' } }] },
+    });
+    expect(result.isError).toBe(true);
+    const error = errorSchema.parse(JSON.parse(result.text));
+    expect(error.code).toBe('INVALID_ARGS');
+    expect(error.message).toContain('ops[0]');
+    expect(calls).toEqual([]);
+  });
+
   it('lets an allowed operation run under the allowlist', async () => {
     const calls: string[] = [];
     const { client, close } = await connectServer(project(), calls, allow('layer'));
@@ -298,6 +315,25 @@ describe('E7-3 eval.run gate', () => {
     closes.push(close);
 
     const result = await call(client, 'ae_do', { op: 'eval.run', args: { code: '1 + 1' } });
+    expect(result.isError).toBe(true);
+    const error = errorSchema.parse(JSON.parse(result.text));
+    expect(error.code).toBe('FORBIDDEN');
+    expect(calls).toEqual([]);
+  });
+
+  // batch.run checked the policy per step but not the eval switch (#182).
+  it('refuses eval.run inside a batch.run while eval is disabled', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      ...DEFAULT_SETTINGS,
+      evalEnabled: false,
+    });
+    closes.push(close);
+
+    const result = await call(client, 'ae_do', {
+      op: 'batch.run',
+      args: { ops: [{ op: 'eval.run', args: { code: '1 + 1' } }] },
+    });
     expect(result.isError).toBe(true);
     const error = errorSchema.parse(JSON.parse(result.text));
     expect(error.code).toBe('FORBIDDEN');

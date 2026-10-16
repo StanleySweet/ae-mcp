@@ -1,5 +1,5 @@
 import { makeError, type OperationDefinition } from '@ae-mcp/protocol';
-import type { OperationRegistry } from './operations.js';
+import { validateOperationArgs, type OperationRegistry } from './operations.js';
 import type { Settings } from './settings.js';
 
 export function isPermitted(definition: OperationDefinition, settings: Settings): boolean {
@@ -20,7 +20,9 @@ export function evalRunEnabled(definition: OperationDefinition, settings: Settin
   return definition.name !== 'eval.run' || settings.evalEnabled;
 }
 
-/** The first policy-blocked sub-op of a batch.run, or null when none blocks it. */
+/** The first sub-op of a batch.run that ae_do would refuse on its own (unknown,
+bad arguments, outside the policy, or eval.run while eval is off), or null.
+Each step gets the same checks as a standalone ae_do call (#182). */
 export function batchRunBlock(
   registry: OperationRegistry,
   ops: unknown,
@@ -29,16 +31,20 @@ export function batchRunBlock(
   if (!Array.isArray(ops)) {
     return null;
   }
-  for (const sub of ops) {
+  for (const [index, sub] of ops.entries()) {
     const name = subOpName(sub);
     if (name === null) {
-      continue;
+      return makeError('INVALID_ARGS', `ops[${index}].op must be a non-empty string`);
     }
     const definition = registry.get(name);
     if (definition === undefined) {
       return makeError('UNKNOWN_TOOL', `unknown operation '${name}' inside batch.run`);
     }
-    if (!isPermitted(definition, settings)) {
+    const validation = validateOperationArgs(definition.schema, (sub as { args?: unknown }).args);
+    if (!validation.ok) {
+      return makeError('INVALID_ARGS', `ops[${index}] (${name}): ${validation.message}`);
+    }
+    if (!isPermitted(definition, settings) || !evalRunEnabled(definition, settings)) {
       return makeError(
         'FORBIDDEN',
         `operation '${name}' inside batch.run is not permitted by the current policy`,
