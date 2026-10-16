@@ -13,6 +13,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private string _subtitle = "Checking your Mac…";
     private string _progress = "";
+    private string _installStatus = "";
     private bool _busy;
 
     public MainViewModel(SetupService service)
@@ -50,6 +51,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
         private set => Set(ref _progress, value);
     }
 
+    /// <summary>"Fresh install", "Update from X to Y" or "Up to date"; empty until After Effects is found.</summary>
+    public string InstallStatus
+    {
+        get => _installStatus;
+        private set => Set(ref _installStatus, value);
+    }
+
     public bool Busy
     {
         get => _busy;
@@ -69,6 +77,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         _environment = await _service.DetectAsync();
         Apply(Checklist.Build(_environment));
         Subtitle = Summarize(_environment);
+        var ae = _environment.AfterEffects.FirstOrDefault();
+        if (ae is not null)
+        {
+            InstallStatus = InstallDetector.Describe(await _service.DetectInstallAsync(ae));
+        }
     }
 
     private async Task InstallAsync()

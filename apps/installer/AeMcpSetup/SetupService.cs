@@ -81,6 +81,13 @@ public sealed class SetupService
         return new RepairResult(checks.All(check => check.IsOk), checks);
     }
 
+    /// <summary>Reads what is already installed for <paramref name="install"/>, compared with the bundled payload.</summary>
+    public async Task<InstallState> DetectInstallAsync(AeInstall install)
+    {
+        var payload = await ReadResourceAsync(PayloadPath);
+        return await InstallDetector.DetectAsync(_root, install, payload);
+    }
+
     /// <summary>Removes the bridge payload, folders and Startup loader.</summary>
     public async Task<UninstallResult> UninstallAsync(AeInstall? install = null)
     {
