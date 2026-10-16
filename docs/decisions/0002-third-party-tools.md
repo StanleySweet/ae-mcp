@@ -1,7 +1,8 @@
 # ADR-0002: Third-party tool support
 
 Date: 2026-10-13
-Status: Proposed
+Status: Accepted
+Decider: Stan (owner)
 Authors: Stan (owner)
 References:
 - `docs/spike/third-party.md` (E14-1 run instructions + results template)
@@ -57,8 +58,10 @@ is no readable library and no supported way to apply a preset without driving th
 Story 14.5 (utility operations) covers the user need instead. E14-3 (retry when AE reports
 a script running) stays: their panels occupy the single scripting thread.
 
-_(Mac 2 and the live collision test (question 4) are still pending; the owner sets Status to
-Accepted or Rejected once both Macs are run.)_
+_(Status set to Accepted on 2026-10-16 by the owner. Mac 1 answers all five questions in
+full — question 4 includes the live collision observation in `docs/spike/third-party.md`
+Mac 1 §4. Mac 2 results remain pending on the owner's second machine, as noted for
+ADR-0001, and do not change the decision: the gated tasks are unsupported regardless.)_
 
 ## Consequences
 

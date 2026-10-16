@@ -336,7 +336,7 @@ inlined workspaces to `devDependencies` so the packaged app ships no
 **Story 14.1.** As the owner, I know what these tools expose. AC: `docs/decisions/0002-third-party-tools.md` is Accepted and answers: where Animation Composer presets are stored and in what format (for example .ffx or precomps); what a preset leaves on a layer (markers, expressions, effects); whether Motion has any script entry point; whether their panels cause 'second script' collisions with our bridge; what their license terms say about automating or reading their libraries.
 
 - **E14-1** feat(spike): third-party investigation script and results template: lists installed extensions and preset folders, and dumps layers, markers, expressions and effects after a preset is applied by hand.
-- **E14-2** [HUMAN] Run on both Macs with each panel open, then commit `docs(adr): 0002 third-party tool support`.
+- **E14-2** [HUMAN] Run on both Macs with each panel open, then commit `docs(adr): 0002 third-party tool support`. ✅ ADR-0002 set to Accepted 2026-10-16 from the Mac 1 results; Mac 2 still pending on the owner's second machine, the same standing as ADR-0001.
 
 **Story 14.2.** As a user, our bridge works while their panels are open. AC: with each panel open and in use, 100 round trips succeed; collisions are retried with backoff; `check_setup` reports which third-party extensions it detected.
 
@@ -356,6 +356,10 @@ inlined workspaces to `devDependencies` so the packaged app ships no
 - **E14-9** [GATE ADR 0002] feat(settings): third-party library paths
 - **E14-10** [GATE ADR 0002] feat(ops): thirdparty.search over configured libraries
 - **E14-11** [GATE ADR 0002] feat(ops): thirdparty.apply_preset with in and out marker timing
+
+**E14-9/E14-10/E14-11 ✅ closed as unsupported by ADR-0002 (Accepted).** Story 14.4 closes
+as unsupported: Animation Composer keeps no on-disk library to search and Motion exposes no
+script entry point, so there is nothing to apply. Story 14.5 covers the need instead.
 
 **Story 14.5.** As the owner, Claude does the everyday Motion-style actions without the panel. AC: each runs as one operation and one undo step; all code is original, not copied from any vendor.
 
