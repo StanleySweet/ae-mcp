@@ -193,6 +193,15 @@ export function defaultOperationRegistry(): OperationRegistry {
       },
     }),
   );
+  register(
+    operation('anchor.move_preserving', 'anchor', 'Move the anchor point while keeping the layer visually in place.', {
+      schema: {
+        comp,
+        index: layerIndex,
+        anchor: {},
+      },
+    }),
+  );
 
   // Expression.
   register(operation('expression.set', 'expression', 'Set an expression on a layer 1 property.', {

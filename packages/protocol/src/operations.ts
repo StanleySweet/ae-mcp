@@ -6,6 +6,7 @@ export const operationCategories = [
   'layer',
   'property',
   'keyframe',
+  'anchor',
   'expression',
   'effect',
   'preset',

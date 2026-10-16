@@ -364,7 +364,7 @@ script entry point, so there is nothing to apply. Story 14.5 covers the need ins
 **Story 14.5.** As the owner, Claude does the everyday Motion-style actions without the panel. AC: each runs as one operation and one undo step; all code is original, not copied from any vendor.
 
 - **E14-12** feat(ops): ease.preset for selected keyframes (ease in, ease out, overshoot) ✅ 2026-10-16, landed as the `keyframe.ease_preset` op (an op's name prefix must equal its category, `operations.test.ts`), closes #143.
-- **E14-13** feat(ops): anchor.move_preserving for nine anchor positions
+- **E14-13** feat(ops): anchor.move_preserving for nine anchor positions ✅ 2026-10-16, landed as the `anchor.move_preserving` op (nine position names + literal point), closes #144.
 - **E14-14** feat(ops): expression.snippet library (wiggle, loop, delay, overshoot)
 - **E14-15** feat(ops): rig.null_controller linking layers to a null with sliders
 
@@ -485,6 +485,7 @@ Sources: kumo = [kumoproductions/mcp-aftereffects](https://github.com/kumoproduc
 | layer            | add_text, add_shape, add_solid, add_adjustment, add_null, add_footage, center, set_transform, set_parent, delete, bounds | both |
 | property         | get, list, set                                      | kumo |
 | keyframe         | add, remove, set_easing (temporal and spatial), ease_preset (selected keyframes) | both |
+| anchor           | move_preserving (nine positions or [x,y])           | both |
 | expression       | set, clear, check_errors                            | both |
 | effect           | apply (name or matchName), list_on_layer, list_available, set_property, set_keyframe, remove, apply_template | llama |
 | preset           | apply_ffx, list, search                              | llama |

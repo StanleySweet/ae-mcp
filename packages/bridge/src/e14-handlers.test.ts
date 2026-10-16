@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import vm from 'node:vm';
 import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
-import { MockAE, MockCompItem, MockAVLayer, MockProperty, runInMockAE } from './mock-ae.js';
+import { MockAE, MockCompItem, MockAVLayer, MockProperty, MockPropertyGroup, runInMockAE } from './mock-ae.js';
 
 async function payloadContext(): Promise<{ ctx: vm.Context; ae: MockAE }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-e14-'));
@@ -142,5 +142,89 @@ describe('keyframe.ease_preset', () => {
       keyframes: 1,
       warning: expect.stringContaining('expression'),
     });
+  });
+});
+
+describe('anchor.move_preserving', () => {
+  function layerWithTransform(ae: MockAE): MockAVLayer {
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    layer.width = 200;
+    layer.height = 100;
+    const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
+    transform.add(new MockProperty('Anchor Point', 'ADBE Anchor Point', [0, 0]));
+    transform.add(new MockProperty('Position', 'ADBE Position', [400, 300]));
+    layer.add(transform);
+    comp.addLayer(layer);
+    return layer;
+  }
+
+  function transformProp(layer: MockAVLayer, matchName: string): MockProperty {
+    return (layer.property('ADBE Transform Group') as MockPropertyGroup).property(
+      matchName,
+    ) as MockProperty;
+  }
+
+  it('moves the anchor to a bounds position and keeps the layer in place', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const layer = layerWithTransform(ae);
+
+    const out = invoke(ctx, 'anchor.move_preserving', {
+      comp: 'Main',
+      index: 1,
+      anchor: 'bottom-right',
+    });
+
+    // A 200x100 layer has bottom-right at [100, 50] in layer space; the content
+    // must not shift, so position gains exactly the same delta.
+    expect(out.value).toMatchObject({ success: true, anchorPoint: [100, 50] });
+    expect(transformProp(layer, 'ADBE Anchor Point').value).toEqual([100, 50]);
+    expect(transformProp(layer, 'ADBE Position').value).toEqual([500, 350]);
+  });
+
+  it('accepts an explicit [x, y] layer point', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const layer = layerWithTransform(ae);
+
+    const out = invoke(ctx, 'anchor.move_preserving', {
+      comp: 'Main',
+      index: 1,
+      anchor: [20, 10],
+    });
+
+    expect(out.value).toMatchObject({ success: true, anchorPoint: [20, 10] });
+    expect(transformProp(layer, 'ADBE Position').value).toEqual([420, 310]);
+  });
+
+  it('leaves a centred layer untouched when asked for centre', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const layer = layerWithTransform(ae);
+
+    const out = invoke(ctx, 'anchor.move_preserving', {
+      comp: 'Main',
+      index: 1,
+      anchor: 'center',
+    });
+
+    expect(out.value).toMatchObject({ success: true, anchorPoint: [0, 0] });
+    expect(transformProp(layer, 'ADBE Position').value).toEqual([400, 300]);
+  });
+
+  it('reports an unknown anchor name', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const layer = layerWithTransform(ae);
+
+    const out = invoke(ctx, 'anchor.move_preserving', {
+      comp: 'Main',
+      index: 1,
+      anchor: 'sideways',
+    });
+
+    expect(out.value).toEqual({ success: false, error: 'Unknown anchor: sideways' });
+    expect(transformProp(layer, 'ADBE Position').value).toEqual([400, 300]);
   });
 });

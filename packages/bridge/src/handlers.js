@@ -1199,6 +1199,86 @@ AEMCP.register('keyframe.ease_preset', function (args) {
     return aemcpWithExpressionWarning(prop, { success: true, preset: preset, property: propertyName, keyframes: selection.length });
 });
 
+// E14-13: move the anchor point while keeping the layer visually in place.
+// The "nine anchor positions" are conveniences; we also accept a literal [x, y]
+// in layer coordinates. Use sourceRectAtTime (includes layer bounds in layer space)
+// and sourcePointToComp to compute the anchor→comp delta.
+// ponytail: this computes the delta in comp space by mapping the old and new anchor
+// points through sourcePointToComp. The mock's sourcePointToComp is intentionally
+// minimal (no rotation/scale/parent) — the real AE behavior is the source of truth;
+// if project geometry uses 3D/parenting, the op's semantics should be validated
+// against a real AE run. Upgrade path: fall back to a comp-space projection if
+// sourcePointToComp throws or returns NaN in older AE builds.
+AEMCP.register('anchor.move_preserving', function (args) {
+    var compName = args && args.comp ? args.comp : null;
+    var layerIndex = args && args.index ? args.index : 1;
+    var anchor = args && args.anchor !== undefined ? args.anchor : 'center';
+    var project = app.project;
+    var comp;
+    for (var i = 1; i <= project.numItems; i++) {
+        var item = project.item(i);
+        if (item instanceof CompItem && item.name === compName) {
+            comp = item;
+            break;
+        }
+    }
+    if (!comp) return { success: false, error: 'Composition not found' };
+    var layer = comp.layer(layerIndex);
+    if (!layer) return { success: false, error: 'Layer not found' };
+    if (!layer.property) return { success: false, error: 'Not an AV layer' };
+    var transform = layer.property('ADBE Transform Group');
+    if (!transform) return { success: false, error: 'Transform not found' };
+    var anchorProp = transform.property('ADBE Anchor Point');
+    var posProp = transform.property('ADBE Position');
+    if (!anchorProp || !posProp) return { success: false, error: 'Transform properties not found' };
+    var bounds;
+    try {
+        bounds = layer.sourceRectAtTime(layer.time, true);
+    } catch (e) {
+        bounds = null;
+    }
+    var newAnchor = null;
+    if (Array.isArray(anchor)) {
+        newAnchor = [anchor[0], anchor[1]];
+    } else if (anchor === 'center') {
+        newAnchor = [0, 0];
+    } else if (anchor === 'top-left') {
+        newAnchor = [bounds ? bounds.left : 0, bounds ? bounds.top : 0];
+    } else if (anchor === 'top-center') {
+        newAnchor = [bounds ? bounds.left + bounds.width / 2 : 0, bounds ? bounds.top : 0];
+    } else if (anchor === 'top-right') {
+        newAnchor = [bounds ? bounds.left + bounds.width : 0, bounds ? bounds.top : 0];
+    } else if (anchor === 'center-left') {
+        newAnchor = [bounds ? bounds.left : 0, bounds ? bounds.top + bounds.height / 2 : 0];
+    } else if (anchor === 'center-right') {
+        newAnchor = [bounds ? bounds.left + bounds.width : 0, bounds ? bounds.top + bounds.height / 2 : 0];
+    } else if (anchor === 'bottom-left') {
+        newAnchor = [bounds ? bounds.left : 0, bounds ? bounds.top + bounds.height : 0];
+    } else if (anchor === 'bottom-center') {
+        newAnchor = [bounds ? bounds.left + bounds.width / 2 : 0, bounds ? bounds.top + bounds.height : 0];
+    } else if (anchor === 'bottom-right') {
+        newAnchor = [bounds ? bounds.left + bounds.width : 0, bounds ? bounds.top + bounds.height : 0];
+    } else {
+        return { success: false, error: 'Unknown anchor: ' + anchor };
+    }
+    var oldAnchor = anchorProp.value;
+    var pOld;
+    var pNew;
+    try {
+        pOld = layer.sourcePointToComp(oldAnchor);
+        pNew = layer.sourcePointToComp(newAnchor);
+    } catch (e) {
+        pOld = [oldAnchor[0], oldAnchor[1]];
+        pNew = [newAnchor[0], newAnchor[1]];
+    }
+    var delta = [pNew[0] - pOld[0], pNew[1] - pOld[1]];
+    var posVal = posProp.value;
+    var posNew = [posVal[0] + delta[0], posVal[1] + delta[1]];
+    anchorProp.setValue(newAnchor);
+    posProp.setValue(posNew);
+    return aemcpWithExpressionWarning(anchorProp, { success: true, anchorPoint: newAnchor });
+});
+
 // Expression operation handlers (mutating, run via ae_do).
 AEMCP.register('expression.set', function (args) {
     var compName = args && args.comp ? args.comp : null;

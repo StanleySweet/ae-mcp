@@ -430,6 +430,25 @@ export class MockAVLayer extends MockLayer {
   hasAudio = false;
   threeDLayer = false;
   source: MockItem | null = null;
+
+  private transformValue(matchName: string): number[] | null {
+    const transform = this.property('ADBE Transform Group') as MockPropertyGroup | null;
+    const prop = transform ? (transform.property(matchName) as MockProperty | null) : null;
+    return prop && Array.isArray(prop.value) ? (prop.value as number[]) : null;
+  }
+
+  sourceRectAtTime(): { top: number; left: number; width: number; height: number } {
+    return { top: -this.height / 2, left: -this.width / 2, width: this.width, height: this.height };
+  }
+
+  // Mock model: identity rotation/scale and no parent, so the layer-to-comp
+  // mapping is a plain offset. Real AE also folds in rotation, scale and parenting.
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/avlayer/#avlayersourcepointtocomp
+  sourcePointToComp(point: number[]): number[] {
+    const anchor = this.transformValue('ADBE Anchor Point') || [0, 0];
+    const pos = this.transformValue('ADBE Position') || [0, 0];
+    return [pos[0] + (point[0] - anchor[0]), pos[1] + (point[1] - anchor[1])];
+  }
 }
 
 export class MockTextLayer extends MockAVLayer {}

@@ -102,7 +102,7 @@ to save once first.
 A property whose value comes from an expression (for example one added by a preset, or a
 `wiggle`) ignores a direct value or keyframe edit: the expression is the real driver. When
 `ae_do` runs `property.set`, `keyframe.add`, `keyframe.remove`, `keyframe.set_easing`,
-`keyframe.ease_preset`, `effect.set_property` or `effect.set_keyframe` against such a property, the result carries a
+`keyframe.ease_preset`, `anchor.move_preserving`, `effect.set_property` or `effect.set_keyframe` against such a property, the result carries a
 `warning` naming the property and the expression, so Claude can edit the driving control
 instead. `ae_expression_report` lists every expression-driven property on a comp's layers.
 
