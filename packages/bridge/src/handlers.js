@@ -208,6 +208,11 @@ AEMCP.register('project.undo', function () {
 // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectsave
 AEMCP.register('project.increment_save', function () {
     if (!app.project.file) {
+        // A fresh After Effects starts with an empty untitled project: nothing to protect,
+        // so a destructive op (project.open) may proceed without a save (#204).
+        if (app.project.numItems === 0) {
+            return { success: true, file: null, skipped: 'empty untitled project' };
+        }
         aemcpAbort(aemcpErrorIssue('UNSAVED_PROJECT', 'project has never been saved'));
     }
     app.project.save(new File(aemcpNextIncrementPath(app.project.file.fsName)));

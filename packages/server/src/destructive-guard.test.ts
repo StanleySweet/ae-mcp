@@ -520,6 +520,21 @@ describe('E13-5 saved version path reporting', () => {
     const savedVersion = await readFile(join(home, '.ae-mcp', 'bridge', 'last-saved-version'), 'utf8');
     expect(savedVersion.trim()).toBe('/projects/P_v008.aep');
   });
+
+  // An empty untitled project is skipped by the bridge with file: null (#204): the
+  // destructive op runs and nothing is reported as incremented.
+  it('runs the destructive op and reports no increment when the bridge skipped an empty untitled project', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      incrementResult: { success: true, file: null, skipped: 'empty untitled project' },
+    });
+    closes.push(close);
+
+    const result = await call(client, 'layer.delete', { index: 1 });
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.text).increment).toBeUndefined();
+    expect(calls).toEqual(['project.increment_save', 'layer.delete']);
+  });
 });
 
 describe('E13-6 guard cannot be bypassed', () => {

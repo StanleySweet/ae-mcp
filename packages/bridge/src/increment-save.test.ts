@@ -44,10 +44,22 @@ describe('project.increment_save', () => {
   it('refuses to increment a project that has never been saved', async () => {
     const { ctx, ae } = await payloadContext();
     ae.project.file = null;
+    ae.project.items.addComp('Main', 1920, 1080, 1, 10, 25);
 
     const outcome = invoke(ctx, 'project.increment_save', null);
 
     expect(ae.executedCommands).toEqual([]);
     expect(outcome.issue).toMatchObject({ code: 'UNSAVED_PROJECT', message: 'project has never been saved' });
+  });
+
+  // A fresh After Effects starts with an empty untitled project: nothing to protect (#204).
+  it('skips an empty untitled project instead of refusing it', async () => {
+    const { ctx, ae } = await payloadContext();
+    ae.project.file = null;
+
+    const outcome = invoke(ctx, 'project.increment_save', null);
+
+    expect(ae.executedCommands).toEqual([]);
+    expect(outcome.value).toEqual({ success: true, file: null, skipped: 'empty untitled project' });
   });
 });
