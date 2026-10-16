@@ -26,6 +26,22 @@ chunk of work; don't rewrite old entries — supersede them.
   ease out, overshoot)`: its blockers (#142, #73) are closed. AE APIs looked up for
   it — `Property.selectedKeys` (read-only int array) and `KeyframeEase(speed,
   influence)` / `setTemporalEaseAtKey` (one ease per value dimension).
+- Landed **E14-12 (#143)** as the `keyframe.ease_preset` op (`8044a6fe`) —
+  influence-only curves (speed 0; `ponytail:` note: a fixed speed is meaningless
+  across property types, upgrade path = custom speed args), one ease per value
+  dimension, wrapped in the expression warning. The op name follows the
+  `category.op` invariant (`ease` is not a category).
+- Landed **E14-13 (#144)** as the `anchor.move_preserving` op (`5ffd40e`) — nine
+  named anchor positions or a literal `[x,y]`, moving the anchor while keeping the
+  layer visually in place via `sourceRectAtTime` + `sourcePointToComp` (delta taken
+  as `posNew = posVal + delta` after a first-attempt sign error — mock divergence,
+  `sourcePointToComp` is identity-only there).
+- Landed **E14-14 (#145)** as the `expression.snippet` op (`c9c4c744`) — four
+  named snippets (`wiggle`, `loop`, `delay`, `overshoot`) applied via
+  `Property.expression` + `Property.expressionEnabled`. Snippets are the documented
+  expression forms; `overshoot` is an original damped-sine spring built from
+  `velocityAtTime` + `Math` (no vendor code, rule 5). Next frontier: **E14-15
+  (#146)** `rig.null_controller`, blocked by #145 (now closed).
 
 ## 2026-10-15
 
