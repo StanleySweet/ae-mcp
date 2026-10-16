@@ -169,7 +169,7 @@ export function defaultOperationRegistry(): OperationRegistry {
       lightType: { type: 'string', enum: ['parallel', 'spot', 'point', 'ambient'] },
     },
   }));
-  register(operation('layer.set_3d', 'layer', 'Turn the 3D switch on or off for an AV layer (not camera/light).', {
+  register(operation('layer.set_3d', 'layer', 'Turn the 3D switch on or off for a layer (not camera/light).', {
     schema: { comp, index: layerIndex, enabled: { type: 'boolean' } },
   }));
   register(operation('layer.add_solid', 'layer', 'Add a solid layer.', {

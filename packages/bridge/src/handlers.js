@@ -936,14 +936,18 @@ AEMCP.register('layer.add_light', function (args) {
 });
 
 // Ref: https://ae-scripting.docsforadobe.dev/layer/avlayer/#avlayerthreedlayer
+// Ref: https://ae-scripting.docsforadobe.dev/layer/cameralayer/ (CameraLayer inherits from Layer)
+// Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/ (LightLayer inherits from Layer)
 AEMCP.register('layer.set_3d', function (args) {
     var comp = aemcpRequireComp(aemcpCompKey(args));
     var layer = comp.layer(args ? args.index : 0);
     if (!layer) {
         aemcpAbortArgs('layer not found: ' + (args ? args.index : undefined));
     }
-    if (!(layer instanceof AVLayer)) {
-        aemcpAbortArgs('layer ' + layer.index + ' cannot be 3D (camera and light layers are not AV layers)');
+    // Gate on what cannot carry the 3D switch, not on AVLayer: in real AE a
+    // ShapeLayer or TextLayer is not instanceof AVLayer, yet has a 3D switch.
+    if (layer instanceof CameraLayer || layer instanceof LightLayer) {
+        aemcpAbortArgs('layer ' + layer.index + ' cannot be 3D (camera and light layers have no 3D switch)');
     }
     layer.threeDLayer = !!(args && args.enabled);
     return { index: layer.index, threeDLayer: layer.threeDLayer };

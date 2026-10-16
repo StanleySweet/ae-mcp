@@ -66,4 +66,29 @@ describe('camera, light and 3D handlers', () => {
     expect(invoke(ctx, 'layer.set_3d', { comp: 'Main', index: 1, enabled: true }).issue?.code).toBe('INVALID_ARGS');
     expect(invoke(ctx, 'layer.set_3d', { comp: 'Main', index: 9, enabled: true }).issue?.code).toBe('INVALID_ARGS');
   });
+
+  it('refuses 3D on light layers', async () => {
+    const { ctx } = await setup();
+    invoke(ctx, 'layer.add_light', { comp: 'Main' });
+    const r = invoke(ctx, 'layer.set_3d', { comp: 'Main', index: 1, enabled: true });
+    expect(r.ok).toBe(false);
+    expect(r.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  it('turns 3D on for shape and text layers, which are not AVLayer in AE', async () => {
+    const { ctx, ae } = await setup();
+    invoke(ctx, 'layer.add_shape', { comp: 'Main' });
+    invoke(ctx, 'layer.add_text', { comp: 'Main', text: 'Hello' });
+    // The sandbox reproduces AE: neither is `instanceof AVLayer`.
+    const comp = ae.project.item(1) as MockCompItem;
+    expect(vm.runInContext('(layer) => layer instanceof AVLayer', ctx)(comp.layer(1))).toBe(false);
+    expect(vm.runInContext('(layer) => layer instanceof AVLayer', ctx)(comp.layer(2))).toBe(false);
+
+    const shape = invoke(ctx, 'layer.set_3d', { comp: 'Main', index: 1, enabled: true });
+    expect(shape.ok).toBe(true);
+    expect(shape.value).toEqual({ index: 1, threeDLayer: true });
+    const text = invoke(ctx, 'layer.set_3d', { comp: 'Main', index: 2, enabled: true });
+    expect(text.ok).toBe(true);
+    expect(text.value).toEqual({ index: 2, threeDLayer: true });
+  });
 });

@@ -1185,6 +1185,14 @@ export class MockAE {
   }
 }
 
+// Real AE (test drive, #200/#209): a ShapeLayer is not `instanceof AVLayer` in
+// ExtendScript, and TextLayer is not treated as one either. Mirror that so
+// `instanceof AVLayer` in handlers sees the same hierarchy as AE.
+const MockAVLayerInSandbox = {
+  [Symbol.hasInstance]: (value: unknown): boolean =>
+    value instanceof MockAVLayer && !(value instanceof MockShapeLayer) && !(value instanceof MockTextLayer),
+};
+
 export function runInMockAE(code: string, ae: MockAE): vm.Context {
   const sandbox: Record<string, unknown> = {
     app: ae.app,
@@ -1196,7 +1204,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     ImportOptions: MockImportOptions,
     SolidSource: MockSolidSource,
     CloseOptions: { DO_NOT_SAVE_CHANGES: 1612, PROMPT_TO_SAVE_CHANGES: 1613, SAVE_CHANGES: 1614 },
-    AVLayer: MockAVLayer,
+    AVLayer: MockAVLayerInSandbox,
     TextLayer: MockTextLayer,
     ShapeLayer: MockShapeLayer,
     Shape: MockShape,
