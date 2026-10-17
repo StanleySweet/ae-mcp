@@ -9,7 +9,7 @@ import { afterEach, describe, it, expect } from 'vitest';
 import { createAEClient } from './ae-client.js';
 import { FileQueueTransport } from './file-queue-transport.js';
 import { OperationRegistry } from './operations.js';
-import { createServer } from './server.js';
+import { createServer, SERVER_VERSION } from './server.js';
 
 function registry(): OperationRegistry {
   const registry = new OperationRegistry();
@@ -159,7 +159,7 @@ describe('ae_do', () => {
 
   it('adds one warning line when the bridge version differs from the server', async () => {
     const calls: string[] = [];
-    const { client, close } = await connectServer(project(), calls, undefined, '1.4.0');
+    const { client, close } = await connectServer(project(), calls, undefined, '0.0.1');
     closes.push(close);
 
     const { isError, text } = await call(client, {
@@ -169,13 +169,13 @@ describe('ae_do', () => {
     expect(isError).toBe(false);
     const parsed = JSON.parse(text) as { result: unknown; warning?: string };
     expect(parsed.result).toEqual({ index: 1, name: 'Hero' });
-    expect(parsed.warning).toMatch(/bridge is version 1\.4\.0 but the server is 1\.4\.1/);
+    expect(parsed.warning).toContain(`bridge is version 0.0.1 but the server is ${SERVER_VERSION}`);
     expect(parsed.warning).not.toContain('\n');
   });
 
   it('adds no warning when the bridge version matches the server', async () => {
     const calls: string[] = [];
-    const { client, close } = await connectServer(project(), calls, undefined, '1.4.1+abc1234');
+    const { client, close } = await connectServer(project(), calls, undefined, `${SERVER_VERSION}+abc1234`);
     closes.push(close);
 
     const { text } = await call(client, { op: 'layer.rename', args: { index: 1, name: 'Hero' } });
