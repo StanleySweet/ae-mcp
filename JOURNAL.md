@@ -5,6 +5,13 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.6.2`**: `script_save {name, source}` saves a script Claude wrote, for reusable tools that then run with no Claude and no tokens (#268).
+  - The source is parsed, never run, and refused if it uses syntax ES3 ExtendScript cannot run, with the offending line named.
+  - The saved file gets a header comment. The skill says to show the user the code and get a go-ahead first.
+  - Server-only change; the drive skips `script_save` because it writes into the real AE folder.
+  - **Issue cleanup:** #241 closed (MOGRT values: use `property.set`). #238, #249 and #264 marked needs-human with what is left. Merged agent worktrees removed.
+  - **Open:** the user tests Setup's update path and a parametric "offset layers by N frames" script.
+
 - **`chore(release): v1.6.1`**: six fixes reported by a v1.6.0 Claude Desktop session.
   - `ae_render_frame` was dropped as invalid: `region` is now an array, not a tuple.
   - The `batch.run` message no longer says "rolled back".
