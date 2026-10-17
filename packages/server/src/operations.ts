@@ -418,7 +418,7 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Shape.
   register(
-    operation('shape.add', 'shape', 'Add a shape (path, rect or ellipse) to a shape layer; name labels the shape, layerName names a layer created when layerIndex is omitted.', {
+    operation('shape.add', 'shape', 'Add a shape (path, rect or ellipse) to a shape layer; name labels the shape, layerName names a layer created when layerIndex is omitted. A new group is added below existing groups (drawn behind them) unless front: true.', {
       schema: {
         comp,
         layerIndex,
@@ -426,29 +426,46 @@ export function defaultOperationRegistry(): OperationRegistry {
         name: { type: 'string' },
         layerName: { type: 'string' },
         size: { type: 'array' },
+        position: { type: 'array' },
         vertices: { type: 'array' },
         inTangents: { type: 'array' },
         outTangents: { type: 'array' },
         closed: { type: 'boolean' },
         fillColor: { type: 'array' },
+        fillOpacity: { type: 'number', description: '0-100' },
         strokeColor: { type: 'array' },
+        strokeOpacity: { type: 'number', description: '0-100' },
         strokeWidth: { type: 'number' },
+        groupPosition: { type: 'array' },
+        groupScale: { type: 'array' },
+        groupRotation: { type: 'number' },
+        groupOpacity: { type: 'number', description: '0-100' },
+        front: { type: 'boolean' },
       },
     }),
   );
   register(
-    operation('shape.set', 'shape', 'Set the first vector path on a shape layer.', {
+    operation('shape.set', 'shape', 'Edit one group (1-based, default 1) of a shape layer: its first path (vertices, inTangents, outTangents, closed), rect/ellipse position, fill/stroke opacity, group transform, or front: true to move the group to the top.', {
       schema: {
         comp,
         layerIndex,
+        group: { type: 'number', description: '1-based group index, default 1' },
         vertices: { type: 'array' },
         inTangents: { type: 'array' },
         outTangents: { type: 'array' },
         closed: { type: 'boolean' },
+        position: { type: 'array' },
+        fillOpacity: { type: 'number', description: '0-100' },
+        strokeOpacity: { type: 'number', description: '0-100' },
+        groupPosition: { type: 'array' },
+        groupScale: { type: 'array' },
+        groupRotation: { type: 'number' },
+        groupOpacity: { type: 'number', description: '0-100' },
+        front: { type: 'boolean' },
       },
     }),
   );
-  register(operation('shape.read', 'shape', 'Read shape layer contents.', {
+  register(operation('shape.read', 'shape', 'Read shape layer contents: each group with its name, items (path, rect, ellipse, fill, stroke) and group transform.', {
     readOnly: true,
     schema: { comp, layerIndex },
   }));

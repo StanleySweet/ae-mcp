@@ -468,6 +468,16 @@ export class MockPropertyGroup {
     return true;
   }
 
+  // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybasemoveto
+  moveTo(newIndex: number): void {
+    const parent = this.parentGroup;
+    if (!parent) {
+      throw new Error('mock AE: moveTo needs an indexed parent group');
+    }
+    parent.children.splice(parent.children.indexOf(this), 1);
+    parent.children.splice(newIndex - 1, 0, this);
+  }
+
   // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybaseremove
   remove(): void {
     const parent = this.parentGroup;
@@ -616,6 +626,17 @@ const VECTOR_ITEMS: Record<string, string> = {
   'ADBE Vector Graphic - Stroke': 'Stroke',
 };
 
+// Ref: https://ae-scripting.docsforadobe.dev/matchnames/layer/shapelayer/
+function vectorGroupTransform(): MockPropertyGroup {
+  const transform = new MockPropertyGroup('Transform', 'ADBE Vector Transform Group');
+  transform.add(new MockProperty('Anchor Point', 'ADBE Vector Anchor', [0, 0]));
+  transform.add(new MockProperty('Position', 'ADBE Vector Position', [0, 0]));
+  transform.add(new MockProperty('Scale', 'ADBE Vector Scale', [100, 100]));
+  transform.add(new MockProperty('Rotation', 'ADBE Vector Rotation', 0));
+  transform.add(new MockProperty('Opacity', 'ADBE Vector Group Opacity', 100));
+  return transform;
+}
+
 export class MockVectorsGroup extends MockPropertyGroup {
   canAddProperty(name: string): boolean {
     return Object.prototype.hasOwnProperty.call(VECTOR_ITEMS, name);
@@ -629,17 +650,23 @@ export class MockVectorsGroup extends MockPropertyGroup {
     const item = this.add(new MockEffect(VECTOR_ITEMS[matchName], matchName));
     if (matchName === 'ADBE Vector Group') {
       item.add(new MockVectorsGroup('Contents', 'ADBE Vectors Group'));
+      // Every Vector Group carries its own Transform group; it is never addProperty'd.
+      item.add(vectorGroupTransform());
     } else if (matchName === 'ADBE Vector Shape - Group') {
       item.add(new MockProperty('Path', 'ADBE Vector Shape', null));
     } else if (matchName === 'ADBE Vector Shape - Rect') {
       item.add(new MockProperty('Size', 'ADBE Vector Rect Size', [100, 100]));
+      item.add(new MockProperty('Position', 'ADBE Vector Rect Position', [0, 0]));
     } else if (matchName === 'ADBE Vector Shape - Ellipse') {
       item.add(new MockProperty('Size', 'ADBE Vector Ellipse Size', [100, 100]));
+      item.add(new MockProperty('Position', 'ADBE Vector Ellipse Position', [0, 0]));
     } else if (matchName === 'ADBE Vector Graphic - Fill') {
       item.add(new MockProperty('Color', 'ADBE Vector Fill Color', [1, 0, 0, 1]));
+      item.add(new MockProperty('Opacity', 'ADBE Vector Fill Opacity', 100));
     } else if (matchName === 'ADBE Vector Graphic - Stroke') {
       item.add(new MockProperty('Color', 'ADBE Vector Stroke Color', [1, 1, 1, 1]));
       item.add(new MockProperty('Stroke Width', 'ADBE Vector Stroke Width', 2));
+      item.add(new MockProperty('Opacity', 'ADBE Vector Stroke Opacity', 100));
     }
     return item;
   }

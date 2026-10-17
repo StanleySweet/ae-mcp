@@ -36,7 +36,16 @@ var AEMCP_MATCH = {
     SHAPE_FILL_COLOR: 'ADBE Vector Fill Color',
     SHAPE_STROKE: 'ADBE Vector Graphic - Stroke',
     SHAPE_STROKE_COLOR: 'ADBE Vector Stroke Color',
-    SHAPE_STROKE_WIDTH: 'ADBE Vector Stroke Width'
+    SHAPE_STROKE_WIDTH: 'ADBE Vector Stroke Width',
+    SHAPE_RECT_POSITION: 'ADBE Vector Rect Position',
+    SHAPE_ELLIPSE_POSITION: 'ADBE Vector Ellipse Position',
+    SHAPE_FILL_OPACITY: 'ADBE Vector Fill Opacity',
+    SHAPE_STROKE_OPACITY: 'ADBE Vector Stroke Opacity',
+    SHAPE_GROUP_TRANSFORM: 'ADBE Vector Transform Group',
+    SHAPE_GROUP_POSITION: 'ADBE Vector Position',
+    SHAPE_GROUP_SCALE: 'ADBE Vector Scale',
+    SHAPE_GROUP_ROTATION: 'ADBE Vector Rotation',
+    SHAPE_GROUP_OPACITY: 'ADBE Vector Group Opacity'
 };
 
 // The only way the bridge adds a property: ask AE (canAddProperty) whether the
@@ -2116,21 +2125,127 @@ AEMCP.register('mask.read', function (args) {
     };
 });
 
+// Shape helpers for shape.add / shape.set / shape.read (#214).
+// Opacity arguments are percentages; anything outside 0-100 is an INVALID_ARGS.
+function aemcpShapeCheckArgs(args, shapeType) {
+    if (args.position !== undefined && shapeType === 'path') {
+        aemcpAbortArgs('position applies to rect and ellipse only');
+    }
+    if (args.fillOpacity !== undefined) aemcpShapeOpacity(args.fillOpacity, 'fillOpacity');
+    if (args.strokeOpacity !== undefined) aemcpShapeOpacity(args.strokeOpacity, 'strokeOpacity');
+}
+
+function aemcpShapeOpacity(value, label) {
+    if (typeof value !== 'number' || value < 0 || value > 100) {
+        aemcpAbortArgs(label + ' must be a number from 0 to 100');
+    }
+}
+
+// Writes only the group-level fields that were given: the Vector Group's own
+// Transform group (ADBE Vector Transform Group, present on every group, never added).
+// Ref: https://ae-scripting.docsforadobe.dev/matchnames/layer/shapelayer/
+function aemcpApplyGroupFields(group, args) {
+    var transform = group.property(AEMCP_MATCH.SHAPE_GROUP_TRANSFORM);
+    if (args.groupPosition !== undefined) transform.property(AEMCP_MATCH.SHAPE_GROUP_POSITION).setValue(args.groupPosition);
+    if (args.groupScale !== undefined) transform.property(AEMCP_MATCH.SHAPE_GROUP_SCALE).setValue(args.groupScale);
+    if (args.groupRotation !== undefined) transform.property(AEMCP_MATCH.SHAPE_GROUP_ROTATION).setValue(args.groupRotation);
+    if (args.groupOpacity !== undefined) transform.property(AEMCP_MATCH.SHAPE_GROUP_OPACITY).setValue(args.groupOpacity);
+}
+
+// Reads one property value, or null when it is missing or AE refuses to read it.
+function aemcpReadValue(group, matchName) {
+    try {
+        var prop = group ? group.property(matchName) : null;
+        return prop ? prop.value : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// Describes one item of a Vector Group's contents; other item kinds are skipped.
+function aemcpReadShapeItem(item) {
+    var matchName = item.matchName;
+    if (matchName === AEMCP_MATCH.SHAPE_PATH) {
+        var shape = aemcpReadValue(item, AEMCP_MATCH.SHAPE_PATH_VALUE);
+        return {
+            type: 'path',
+            vertices: shape ? shape.vertices : null,
+            inTangents: shape ? shape.inTangents : null,
+            outTangents: shape ? shape.outTangents : null,
+            closed: shape ? shape.closed : null
+        };
+    }
+    if (matchName === AEMCP_MATCH.SHAPE_RECT) {
+        return {
+            type: 'rect',
+            size: aemcpReadValue(item, AEMCP_MATCH.SHAPE_RECT_SIZE),
+            position: aemcpReadValue(item, AEMCP_MATCH.SHAPE_RECT_POSITION)
+        };
+    }
+    if (matchName === AEMCP_MATCH.SHAPE_ELLIPSE) {
+        return {
+            type: 'ellipse',
+            size: aemcpReadValue(item, AEMCP_MATCH.SHAPE_ELLIPSE_SIZE),
+            position: aemcpReadValue(item, AEMCP_MATCH.SHAPE_ELLIPSE_POSITION)
+        };
+    }
+    if (matchName === AEMCP_MATCH.SHAPE_FILL) {
+        return {
+            type: 'fill',
+            color: aemcpReadValue(item, AEMCP_MATCH.SHAPE_FILL_COLOR),
+            opacity: aemcpReadValue(item, AEMCP_MATCH.SHAPE_FILL_OPACITY)
+        };
+    }
+    if (matchName === AEMCP_MATCH.SHAPE_STROKE) {
+        return {
+            type: 'stroke',
+            color: aemcpReadValue(item, AEMCP_MATCH.SHAPE_STROKE_COLOR),
+            opacity: aemcpReadValue(item, AEMCP_MATCH.SHAPE_STROKE_OPACITY),
+            width: aemcpReadValue(item, AEMCP_MATCH.SHAPE_STROKE_WIDTH)
+        };
+    }
+    return null;
+}
+
+function aemcpReadShapeGroup(group, index) {
+    var items = [];
+    var groupContents = group.property(AEMCP_MATCH.SHAPE_GROUP_CONTENTS);
+    var count = groupContents ? groupContents.numProperties : 0;
+    for (var i = 1; i <= count; i++) {
+        var item = aemcpReadShapeItem(groupContents.property(i));
+        if (item) items.push(item);
+    }
+    var transform = group.property(AEMCP_MATCH.SHAPE_GROUP_TRANSFORM);
+    return {
+        index: index,
+        name: group.name,
+        items: items,
+        transform: {
+            position: aemcpReadValue(transform, AEMCP_MATCH.SHAPE_GROUP_POSITION),
+            scale: aemcpReadValue(transform, AEMCP_MATCH.SHAPE_GROUP_SCALE),
+            rotation: aemcpReadValue(transform, AEMCP_MATCH.SHAPE_GROUP_ROTATION),
+            opacity: aemcpReadValue(transform, AEMCP_MATCH.SHAPE_GROUP_OPACITY)
+        }
+    };
+}
+
 AEMCP.register('shape.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
     var shapeType = args && args.type ? args.type : 'path'; // 'path', 'rect', 'ellipse'
+    aemcpShapeCheckArgs(args, shapeType);
     var comp = aemcpRequireComp(compName);
     var layer;
     if (layerIndex !== null) {
         layer = comp.layer(layerIndex);
+        if (!layer) aemcpAbortArgs('layer not found: ' + layerIndex);
     } else {
         layer = comp.layers.addShape();
         if (args && args.layerName) layer.name = args.layerName;
     }
-    if (!layer) return { success: false, error: 'Shape layer not found or could not be created' };
 
     var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
+    // A new group is added below existing groups (drawn behind them) unless front: true.
     var shapeGroup = aemcpAddProperty(contents, AEMCP_MATCH.SHAPE_GROUP);
     // `name` labels the shape itself; `layerName` names a layer created here (#185).
     if (args && args.name) shapeGroup.name = args.name;
@@ -2139,9 +2254,11 @@ AEMCP.register('shape.add', function (args) {
     if (shapeType === 'rect') {
         var rect = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_RECT);
         if (args.size) rect.property(AEMCP_MATCH.SHAPE_RECT_SIZE).setValue(args.size);
+        if (args.position !== undefined) rect.property(AEMCP_MATCH.SHAPE_RECT_POSITION).setValue(args.position);
     } else if (shapeType === 'ellipse') {
         var ellipse = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_ELLIPSE);
         if (args.size) ellipse.property(AEMCP_MATCH.SHAPE_ELLIPSE_SIZE).setValue(args.size);
+        if (args.position !== undefined) ellipse.property(AEMCP_MATCH.SHAPE_ELLIPSE_POSITION).setValue(args.position);
     } else {
         var pathProp = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_PATH);
         if (args.vertices) {
@@ -2154,43 +2271,73 @@ AEMCP.register('shape.add', function (args) {
         }
     }
 
-    if (args && args.fillColor) {
+    if (args && (args.fillColor || args.fillOpacity !== undefined)) {
         var fill = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_FILL);
-        fill.property(AEMCP_MATCH.SHAPE_FILL_COLOR).setValue(args.fillColor);
+        if (args.fillColor) fill.property(AEMCP_MATCH.SHAPE_FILL_COLOR).setValue(args.fillColor);
+        if (args.fillOpacity !== undefined) fill.property(AEMCP_MATCH.SHAPE_FILL_OPACITY).setValue(args.fillOpacity);
     }
-    if (args && args.strokeColor) {
+    if (args && (args.strokeColor || args.strokeOpacity !== undefined)) {
         var stroke = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_STROKE);
-        stroke.property(AEMCP_MATCH.SHAPE_STROKE_COLOR).setValue(args.strokeColor);
+        if (args.strokeColor) stroke.property(AEMCP_MATCH.SHAPE_STROKE_COLOR).setValue(args.strokeColor);
+        if (args.strokeOpacity !== undefined) stroke.property(AEMCP_MATCH.SHAPE_STROKE_OPACITY).setValue(args.strokeOpacity);
         if (typeof args.strokeWidth === 'number') {
             stroke.property(AEMCP_MATCH.SHAPE_STROKE_WIDTH).setValue(args.strokeWidth);
         }
     }
+    aemcpApplyGroupFields(shapeGroup, args);
+    // Last, because moveTo invalidates other references into the same group.
+    // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybasemoveto
+    if (args && args.front === true) shapeGroup.moveTo(1);
     return { success: true, layerIndex: layer.index };
 });
 
 AEMCP.register('shape.set', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
+    var groupIndex = args && typeof args.group === 'number' ? args.group : 1;
+    aemcpShapeCheckArgs(args, null);
     var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
-    if (!layer) return { success: false, error: 'Layer not found' };
+    if (!layer) aemcpAbortArgs('layer not found: ' + layerIndex);
     var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
-    if (!contents) return { success: false, error: 'Layer contents not found' };
+    var group = contents ? contents.property(groupIndex) : null;
+    if (!group) aemcpAbortArgs('group not found: ' + groupIndex);
+    var groupContents = group.property(AEMCP_MATCH.SHAPE_GROUP_CONTENTS);
 
-    // Traverse and update matching property
     if (args.vertices) {
+        var pathProp = groupContents.property(AEMCP_MATCH.SHAPE_PATH);
+        if (!pathProp) aemcpAbortArgs('no path in group ' + groupIndex);
         var myShape = new Shape();
         myShape.vertices = args.vertices;
         if (args.inTangents) myShape.inTangents = args.inTangents;
         if (args.outTangents) myShape.outTangents = args.outTangents;
         if (typeof args.closed === 'boolean') myShape.closed = args.closed;
-        // set on first vector path found
-        var group = contents.property(1);
-        if (group && group.property(AEMCP_MATCH.SHAPE_GROUP_CONTENTS)) {
-            var p = group.property(AEMCP_MATCH.SHAPE_GROUP_CONTENTS).property(AEMCP_MATCH.SHAPE_PATH);
-            if (p) p.property(AEMCP_MATCH.SHAPE_PATH_VALUE).setValue(myShape);
+        pathProp.property(AEMCP_MATCH.SHAPE_PATH_VALUE).setValue(myShape);
+    }
+    if (args.position !== undefined) {
+        var rect = groupContents.property(AEMCP_MATCH.SHAPE_RECT);
+        var ellipse = groupContents.property(AEMCP_MATCH.SHAPE_ELLIPSE);
+        if (rect) {
+            rect.property(AEMCP_MATCH.SHAPE_RECT_POSITION).setValue(args.position);
+        } else if (ellipse) {
+            ellipse.property(AEMCP_MATCH.SHAPE_ELLIPSE_POSITION).setValue(args.position);
+        } else {
+            aemcpAbortArgs('no rect or ellipse in group ' + groupIndex);
         }
     }
+    if (args.fillOpacity !== undefined) {
+        var fill = groupContents.property(AEMCP_MATCH.SHAPE_FILL);
+        if (!fill) aemcpAbortArgs('no fill in group ' + groupIndex);
+        fill.property(AEMCP_MATCH.SHAPE_FILL_OPACITY).setValue(args.fillOpacity);
+    }
+    if (args.strokeOpacity !== undefined) {
+        var stroke = groupContents.property(AEMCP_MATCH.SHAPE_STROKE);
+        if (!stroke) aemcpAbortArgs('no stroke in group ' + groupIndex);
+        stroke.property(AEMCP_MATCH.SHAPE_STROKE_OPACITY).setValue(args.strokeOpacity);
+    }
+    aemcpApplyGroupFields(group, args);
+    // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybasemoveto
+    if (args.front === true) group.moveTo(1);
     return { success: true };
 });
 
@@ -2199,10 +2346,14 @@ AEMCP.register('shape.read', function (args) {
     var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
-    if (!layer) return { success: false, error: 'Layer not found' };
+    if (!layer) aemcpAbortArgs('layer not found: ' + layerIndex);
     var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
-    var details = { numGroups: contents ? contents.numProperties : 0 };
-    return { shape: details };
+    var groups = [];
+    var count = contents ? contents.numProperties : 0;
+    for (var g = 1; g <= count; g++) {
+        groups.push(aemcpReadShapeGroup(contents.property(g), g));
+    }
+    return { groups: groups };
 });
 
 // Map a friendly justification name to the ParagraphJustification enum.

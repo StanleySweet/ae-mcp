@@ -41,6 +41,15 @@ const DOCUMENTED = new Set([
   'ADBE Vector Graphic - Stroke',
   'ADBE Vector Stroke Color',
   'ADBE Vector Stroke Width',
+  'ADBE Vector Rect Position',
+  'ADBE Vector Ellipse Position',
+  'ADBE Vector Fill Opacity',
+  'ADBE Vector Stroke Opacity',
+  'ADBE Vector Transform Group',
+  'ADBE Vector Position',
+  'ADBE Vector Scale',
+  'ADBE Vector Rotation',
+  'ADBE Vector Group Opacity',
 ]);
 
 // Match names the scripting guide does not list, read from live AE instead

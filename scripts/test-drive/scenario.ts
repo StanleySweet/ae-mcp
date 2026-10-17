@@ -243,6 +243,7 @@ export const scenario: Step[] = [
     name: 'Card',
     size: [600, 300],
     fillColor: [0.9, 0.3, 0.3],
+    fillOpacity: 80,
     strokeColor: [1, 1, 1],
     strokeWidth: 4,
   })),
@@ -252,6 +253,7 @@ export const scenario: Step[] = [
     type: 'ellipse',
     name: 'Dot',
     size: [160, 160],
+    position: [480, 300],
     fillColor: [0.2, 0.8, 0.9],
   })),
   op('shape.add.path', 'shape.add', (s) => ({
@@ -266,10 +268,13 @@ export const scenario: Step[] = [
     ],
     closed: true,
     fillColor: [0.95, 0.85, 0.2],
+    groupOpacity: 90,
   })),
+  // Group 3 is the Triangle: group 1 is the Card rect, which has no path.
   op('shape.set', 'shape.set', (s) => ({
     comp: s.comp,
     layerIndex: 1,
+    group: 3,
     vertices: [
       [0, -120],
       [120, 90],
