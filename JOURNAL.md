@@ -5,6 +5,12 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.5.2`**: AE modals no longer freeze the bridge.
+  - **Dialog suppression:** every job runs inside `app.beginSuppressDialogs()`, and `app.onError` collects AE's error text into the result (`details.aeErrors`). Increment and Save and the MOGRT export used to open modals; they no longer do.
+  - **Self-recovery:** the client tracks jobs that never finished. Before sending a new job it presses Escape blind and waits for the held job's result, instead of stacking "script already running" dialogs. After four presses it returns `DIALOG_OPEN` and sends nothing. AE 26.5 hides its windows from Accessibility, so dialogs cannot be read by script (finding added).
+  - **`mogrt.export`:** refuses a comp with no control. It stops with `exported: false` while the project is unsaved or was never saved, and builds its result before the export, which invalidates the comp. #241 stays open: control values cannot be set through the op.
+  - **Test drive:** now runs MOGRT export, export presets, versions with render, audio to keyframes, localization and relink with apply. On AE 26.5: 189 passed, 0 failed, 5 skipped. #236 is closed: Cmd+Z only, per ADR-0009.
+
 - **`chore(release): v1.5.1`**: the v1.5.0 content, actually published. The `v1.5.0` tag was pushed with a red check: two `ae_do` tests hard-coded server version 1.4.1, so the release workflow failed and published nothing. The tests now follow `SERVER_VERSION`. The `v1.5.0` tag stays, as pushed tags are never moved.
 
 - **`chore(release): v1.5.0`**: ships 26 of the 30 improvement issues (#227-#256).
