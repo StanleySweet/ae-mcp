@@ -887,9 +887,10 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_catalog',
     {
       description:
-        'List operations available through ae_do, optionally filtered by category.',
+        'List operations available through ae_do: name and description. Filter by category. Use ae_describe for one schema.',
       inputSchema: {
         category: z.string().optional(),
+        verbose: z.boolean().optional(),
       },
     },
     async (args) => {
@@ -897,7 +898,43 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const allowed = operations
         .list(args.category)
         .filter((definition) => isPermitted(definition, settings) && evalRunEnabled(definition, settings));
-      return text({ operations: allowed });
+      if (args.verbose === true) {
+        return text({ operations: allowed });
+      }
+      return text({
+        operations: allowed.map((definition) => ({
+          name: definition.name,
+          description: definition.description,
+        })),
+      });
+    },
+  );
+
+  server.registerTool(
+    'ae_describe',
+    {
+      description:
+        'Show one ae_do operation: its full schema and required arguments. Call it before ae_do with an unfamiliar op.',
+      inputSchema: {
+        op: z.string(),
+      },
+    },
+    async (args) => {
+      const settings = await getSettings();
+      const visible = operations
+        .list()
+        .filter((definition) => isPermitted(definition, settings) && evalRunEnabled(definition, settings));
+      const definition = visible.find((entry) => entry.name === args.op);
+      if (definition === undefined) {
+        // Hidden operations are reported as unknown, the same as ae_catalog does.
+        const suggestions = closestNames(
+          visible.map((entry) => entry.name),
+          args.op,
+        );
+        const suffix = suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : '';
+        return text(makeError('INVALID_ARGS', `unknown operation '${args.op}'.${suffix}`), true);
+      }
+      return text(definition);
     },
   );
 

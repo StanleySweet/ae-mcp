@@ -230,6 +230,7 @@ export const scenario: Step[] = [
   tool('ae_context', 'ae_context', () => ({})),
   tool('ae_project_info', 'ae_project_info', () => ({})),
   tool('ae_catalog', 'ae_catalog', () => ({})),
+  tool('ae_describe', 'ae_describe', () => ({ op: 'project.info' })),
   tool('ae_dialogs.list', 'ae_dialogs', () => ({ action: 'list' }), { skipOnResult: accessibilitySkip }),
   tool('get_selection', 'get_selection', () => ({})),
   op('project.info', 'project.info', () => ({})),

@@ -69,7 +69,7 @@ describe('mcp server skeleton', () => {
       expect(tool.description?.length ?? 0, tool.name).toBeLessThan(200);
     }
     const total = tools.tools.reduce((sum, tool) => sum + (tool.description?.length ?? 0), 0);
-    expect(total).toBe(2213);
+    expect(total).toBe(2363);
     await client.close();
     await server.close();
   });

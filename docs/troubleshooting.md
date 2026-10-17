@@ -74,7 +74,7 @@ short `hint`. The codes and their hints:
 | `BRIDGE_NOT_LOADED` | Restart After Effects so the bridge loads, then retry. |
 | `UNKNOWN_TOOL` | Call `ae_catalog` to list the operations. |
 | `INVALID_MESSAGE` | Client and server protocol differ; restart the client. |
-| `INVALID_ARGS` | Call `ae_catalog` for the operation's schema. |
+| `INVALID_ARGS` | Call `ae_describe` for the operation's schema. |
 | `FORBIDDEN` | Adjust `~/.ae-mcp/settings.json` or the environment override. |
 | `UNSAVED_PROJECT` | Save the project once (File > Save), then retry. |
 | `SCRIPT_ERROR` | See Window > Console in After Effects. |

@@ -243,7 +243,7 @@ describe('ae_do', () => {
     const error = errorSchema.parse(JSON.parse(text));
     expect(error.code).toBe('INVALID_ARGS');
     expect(error.message).toContain("missing required argument 'name'");
-    expect(error.hint).toBe("Call ae_catalog for the operation's schema.");
+    expect(error.hint).toBe("Call ae_describe for the operation's schema.");
     expect(calls).toEqual([]);
   });
 
