@@ -25,6 +25,8 @@ export const errorSchema = z.object({
   code: errorCodeSchema,
   message: z.string(),
   hint: z.string().optional(),
+  // Set by batch.run when the server must undo the batch as a separate job.
+  rollback: z.boolean().optional(),
 });
 
 export const resultSchema = z.discriminatedUnion('ok', [

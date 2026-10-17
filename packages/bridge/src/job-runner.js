@@ -97,12 +97,9 @@ function aemcpInvoke(tool, args, deadline) {
         }
         AEMCP_BUSY = false;
     }
-    // batch.run asks for a rollback; Undo only reverts the whole batch once its
-    // group has ended. Ref: https://ae-scripting.docsforadobe.dev/general/application/#appexecutecommand
-    if (!outcome.ok && outcome.issue.rollback) {
-        delete outcome.issue.rollback;
-        app.executeCommand(16);
-    }
+    // A batch rollback is NOT undone here: Edit > Undo inside the running script
+    // makes AE raise a modal "Undo group mismatch" that blocks every later job.
+    // The issue keeps `rollback: true`; the server runs project.undo as its own job.
     return outcome;
 }
 

@@ -927,6 +927,15 @@ export function createServer(options: ServerOptions = {}): McpServer {
           : validation.args;
       const result = await callRaw(definition.name, bridgeArgs);
       if (!result.ok) {
+        // Batch rollback: Undo runs as its own job, outside the batch script, or
+        // AE raises a modal "Undo group mismatch" (live test drive, #258).
+        if ((result.error as { rollback?: boolean }).rollback === true) {
+          delete (result.error as { rollback?: boolean }).rollback;
+          const undone = await callRaw('project.undo');
+          if (!undone.ok) {
+            result.error.message += ` (rollback failed: ${undone.error.message})`;
+          }
+        }
         return toResult(result);
       }
       const payload: Record<string, unknown> = { result: result.result };

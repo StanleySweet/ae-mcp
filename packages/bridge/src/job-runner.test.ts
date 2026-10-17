@@ -257,7 +257,9 @@ describe('bridge batch.run', () => {
       return { result: await driver.waitForResult('batch-rb'), ae };
     }
 
-    it('undoes once, after the group ended, when a mutating step preceded the failure', async () => {
+    // Undo inside the batch script raised AE's modal "Undo group mismatch" (#258):
+    // the bridge only flags the rollback; the server undoes in a separate job.
+    it('flags a rollback without undoing in-script when a mutating step preceded the failure', async () => {
       const { result, ae } = await run({
         ops: [{ op: 'a.ok' }, { op: 'a.boom' }],
         mutating: [true, true],
@@ -267,9 +269,10 @@ describe('bridge batch.run', () => {
         error: {
           code: 'SCRIPT_ERROR',
           message: 'batch rolled back after ops[1] (a.boom) failed: Error: kaboom',
+          rollback: true,
         },
       });
-      expect(ae.executedCommands).toEqual([16]);
+      expect(ae.executedCommands).toEqual([]);
       expect(ae.app.inUndoGroup()).toBe(false);
       expect(ae.undoGroups).toHaveLength(1);
     });
