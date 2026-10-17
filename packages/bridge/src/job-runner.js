@@ -187,6 +187,89 @@ AEMCP.busy = function () {
     return aemcpBusy();
 };
 
+// A step argument that is exactly "$<step>" plus an optional path, such as
+// "$0.index" or "$2.layers[1]", reads a field of an earlier step result (#229).
+var AEMCP_REF = /^\$(\d+)((?:\.[A-Za-z_][A-Za-z0-9_]*|\[\d+\])*)$/;
+
+// Returns a message when a reference in value names the current or a later step.
+function aemcpCheckRefs(value, step, op) {
+    var m, key, msg;
+    if (typeof value === 'string') {
+        m = AEMCP_REF.exec(value);
+        if (m && parseInt(m[1], 10) >= step) {
+            return 'ops[' + step + '] (' + op + '): reference ' + value + ' must name an earlier step (0 to ' + (step - 1) + ')';
+        }
+        return null;
+    }
+    if (value === null || typeof value !== 'object') return null;
+    for (key in value) {
+        if (value.hasOwnProperty(key)) {
+            msg = aemcpCheckRefs(value[key], step, op);
+            if (msg !== null) return msg;
+        }
+    }
+    return null;
+}
+
+// Replaces each reference with the field it names in results. Returns
+// {ok: true, value: copy} or {ok: false, issue} naming the step and reference.
+function aemcpResolveRefs(value, results, step, op) {
+    var m, out, key, i, resolved;
+    if (typeof value === 'string') {
+        m = AEMCP_REF.exec(value);
+        if (!m) return { ok: true, value: value };
+        resolved = aemcpReadRefPath(results[parseInt(m[1], 10)], m[2]);
+        if (!resolved.ok) {
+            return { ok: false, issue: aemcpErrorIssue('INVALID_ARGS', 'ops[' + step + '] (' + op + '): reference ' + value + ' does not resolve to a field of its step result') };
+        }
+        return { ok: true, value: resolved.value };
+    }
+    if (value === null || typeof value !== 'object') return { ok: true, value: value };
+    if (Object.prototype.toString.call(value) === '[object Array]') {
+        out = [];
+        for (i = 0; i < value.length; i++) {
+            resolved = aemcpResolveRefs(value[i], results, step, op);
+            if (!resolved.ok) return resolved;
+            out.push(resolved.value);
+        }
+        return { ok: true, value: out };
+    }
+    out = {};
+    for (key in value) {
+        if (value.hasOwnProperty(key)) {
+            resolved = aemcpResolveRefs(value[key], results, step, op);
+            if (!resolved.ok) return resolved;
+            out[key] = resolved.value;
+        }
+    }
+    return { ok: true, value: out };
+}
+
+// Walks a path such as ".layers[1].name" from root. Fails on any missing field.
+function aemcpReadRefPath(root, path) {
+    var value = root;
+    var pos = 0;
+    var end, key;
+    while (pos < path.length) {
+        if (path.charAt(pos) === '.') {
+            end = pos + 1;
+            while (end < path.length && path.charAt(end) !== '.' && path.charAt(end) !== '[') end++;
+            key = path.slice(pos + 1, end);
+        } else {
+            end = path.indexOf(']', pos);
+            key = path.slice(pos + 1, end);
+            end = end + 1;
+        }
+        if (value === null || value === undefined || typeof value !== 'object' || value[key] === undefined) {
+            return { ok: false };
+        }
+        value = value[key];
+        pos = end;
+    }
+    if (value === undefined) return { ok: false };
+    return { ok: true, value: value };
+}
+
 // batch.run: one undo group for many sub-ops. aemcpInvoke already opened the
 // group for 'batch.run'; each sub-op runs via aemcpRunHandler (no nested group).
 // When a step fails after a mutating one succeeded (args.mutating, set by the
@@ -196,7 +279,14 @@ AEMCP.register('batch.run', function (args) {
     var ops = args && args.ops ? args.ops : [];
     var results = [];
     var changed = false;
-    var i, sub, outcome;
+    var i, sub, outcome, msg, resolved;
+    // Check every reference before any step runs, so a bad one changes nothing.
+    for (i = 0; i < ops.length; i++) {
+        if (ops[i] && typeof ops[i].op === 'string') {
+            msg = aemcpCheckRefs(ops[i].args, i, ops[i].op);
+            if (msg !== null) aemcpAbort(aemcpErrorIssue('INVALID_ARGS', msg));
+        }
+    }
     for (i = 0; i < ops.length; i++) {
         sub = ops[i];
         if (!sub || typeof sub.op !== 'string' || sub.op.length === 0) {
@@ -205,7 +295,8 @@ AEMCP.register('batch.run', function (args) {
         if (AEMCP_NOT_IN_BATCH[sub.op]) {
             aemcpAbort(aemcpErrorIssue('INVALID_ARGS', 'ops[' + i + '] (' + sub.op + ') cannot run inside batch.run'));
         }
-        outcome = aemcpRunHandler(sub.op, sub.args);
+        resolved = aemcpResolveRefs(sub.args, results, i, sub.op);
+        outcome = resolved.ok ? aemcpRunHandler(sub.op, resolved.value) : { ok: false, issue: resolved.issue };
         if (!outcome.ok) {
             if (args.atomic !== false && changed) {
                 outcome.issue.message = 'batch rolled back after ops[' + i + '] (' + sub.op + ') failed: ' + outcome.issue.message;

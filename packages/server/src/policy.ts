@@ -40,11 +40,14 @@ export function batchRunBlock(
     if (definition === undefined) {
       return makeError('UNKNOWN_TOOL', `unknown operation '${name}' inside batch.run`);
     }
-    const validation = validateOperationArgs(
+    // A "$<step>.<path>" reference stands for a value the bridge fills in from an
+    // earlier step, so its type is only checked there (#229).
+    const withoutRefs = dropBatchReferences(
       definition.schema,
       (sub as { args?: unknown }).args,
       definition.required,
     );
+    const validation = validateOperationArgs(definition.schema, withoutRefs.args, withoutRefs.required);
     if (!validation.ok) {
       return makeError('INVALID_ARGS', `ops[${index}] (${name}): ${validation.message}`);
     }
@@ -73,6 +76,31 @@ export function batchHasDestructive(registry: OperationRegistry, ops: unknown): 
     }
   }
   return false;
+}
+
+// Matches "$<step>" plus an optional path, as the bridge resolves it (job-runner.js AEMCP_REF).
+const BATCH_REFERENCE = /^\$\d+((\.[A-Za-z_][A-Za-z0-9_]*)|(\[\d+\]))*$/;
+
+/** The args without the schema-known fields that hold a batch reference, and the
+required list without those fields. Unknown fields stay, so they still fail. */
+function dropBatchReferences(
+  schema: Record<string, unknown>,
+  args: unknown,
+  required: readonly string[] = [],
+): { args: unknown; required: string[] } {
+  if (args === null || typeof args !== 'object' || Array.isArray(args)) {
+    return { args, required: [...required] };
+  }
+  const kept: Record<string, unknown> = {};
+  const dropped = new Set<string>();
+  for (const [key, value] of Object.entries(args)) {
+    if (schema[key] !== undefined && typeof value === 'string' && BATCH_REFERENCE.test(value)) {
+      dropped.add(key);
+    } else {
+      kept[key] = value;
+    }
+  }
+  return { args: kept, required: required.filter((name) => !dropped.has(name)) };
 }
 
 function subOpName(sub: unknown): string | null {

@@ -86,6 +86,7 @@ Apply with `expression.set {comp, index, property: "ADBE Transform Group/ADBE Po
 
 1. `ae_do {op: "batch.run", args: {ops: [{op: "layer.add_solid", args: {...}}, {op: "shape.add", args: {...}}], atomic: true}}`.
 2. The batch is one undo group. If a step fails after a change, the whole batch rolls back (Edit > Undo).
+2a. A step argument that is a string `"$<n>.<field>"` takes that field from the result of earlier step `n` (0-based), before the step runs. Example: `{op: "layer.rename", args: {comp: "Main", index: "$0.index", name: "Ctrl"}}` after a `layer.add_null` at step 0. Paths can go deeper: `"$2.layers[1]"`. Naming the current or a later step, or a field that is not there, fails the batch before or at that step with `INVALID_ARGS`.
 3. Never put `project.save`, `project.open`, `project.new` or `project.increment_save` in a batch. Run them alone.
 4. A failed batch is not undone automatically: it is one undo step, so ask the user to press Cmd+Z once in After Effects to revert it.
 4. Destructive steps trigger one incremental save for the whole batch.
