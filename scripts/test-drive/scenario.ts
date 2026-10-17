@@ -7,7 +7,7 @@
  * new operation cannot ship without a drive step.
  */
 
-import { statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 export type StepKind = 'tool' | 'op' | 'plan';
@@ -397,9 +397,6 @@ export const scenario: Step[] = [
     index: layerIndex(s, 'Text'),
     style: 'glitch',
   })),
-  skipOp('localize.apply', 'rewrites the text of the drive comp, which later steps read; check it by hand on a scratch comp'),
-  skipOp('audio.to_keyframes','needs a comp with an audio layer and a real audio file; the drive comp has none'),
-  skipOp('mogrt.export','AE can prompt to save an unsaved project before a MOGRT export, which would block the drive; check it by hand'),
   // #239: one version comp per row, named with the drive prefix so the cleanup removes it.
   plan('versions.generate', 'versions.generate', (s) => ({
     comp: s.comp,
@@ -774,7 +771,59 @@ export const scenario: Step[] = [
   // --- aerender: it reads the saved project file, so save the scratch project first
   op('project.save.copy', 'project.save', (s) => ({ path: outFile(s, 'drive-copy.aep'), overwrite: true })),
   op('project.save.scratch', 'project.save', (s) => ({ path: outFile(s, 'drive.aep'), overwrite: true })),
-  skipTool('export_preset', 'duplicates the comp per format and starts one aerender job each; it needs a saved project and a render the drive does not wait for'),
+  // #241: the project is saved now. One control is required: without it AE shows a modal.
+  op('mogrt.export', 'mogrt.export', (s) => ({
+    comp: s.comp,
+    path: outFile(s, 'drive.mogrt'),
+    overwrite: true,
+    controls: [{ layer: layerIndex(s, 'Text'), property: 'Opacity', name: 'Drive Fade' }],
+  }), {
+    after: (_result, state) => {
+      if (!existsSync(outFile(state, 'drive.mogrt'))) throw new Error('mogrt.export wrote no drive.mogrt');
+    },
+  }),
+  op('mogrt.export.exists', 'mogrt.export', (s) => ({ comp: s.comp, path: outFile(s, 'drive.mogrt') }), {
+    expectError: true,
+  }),
+  // #240: one 1:1 copy (named after the drive comp, so the cleanup removes it) and one aerender job.
+  tool('export_preset', 'export_preset', (s) => ({ comp: s.comp, formats: ['1:1'], outputDir: s.vars.outputDir }), {
+    after: (result, state) => {
+      const jobs = (result.json as { jobs?: Array<{ jobId?: string; output?: string; error?: string }> } | null)?.jobs ?? [];
+      if (jobs.length !== 1 || typeof jobs[0]!.jobId !== 'string') throw new Error(`export_preset returned ${result.text.slice(0, 300)}`);
+      state.vars.presetJobId = jobs[0]!.jobId;
+      state.vars.presetOutput = jobs[0]!.output;
+    },
+  }),
+  // #239 with render: one copy named with the drive prefix (removed by the cleanup), one aerender job.
+  tool('versions_generate.render', 'versions_generate', (s) => ({
+    comp: s.comp,
+    rows: [{ name: `${s.prefix} render row`, title: 'Rendered row' }],
+    mapping: [{ layer: 'Text', text: 'title' }],
+    nameColumn: 'name',
+    dryRun: false,
+    render: true,
+    renderDir: s.vars.outputDir,
+  }), {
+    after: (result, state) => {
+      const jobs = (result.json as { jobs?: Array<{ jobId?: string }> } | null)?.jobs ?? [];
+      if (jobs.length !== 1 || typeof jobs[0]!.jobId !== 'string') throw new Error(`versions_generate returned ${result.text.slice(0, 300)}`);
+      state.vars.versionJobId = jobs[0]!.jobId;
+    },
+  }),
+  tool('job_status.versions_generate', 'job_status', (s) => ({ jobId: s.vars.versionJobId }), {
+    poll: { intervalMs: 500, until: (result) => jobStatusOf(result) !== 'running' },
+    after: (result) => {
+      if (jobStatusOf(result) !== 'succeeded') throw new Error(`version render ended as ${result.text.slice(0, 300)}`);
+    },
+  }),
+  tool('job_status.export_preset', 'job_status', (s) => ({ jobId: s.vars.presetJobId }), {
+    poll: { intervalMs: 500, until: (result) => jobStatusOf(result) !== 'running' },
+    after: (result, state) => {
+      if (jobStatusOf(result) !== 'succeeded') throw new Error(`preset render ended as ${result.text.slice(0, 300)}`);
+      const file = state.vars.presetOutput as string;
+      if (statSync(file).size === 0) throw new Error(`preset render produced an empty file: ${file}`);
+    },
+  }),
   tool('ae_render', 'ae_render', (s) => ({ comp: s.comp, output: outFile(s, 'render.mov'), startFrame: 0, endFrame: 29 }), {
     after: (result, state) => {
       const jobId = (result.json as { jobId?: string } | null)?.jobId;
@@ -997,6 +1046,43 @@ export const scenario: Step[] = [
       { time: 0.5, comment: 'peak' },
     ],
   })),
+  // #242: a fresh null, so the target property has no keyframes yet.
+  op('layer.add_null.audio', 'layer.add_null', (s) => ({ comp: s.comp, name: 'Drive Audio Null' })),
+  refreshLayers('ae_layer_info.audio-null'),
+  op('audio.to_keyframes', 'audio.to_keyframes', (s) => ({
+    comp: s.comp,
+    audioLayer: layerIndex(s, s.vars.toneName as string),
+    targetLayer: layerIndex(s, 'Drive Audio Null'),
+    property: 'Opacity',
+  })),
+  // #245 with apply: import a copy of the tone, delete the copy on disk, relink from the tone's folder.
+  op('project.import_file.missing', 'project.import_file', (s) => {
+    const dir = outFile(s, 'missing');
+    mkdirSync(dir, { recursive: true });
+    copyFileSync(s.vars.toneFile as string, join(dir, 'tone.wav'));
+    return { path: join(dir, 'tone.wav'), folder: s.folder };
+  }, {
+    after: (_result, state) => rmSync(outFile(state, 'missing'), { recursive: true, force: true }),
+  }),
+  op('footage.relink.apply', 'footage.relink', (s) => ({ folder: dirname(s.vars.toneFile as string), apply: true }), {
+    after: (result) => {
+      const relinked = (payload(result).relinked as unknown[] | undefined) ?? [];
+      if (relinked.length < 1) throw new Error(`footage.relink relinked nothing: ${result.text.slice(0, 300)}`);
+    },
+  }),
+
+  // #243 on its own comp, so no later step reads the rewritten text.
+  op('comp.create.localize', 'comp.create', (s) => ({ name: `${s.prefix} localize`, width: 640, height: 360, duration: 1 })),
+  op('text.add.localize', 'text.add', (s) => ({ comp: `${s.prefix} localize`, text: 'Hello', fontSize: 100 })),
+  op('localize.apply', 'localize.apply', (s) => ({
+    comp: `${s.prefix} localize`,
+    table: { Hello: 'Bonjour tout le monde, ceci est bien plus long' },
+  }), {
+    after: (result) => {
+      const changes = (payload(result).changes as unknown[] | undefined) ?? [];
+      if (changes.length < 1) throw new Error(`localize.apply changed nothing: ${result.text.slice(0, 300)}`);
+    },
+  }),
 
   // --- saved-project ops, then the reduce on a scratch comp (these reshape the project)
   op('project.consolidate_footage', 'project.consolidate_footage', () => ({})),
