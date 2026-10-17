@@ -9,6 +9,7 @@ export const ANIMATION_GUIDE_URI = 'ae-mcp://animation-principles';
 export const SERVER_INSTRUCTIONS = [
   `Full rules: resource ${ANIMATION_GUIDE_URI}.`,
   'Keyframes for explicit motion; expressions only when procedural or data-driven.',
+  'Prefer one animate call (presets fade_in, slide_in, pop, or a curve) over key-by-key calls.',
   'Keep existing keys and expressions unless understood; never overwrite silently.',
   'Inspect first; modify, do not rebuild; reuse controllers.',
   'Respect layer order, parenting, masks, effects; check child keys before reparenting.',

@@ -14,6 +14,23 @@ Recipes for the ae-mcp tools. `ae_catalog` lists every operation with its argume
 3. If `project_saved_version` fails, the project was never saved. Save once with `ae_do {op: "project.save", args: {path: "<absolute path>.aep"}}`. Destructive ops refuse an unsaved project with `UNSAVED_PROJECT`.
 4. Inspect what is there with `ae_layer_info {comp}` and `ae_expression_report {comp}`, then change it. Do not rebuild existing structures. `ae_layer_info` is compact by default: transform values at their After Effects defaults and empty arrays (`effects`, `masks`, `markers`) are left out. Pass `fields: ["name", "transform"]` to pick top-level keys (`index` is always kept), `summary: true` for only `index`, `name` and `type`, or `full: true` for every value. Strings over 2000 characters (expressions, text documents) are cut and flagged as `<key>Truncated` with the full `<key>Length`; pass `full: true` to `ae_layer_info`, `ae_expression_report` or `ae_do` (`property.get`, `text.read`) to get them whole.
 
+## Motion
+
+Reach for a named motion first. One `animate` call replaces a chain of `keyframe.add` and `keyframe.set_easing` calls.
+
+| Request | Call |
+| --- | --- |
+| "fade in" | `animate {comp, layer, preset: "fade_in", start, duration}` |
+| "slide in from the left" | `animate {comp, layer, preset: "slide_in", direction: "left", distance, start, duration}` |
+| "pop" / "bounce in" | `animate {comp, layer, preset: "pop", start, duration}` |
+| "settle" / "ease to a stop" | `animate {comp, layer, tracks: {...}, curve: "expo_out"}` |
+| "smooth move" | `animate {comp, layer, tracks: {...}, curve: "smooth"}` |
+| "snappy UI motion" | `animate {comp, layer, tracks: {...}, curve: "snappy"}` |
+
+Directions for `slide_in` are `left`, `right`, `up` and `down`. Only write keys by hand (`keyframe.add`, then `keyframe.set_easing`) when `animate` cannot express the motion, and say why.
+
+After animating, check the result with `ae_render_frame {comp, times: [start, middle, end]}` or `property.sample`, as in Check your work.
+
 ## Keyframes or expressions
 
 Read `docs/agents/animation-principles.md` first. Hand-authored motion gets keyframes. Procedural, random or linked motion gets an expression.

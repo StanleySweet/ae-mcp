@@ -1091,6 +1091,30 @@ export const scenario: Step[] = [
       if (!(mid > 300)) throw new Error(`expo_out ease-out should pass half the distance by 0.5 s, x was ${mid}`);
     },
   }),
+  // #266: a named move end to end. slide_in from the left starts 200 px left of the null's
+  // position and ends on it at 0.5 s, so the first sample is 200 px left of the last.
+  op('layer.add_null.slide', 'layer.add_null', (s) => ({ comp: s.comp, name: 'Drive Slide Null' })),
+  refreshLayers('ae_layer_info.slide-null'),
+  op('animate.slide_in', 'animate', (s) => ({
+    comp: s.comp,
+    layer: layerIndex(s, 'Drive Slide Null'),
+    preset: 'slide_in',
+    direction: 'left',
+    distance: 200,
+  })),
+  op('property.sample.slide', 'property.sample', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Drive Slide Null'),
+    property: POS,
+    times: [0, 0.25, 0.5],
+  }), {
+    after: (result) => {
+      const samples = (payload(result).samples as Array<{ time: number; value: number[] }> | undefined) ?? [];
+      const first = samples[0]?.value?.[0] ?? NaN;
+      const last = samples[samples.length - 1]?.value?.[0] ?? NaN;
+      if (!(Math.abs(last - first - 200) < 1)) throw new Error(`slide_in should move x by 200 px, moved ${last - first}`);
+    },
+  }),
   // #245 with apply: import a uniquely named copy of the tone and delete it on disk; the
   // relink runs after project.open, since AE only marks footage missing when the project loads.
   op('project.import_file.missing', 'project.import_file', (s) => {
