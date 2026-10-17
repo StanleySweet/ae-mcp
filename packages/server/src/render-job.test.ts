@@ -36,6 +36,8 @@ class FakeProcess extends EventEmitter implements AerenderProcess {
 }
 
 /** A client that answers ae_project_info and rejects everything else. */
+const FAKE_TEMPLATES = { outputModule: ['Lossless', 'H.264'], renderSettings: ['Best Settings'] };
+
 function fakeClient(projectFile: string | null): AEClient {
   return {
     async call(tool: string): Promise<ResultMessage> {
@@ -45,6 +47,9 @@ function fakeClient(projectFile: string | null): AEClient {
           ok: true,
           result: { file: projectFile },
         };
+      }
+      if (tool === 'render.templates') {
+        return { protocolVersion: PROTOCOL_VERSION, ok: true, result: FAKE_TEMPLATES };
       }
       return {
         protocolVersion: PROTOCOL_VERSION,
@@ -393,6 +398,39 @@ describe('ae_render / job_status', () => {
     expect(result.isError).toBe(true);
     expect(errorCode(result)).toBe('FORBIDDEN');
     expect(harness.calls).toEqual([]);
+  });
+
+  // E16-2: an unknown template name is refused with the close names, before aerender starts.
+  it('refuses an unknown omTemplate with close names before spawning aerender', async () => {
+    const harness = await start({ aerender: '/fake/aerender' });
+    const result = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main', omTemplate: 'Losless' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(result.isError).toBe(true);
+    expect(errorCode(result)).toBe('INVALID_ARGS');
+    expect(textContent(result)).toMatchObject({
+      message: expect.stringContaining('"Lossless"'),
+      details: { field: 'omTemplate', closest: ['Lossless'] },
+    });
+    expect(harness.calls).toEqual([]);
+  });
+
+  it('refuses an unknown rsTemplate and accepts names the bridge lists', async () => {
+    const harness = await start({ aerender: '/fake/aerender' });
+    const bad = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main', rsTemplate: 'Zzz Nothing' },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(bad.isError).toBe(true);
+    expect(textContent(bad).details).toMatchObject({ field: 'rsTemplate', closest: [] });
+    expect(harness.calls).toEqual([]);
+    const good = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main', omTemplate: 'H.264', rsTemplate: 'Best Settings' },
+    })) as { isError?: boolean };
+    expect(good.isError).toBeFalsy();
+    expect(harness.calls).toHaveLength(1);
   });
 
   it('refuses an output path that already exists before spawning aerender', async () => {

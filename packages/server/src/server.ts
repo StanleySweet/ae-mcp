@@ -65,6 +65,7 @@ import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from 
 import { registerPrompts } from './prompts.js';
 import { cleanupPartialOutput } from './render-output.js';
 import { createRenderProgress } from './render-progress.js';
+import { checkRenderTemplates } from './render-templates.js';
 import {
   checkFinishedOutput,
   createRenderWatchdog,
@@ -1054,6 +1055,11 @@ export function createServer(options: ServerOptions = {}): McpServer {
       args.output !== undefined && (await stat(args.output).then(() => true, () => false));
     if (outputExists) {
       return text(makeError('INVALID_ARGS', `output already exists: ${args.output}`), true);
+    }
+    // Unknown omTemplate/rsTemplate names are refused before aerender starts (E16-2).
+    const badTemplate = await checkRenderTemplates(args, (comp) => callRaw('render.templates', { comp }));
+    if (badTemplate) {
+      return text(badTemplate, true);
     }
     const aerender = await findAerender();
     if (aerender === null) {

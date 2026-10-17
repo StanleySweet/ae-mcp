@@ -90,7 +90,7 @@ const READ_FROM_LIVE_AE = new Set([
   'ADBE Brightness & Contrast 2-0002',
 ]);
 
-const BRIDGE_SOURCES = ['job-runner.js', 'serializers.js', 'handlers.js', 'handlers-relink.js', 'handlers-project.js', 'handlers-eval.js', 'handlers-layers.js', 'handlers-housekeeping.js', 'handlers-verify.js', 'handlers-templates.js', 'handlers-lint.js', 'handlers-errors.js', 'handlers-versions.js', 'handlers-mogrt.js', 'handlers-audio.js', 'handlers-localize.js', 'handlers-animate.js', 'handlers-keytimes.js'];
+const BRIDGE_SOURCES = ['job-runner.js', 'serializers.js', 'handlers.js', 'handlers-relink.js', 'handlers-project.js', 'handlers-eval.js', 'handlers-layers.js', 'handlers-housekeeping.js', 'handlers-verify.js', 'handlers-templates.js', 'handlers-lint.js', 'handlers-errors.js', 'handlers-versions.js', 'handlers-mogrt.js', 'handlers-audio.js', 'handlers-localize.js', 'handlers-animate.js', 'handlers-keytimes.js', 'handlers-render-templates.js'];
 
 function source(file: string): string {
   return readFileSync(join(import.meta.dirname, file), 'utf8');

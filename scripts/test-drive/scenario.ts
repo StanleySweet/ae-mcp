@@ -780,6 +780,7 @@ export const scenario: Step[] = [
     file: `${s.vars.outputDir as string}/${s.prefix} queue.mov`,
   })),
   op('render.status', 'render.status', () => ({})),
+  op('render.templates', 'render.templates', (s) => ({ comp: s.comp })),
 
   // --- aerender: it reads the saved project file, so save the scratch project first
   op('project.save.copy', 'project.save', (s) => ({ path: outFile(s, 'drive-copy.aep'), overwrite: true })),

@@ -94,6 +94,7 @@ const BRIDGE_OPS = [
   'render.queue_add',
   'render.queue_set_output',
   'render.status',
+  'render.templates',
   'font.list',
   'command.find',
   'command.list',

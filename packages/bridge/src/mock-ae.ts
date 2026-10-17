@@ -1186,7 +1186,7 @@ export class MockRenderQueueItem {
   startTime: Date | null = null;
   elapsedSeconds: number | null = null;
   renderTemplate: string | null = null;
-  readonly templates: string[] = [];
+  readonly templates = ['Best Settings', 'Draft Settings'];
   private readonly first: MockOutputModule = new MockOutputModule();
 
   constructor(readonly comp: MockItem) {}

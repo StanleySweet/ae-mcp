@@ -9,6 +9,7 @@ import { registerLocalizeOperations } from './operations-localize.js';
 import { registerMogrtOperations } from './operations-mogrt.js';
 import { registerProjectOperations } from './operations-project.js';
 import { registerRelinkOperations } from './operations-relink.js';
+import { registerRenderTemplateOperations } from './operations-render-templates.js';
 
 import { registerTemplateOperations } from './operations-templates.js';
 import { registerVerifyOperations } from './operations-verify.js';
@@ -799,6 +800,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerAudioOperations(register);
   registerLocalizeOperations(register);
   registerAnimateOperations(register);
+  registerRenderTemplateOperations(register);
 
   return registry;
 }

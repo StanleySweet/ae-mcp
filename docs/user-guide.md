@@ -182,6 +182,10 @@ for each frame aerender reports, with `total` when `startFrame` and `endFrame` a
 Such a call returns when the render ends, because a client accepts progress only while its
 request is open. Without a token nothing extra is sent and the call returns at once.
 
+`omTemplate` and `rsTemplate` must be names your After Effects has. Names are localised (French AE
+differs from English), so an unknown name is refused before aerender starts, with the close names. Call the
+`render.templates` op (`ae_do`) to list them: `{outputModule: [...], renderSettings: [...]}`.
+
 ## Contact sheet at key times
 
 `ae_render_frame {comp, index, atKeys: true}` renders a contact sheet at the key times of one layer
