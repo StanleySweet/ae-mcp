@@ -579,11 +579,14 @@ AEMCP.register('comp.layer_clip_frames', function (args) {
     return { comp: comp.name, inPoint: inPoint, outPoint: outPoint, layers: indices };
 });
 
-// Sanitise a comp name for use as a file name.
+// Sanitise a comp name for use as a file name. Each call adds a unique suffix (E16-3), so a
+// second render of the same frame never reuses, and so never re-reads, an earlier file.
 function aemcpRenderFileName(comp, time) {
     var frame = Math.round(time * comp.frameRate);
     var safe = comp.name.replace(/[^A-Za-z0-9._-]/g, '_');
-    return safe + '-' + frame + '.png';
+    var stamp = (new Date()).getTime().toString(36);
+    var nonce = Math.floor(Math.random() * 1679616).toString(36);
+    return safe + '-' + frame + '-' + stamp + nonce + '.png';
 }
 
 // Default output path under the queue root: <root>/render/<comp>-<frame>.png.
@@ -626,6 +629,8 @@ AEMCP.register('render.frame', function (args) {
     var frame = Math.round(time * comp.frameRate);
     var method = typeof comp.saveFrameToPng === 'function' ? 'direct' : 'queue';
     if (method === 'direct') {
+        // Not on the scripting guide (ae-scripting.docsforadobe.dev, checked for E16-3); the write
+        // can finish after this call returns, so the server waits for the file to settle (#176, #272).
         comp.saveFrameToPng(time, new File(file));
     } else {
         aemcpRenderFrameViaQueue(comp, time, file);

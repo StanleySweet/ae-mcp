@@ -32,6 +32,13 @@ function invoke(ctx: vm.Context, tool: string, args: unknown): Outcome {
   return JSON.parse(json) as Outcome;
 }
 
+// A render file is `<prefix><unique suffix>.png`, so no two renders share a name (E16-3).
+function expectFreshName(file: string, prefix: string): void {
+  expect(file.startsWith(prefix)).toBe(true);
+  expect(file.endsWith('.png')).toBe(true);
+  expect(file.length).toBeGreaterThan(prefix.length + '.png'.length);
+}
+
 function seedComp(ae: MockAE, layerCount = 0): MockCompItem {
   const comp = new MockCompItem(1, 'Main', 1920, 1080, 25, 10);
   ae.project.add(comp);
@@ -58,9 +65,20 @@ describe('render.frame', () => {
       height: 1080,
     });
     expect(comp.numLayers).toBe(1);
-    const file = `${home}/.ae-mcp/render/Main-25.png`;
-    expect(outcome.value?.file).toBe(file);
+    const file = outcome.value?.file as string;
+    expectFreshName(file, `${home}/.ae-mcp/render/Main-25-`);
     expect(ae.fs.get(file)).toBe('PNG:Main:1');
+  });
+
+  // E16-3: a second render of the same frame writes a new file, never the earlier one.
+  it('gives each render of the same frame a fresh file name', async () => {
+    const { ctx, ae } = await payloadContext();
+    seedComp(ae, 1);
+    const first = invoke(ctx, 'render.frame', { comp: 'Main', time: 1 }).value?.file as string;
+    const second = invoke(ctx, 'render.frame', { comp: 'Main', time: 1 }).value?.file as string;
+    expect(second).not.toBe(first);
+    expect(ae.fs.get(first)).toBe('PNG:Main:1');
+    expect(ae.fs.get(second)).toBe('PNG:Main:1');
   });
 
   it('defaults time to zero and the path to the render directory', async () => {
@@ -69,7 +87,7 @@ describe('render.frame', () => {
     const outcome = invoke(ctx, 'render.frame', { comp: 'Main' });
     expect(outcome.ok).toBe(true);
     expect(outcome.value).toMatchObject({ method: 'direct', time: 0, frame: 0 });
-    expect(outcome.value?.file).toBe(`${home}/.ae-mcp/render/Main-0.png`);
+    expectFreshName(outcome.value?.file as string, `${home}/.ae-mcp/render/Main-0-`);
   });
 
   // A read-only op must not write outside the render folder (#178).
@@ -78,7 +96,7 @@ describe('render.frame', () => {
     ae.project.items.addComp('My Comp/01', 640, 480, 1, 4, 24);
     const custom = `${home}/out/custom.png`;
     const outcome = invoke(ctx, 'render.frame', { comp: 'My Comp/01', time: 0.5, file: custom });
-    expect(outcome.value?.file).toBe(`${home}/.ae-mcp/render/My_Comp_01-12.png`);
+    expectFreshName(outcome.value?.file as string, `${home}/.ae-mcp/render/My_Comp_01-12-`);
     expect(ae.fs.has(custom)).toBe(false);
   });
 
@@ -89,7 +107,8 @@ describe('render.frame', () => {
     const outcome = invoke(ctx, 'render.frame', { comp: 'Main', time: 2 });
     expect(outcome.ok).toBe(true);
     expect(outcome.value).toMatchObject({ method: 'queue', frame: 50 });
-    const file = `${home}/.ae-mcp/render/Main-50.png`;
+    const file = outcome.value?.file as string;
+    expectFreshName(file, `${home}/.ae-mcp/render/Main-50-`);
     expect(ae.fs.get(file)).toBe('PNG:Main:2');
     expect(ae.project.renderQueue.numItems).toBe(1);
     expect(ae.project.renderQueue.item(1)?.removed).toBe(true);

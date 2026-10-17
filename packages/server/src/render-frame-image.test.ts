@@ -68,7 +68,7 @@ async function connect(
   const server = createServer({
     root,
     client: aeClient,
-    frameWait: { timeoutMs: 200, intervalMs: 10 },
+    frameWait: { timeoutMs: 1000, intervalMs: 10 },
     ...serverOptions,
   });
   await server.connect(serverTransport);

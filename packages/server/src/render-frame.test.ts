@@ -48,7 +48,7 @@ async function connect(
   const server = createServer({
     root,
     client: aeClient,
-    frameWait: { timeoutMs: 200, intervalMs: 10 },
+    frameWait: { timeoutMs: 1000, intervalMs: 10 },
     ...serverOptions,
   });
   await server.connect(serverTransport);
@@ -402,6 +402,18 @@ describe('readRenderedFrame', () => {
 
     expect(read.ok).toBe(true);
     expect((read as { data: string }).data).toBe(FAKE_PNG.toString('base64'));
+  });
+
+  // #272: a file that ends in IEND can still be growing; wait until its size stops changing.
+  it('returns a frame only once its size has stopped changing', async () => {
+    const { root, file } = await renderDirWith('growing.png', bigFrame(10));
+    const final = bigFrame(5000);
+    setTimeout(() => void writeFile(file, final), 20);
+
+    const read = await readRenderedFrame(root, file, 10_000, undefined, { timeoutMs: 2_000, intervalMs: 100 });
+
+    expect(read.ok).toBe(true);
+    expect((read as { data: string }).data).toBe(final.toString('base64'));
   });
 
   it('waits for a frame that does not exist yet', async () => {

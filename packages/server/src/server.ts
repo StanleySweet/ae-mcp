@@ -231,19 +231,26 @@ const DEFAULT_FRAME_WAIT: FrameWait = { timeoutMs: 15_000, intervalMs: 100 };
 // Every complete PNG ends with this 12-byte IEND chunk (length 0, "IEND", CRC).
 const PNG_IEND = Buffer.from([0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]);
 
-/** Polls until `file` is a complete PNG. `CompItem.saveFrameToPng` returns a
+/** Polls until `file` is a complete PNG whose size has stopped changing (#272). `CompItem.saveFrameToPng` returns a
 DeferredCall that resolves only "once the file has been written", so the bridge
 reports the path before AE has written it (#176). */
 async function waitForCompletePng(file: string, wait: FrameWait): Promise<Buffer | null> {
   const deadline = Date.now() + wait.timeoutMs;
+  let lastSize = -1;
   for (;;) {
     try {
       const buffer = await readFile(file);
-      if (buffer.length >= PNG_IEND.length && buffer.subarray(buffer.length - PNG_IEND.length).equals(PNG_IEND)) {
+      const complete =
+        buffer.length >= PNG_IEND.length && buffer.subarray(buffer.length - PNG_IEND.length).equals(PNG_IEND);
+      // Same size as the previous poll: AE has stopped writing.
+      const settled = buffer.length > 0 && buffer.length === lastSize;
+      lastSize = buffer.length;
+      if (complete && settled) {
         return buffer;
       }
     } catch {
       // Not created yet; keep waiting.
+      lastSize = -1;
     }
     if (Date.now() >= deadline) {
       return null;
