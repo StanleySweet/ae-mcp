@@ -7,6 +7,7 @@ const BRIDGE_OPS = [
   'comp.snapshot',
   'comp.diff',
   'property.sample',
+  'keyframe.times',
   'project.info',
   'project.export_json',
   'project.report_usage',

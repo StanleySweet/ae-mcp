@@ -209,3 +209,77 @@ describe('ae_render_frame image sizing (#253, #234)', () => {
     expect(JSON.parse(compare.content[0]!.text)).toMatchObject({ code: 'INVALID_ARGS' });
   });
 });
+
+describe('ae_render_frame atKeys (E15-5)', () => {
+  const closes: (() => Promise<void>)[] = [];
+
+  afterEach(async () => {
+    for (const close of closes.splice(0)) {
+      await close();
+    }
+  });
+
+  // Keyframes of the stub layer, returned by keyframe.times; every call is recorded.
+  function keyed(keys: number[], rendered: number[], asked: unknown[]): (root: string) => HandlerMap {
+    return (root) => ({
+      ...sizedRender(64, 48, (time) => rendered.push(time))(root),
+      'keyframe.times': async (args) => {
+        asked.push(args);
+        return { comp: 'Main', layers: 1, times: keys };
+      },
+    });
+  }
+
+  it('renders a sheet at the keys and their midpoints, reading the layer given', async () => {
+    const rendered: number[] = [];
+    const asked: unknown[] = [];
+    const { client, close } = await connect(keyed([0, 1], rendered, asked), {
+      toBmp: async (_png, bmp) => {
+        await writeFile(bmp, solidBmp(64, 48, [30, 90, 200]));
+      },
+    });
+    closes.push(close);
+
+    const result = (await client.callTool({
+      name: 'ae_render_frame',
+      arguments: { atKeys: true, index: 1 },
+    })) as { content: unknown[]; isError?: boolean };
+
+    expect(result.isError).toBeFalsy();
+    expect(asked[0]).toMatchObject({ index: 1 });
+    expect(rendered).toEqual([0, 0.5, 1]);
+    expect(pngSize(imageOf(result))).not.toBeNull();
+  });
+
+  it('refuses atKeys together with times', async () => {
+    const rendered: number[] = [];
+    const asked: unknown[] = [];
+    const { client, close } = await connect(keyed([0, 1], rendered, asked));
+    closes.push(close);
+
+    const result = (await client.callTool({
+      name: 'ae_render_frame',
+      arguments: { atKeys: true, times: [0] },
+    })) as { content: Array<{ text: string }>; isError?: boolean };
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0]!.text)).toMatchObject({ code: 'INVALID_ARGS' });
+    expect(asked).toHaveLength(0);
+  });
+
+  it('says so when the layer has no keyframes', async () => {
+    const rendered: number[] = [];
+    const asked: unknown[] = [];
+    const { client, close } = await connect(keyed([], rendered, asked));
+    closes.push(close);
+
+    const result = (await client.callTool({
+      name: 'ae_render_frame',
+      arguments: { atKeys: true, index: 2 },
+    })) as { content: Array<{ text: string }>; isError?: boolean };
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0]!.text)).toMatchObject({ code: 'INVALID_ARGS' });
+    expect(rendered).toHaveLength(0);
+  });
+});

@@ -174,6 +174,14 @@ for each frame aerender reports, with `total` when `startFrame` and `endFrame` a
 Such a call returns when the render ends, because a client accepts progress only while its
 request is open. Without a token nothing extra is sent and the call returns at once.
 
+## Contact sheet at key times
+
+`ae_render_frame {comp, index, atKeys: true}` renders a contact sheet at the key times of one layer
+(`index`, or `layer` as a name) or of every layer in the comp, plus the midpoint between each pair of
+consecutive keys. It reads the times with the read-only `keyframe.times` op. Keys are deduplicated and
+sorted; more than 36 moments are thinned evenly to 36. `atKeys` cannot be combined with `time` or `times`.
+Use it after animating to check the motion.
+
 ## Comparing frames
 
 `ae_render_frame` takes an optional `compareWith`: the path of an earlier frame that

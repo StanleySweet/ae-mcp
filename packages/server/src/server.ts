@@ -48,6 +48,7 @@ import {
   type Size,
   type SheetCell,
 } from './frame-image.js';
+import { atKeysConflict, planKeyContactSheet } from './frame-keys.js';
 import { DEFAULT_HISTORY_LIST, HistoryLog, MAX_HISTORY_LIST } from './history.js';
 import { ANIMATION_GUIDE_URI } from './instructions.js';
 import { JobStore } from './jobs.js';
@@ -809,11 +810,14 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_render_frame',
     {
       description:
-        'Render frame(s) to PNG (default: active comp, frame 0). maxEdge default 768. times: contact sheet (max 36). region [x,y,w,h]: crop. compareWith: diff. See docs/user-guide.md.',
+        'Render frame(s) to PNG (default: active comp, frame 0). maxEdge 768. times or atKeys: contact sheet (max 36). region [x,y,w,h]: crop. compareWith: diff. See docs/user-guide.md.',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         time: z.number().optional(),
         times: z.array(z.number()).min(1).max(MAX_CONTACT_FRAMES).optional(),
+        atKeys: z.boolean().optional(),
+        layer: z.union([z.string(), z.number()]).optional(),
+        index: z.number().int().optional(),
         region: z
           .tuple([
             z.number().int().min(0),
@@ -826,7 +830,24 @@ export function createServer(options: ServerOptions = {}): McpServer {
         compareWith: z.string().optional(),
       },
     },
-    async (args) => {
+    async (input) => {
+      // atKeys: the sheet's times come from the layer's (or comp's) key times, read by the bridge.
+      let args = input;
+      if (input.atKeys === true) {
+        const conflict = atKeysConflict(input);
+        if (conflict) {
+          return text(makeError('INVALID_ARGS', conflict), true);
+        }
+        const keyed = await callRaw('keyframe.times', { comp: input.comp, layer: input.layer, index: input.index });
+        if (!keyed.ok) {
+          return toResult(keyed);
+        }
+        const plan = planKeyContactSheet(keyed.result, MAX_CONTACT_FRAMES);
+        if ('error' in plan) {
+          return text(makeError('INVALID_ARGS', plan.error), true);
+        }
+        args = { ...input, times: plan.times };
+      }
       if (args.times !== undefined && args.time !== undefined) {
         return text(makeError('INVALID_ARGS', 'pass time or times, not both'), true);
       }

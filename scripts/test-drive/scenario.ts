@@ -580,6 +580,7 @@ export const scenario: Step[] = [
     property: OPACITY,
     times: [0, 1.5],
   })),
+  op('keyframe.times', 'keyframe.times', (s) => ({ comp: s.comp, index: layerIndex(s, 'Shapes') })),
 
   // --- expressions -----------------------------------------------------------
   op('expression.set', 'expression.set', (s) => ({
@@ -753,6 +754,13 @@ export const scenario: Step[] = [
       const meta = result.json as { compare?: unknown } | null;
       if (!meta?.compare) {
         throw new Error('ae_render_frame compareWith returned no compare block');
+      }
+    },
+  }),
+  tool('ae_render_frame.at_keys', 'ae_render_frame', (s) => ({ comp: s.comp, atKeys: true, index: layerIndex(s, 'Shapes') }), {
+    after: (result) => {
+      if (result.isError) {
+        throw new Error('ae_render_frame atKeys failed: ' + result.text);
       }
     },
   }),

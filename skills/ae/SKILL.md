@@ -96,7 +96,7 @@ Apply with `expression.set {comp, index, property: "ADBE Transform Group/ADBE Po
 1. Before a change: `ae_do {op: "comp.snapshot", args: {comp}}` and keep the result. It lists each layer with its index, name, in/out, transform values, effects and expression flags.
 2. After the change: `ae_do {op: "comp.diff", args: {comp, snapshot: <the result from step 1>}}`. It reports added and removed layers and changed fields.
 3. `ae_render_frame {comp, time}` at two or three times (start, middle, end). Frames come back with their longest edge at `maxEdge` 768 by default. Pass `times: [...]` for one contact sheet of several frames (labelled by time), `region: [x, y, w, h]` to crop, or a larger `maxEdge` to read fine detail.
-4. For a motion check, `property.sample {comp, index, property, times}` returns values at the given times.
+4. For a motion check, `property.sample {comp, index, property, times}` returns values at the given times. After animating, `ae_render_frame {comp, index, atKeys: true}` makes one contact sheet at the layer's key times and the midpoints between them (omit `index` for every layer; max 36 frames).
 5. Read every `warning` in a result. It names an expression-driven property, so edit its driver instead.
 
 ## Bulk edits: plan, then apply
