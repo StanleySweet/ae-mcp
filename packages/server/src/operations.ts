@@ -826,29 +826,38 @@ export function validateOperationArgs(
     return { ok: false, message: 'arguments must be an object' };
   }
   const values = (args ?? {}) as Record<string, unknown>;
-  for (const name of required) {
-    // `layer` (index, name or {id}) satisfies a required `index`.
-    if (name === 'index' && values.layer !== undefined) continue;
-    if (values[name] === undefined) {
-      return {
-        ok: false,
-        message: `missing required argument '${name}'`,
-        details: { arg: name, expected: 'required' },
-      };
-    }
+  const accepted = Object.keys(schema);
+  // `layer` is accepted wherever an operation takes `index` or `layerIndex`.
+  const takesLayer = schema.index !== undefined || schema.layerIndex !== undefined;
+  const unknown = Object.keys(values).filter((key) => schema[key] === undefined && !(key === 'layer' && takesLayer));
+  // `layer` (index, name or {id}) satisfies a required `index`.
+  const missing = required.filter((name) => values[name] === undefined && !(name === 'index' && values.layer !== undefined));
+  // One message names every wrong and missing argument and lists the accepted ones, so a
+  // caller that passed `name` for `property` fixes it in one retry instead of looping.
+  if (unknown.length > 0 || missing.length > 0) {
+    const parts = [
+      ...unknown.map((key) => {
+        const closest = closeNames(accepted, key).filter((name) => values[name] === undefined);
+        const hint = closest.length > 0 ? closest : missing;
+        return `unknown argument '${key}'${hint.length > 0 ? ` (did you mean '${hint[0]}'?)` : ''}`;
+      }),
+      ...missing.map((name) => `missing required argument '${name}'`),
+    ];
+    const first = unknown[0] ?? missing[0]!;
+    const closest = unknown.length > 0 ? closeNames(accepted, first) : [];
+    return {
+      ok: false,
+      message: `${parts.join('; ')}. Accepted arguments: ${accepted.join(', ')}`,
+      details: {
+        arg: first,
+        ...(unknown.length > 0 ? (closest.length > 0 ? { closest } : {}) : { expected: 'required' }),
+        accepted,
+      },
+    };
   }
   for (const [key, value] of Object.entries(values)) {
     const property = schema[key] as PropertySchema | undefined;
-    // `layer` is accepted wherever an operation takes `index` or `layerIndex`.
-    if (property === undefined && key === 'layer' && (schema.index !== undefined || schema.layerIndex !== undefined)) continue;
-    if (property === undefined) {
-      const closest = closeNames(Object.keys(schema), key);
-      return {
-        ok: false,
-        message: `unknown argument '${key}'`,
-        details: { arg: key, ...(closest.length > 0 ? { closest } : {}) },
-      };
-    }
+    if (property === undefined) continue;
     if (Array.isArray(property.enum) && !property.enum.includes(value)) {
       const allowed = property.enum as unknown[];
       const closest = typeof value === 'string' ? closeNames(allowed.map(String), value) : [];

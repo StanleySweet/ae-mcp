@@ -180,17 +180,17 @@ describe('validateOperationArgs required arguments', () => {
   const schema = { index: { type: 'number' }, name: { type: 'string' } };
 
   it('rejects a missing required argument, naming it', () => {
-    expect(validateOperationArgs(schema, { index: 1 }, ['index', 'name'])).toEqual({
+    expect(validateOperationArgs(schema, { index: 1 }, ['index', 'name'])).toMatchObject({
       ok: false,
-      message: "missing required argument 'name'",
+      message: expect.stringMatching(/^missing required argument 'name'\. Accepted arguments: /),
       details: { arg: 'name', expected: 'required' },
     });
   });
 
   it('rejects a missing required argument when no args are given at all', () => {
-    expect(validateOperationArgs(schema, undefined, ['index'])).toEqual({
+    expect(validateOperationArgs(schema, undefined, ['index'])).toMatchObject({
       ok: false,
-      message: "missing required argument 'index'",
+      message: expect.stringMatching(/^missing required argument 'index'/),
       details: { arg: 'index', expected: 'required' },
     });
   });
@@ -221,7 +221,7 @@ describe('validateOperationArgs required arguments', () => {
   it('rejects layer on an operation whose schema has no index', () => {
     expect(validateOperationArgs({ name: { type: 'string' } }, { layer: 'Hero' })).toMatchObject({
       ok: false,
-      message: "unknown argument 'layer'",
+      message: expect.stringMatching(/^unknown argument 'layer'/),
     });
   });
 
@@ -266,18 +266,29 @@ describe('validateOperationArgs details (#237)', () => {
   });
 
   it('suggests the closest argument name for an unknown argument', () => {
-    expect(validateOperationArgs(schema, { nmae: 'Hero' })).toEqual({
+    expect(validateOperationArgs(schema, { nmae: 'Hero' })).toMatchObject({
       ok: false,
-      message: "unknown argument 'nmae'",
+      message: expect.stringMatching(/^unknown argument 'nmae' \(did you mean 'name'\?\)/),
       details: { arg: 'nmae', closest: ['name'] },
     });
   });
 
   it('omits closest for an unknown argument with no close name', () => {
-    expect(validateOperationArgs(schema, { qqqqqqqqqqqq: 1 })).toEqual({
+    const result = validateOperationArgs(schema, { qqqqqqqqqqqq: 1 });
+    expect(result).toMatchObject({ ok: false, details: { arg: 'qqqqqqqqqqqq' } });
+    expect(result.ok ? {} : result.details).not.toHaveProperty('closest');
+  });
+
+  // A Claude Desktop session sent `name` (a property path) to property.sample four times,
+  // each time told only "missing required argument 'property'".
+  it('names the wrong argument, the missing one, and every accepted argument', () => {
+    const sample = { comp: { type: 'string' }, index: { type: 'number' }, property: { type: 'string' }, times: { type: 'array' } };
+    const result = validateOperationArgs(sample, { comp: 'Logo', index: 1, name: 'Contents/Group 9/Transform/Scale', times: [0] }, ['index', 'property', 'times']);
+    expect(result).toMatchObject({
       ok: false,
-      message: "unknown argument 'qqqqqqqqqqqq'",
-      details: { arg: 'qqqqqqqqqqqq' },
+      message:
+        "unknown argument 'name' (did you mean 'property'?); missing required argument 'property'. Accepted arguments: comp, index, property, times",
+      details: { arg: 'name', accepted: ['comp', 'index', 'property', 'times'] },
     });
   });
 });

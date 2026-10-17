@@ -769,6 +769,21 @@ describe('keyframe handlers', () => {
     expect(scale.temporalEases[0]!.outEase).toHaveLength(3);
   });
 
+  // A shape group's Position reports a multi-dimension value type but is spatial; AE then
+  // rejects anything but 1 ease ("L'ensemble de valeurs ne contient pas 1 éléments").
+  it('set_easing sends one ease to a spatial property, whatever its value type', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const scale = layerWithScale(ae);
+    scale.isSpatial = true;
+    invoke(ctx, 'keyframe.add', { comp: 'Main', index: 1, time: 1, value: [50, 50, 100], property: 'Scale' });
+
+    invoke(ctx, 'keyframe.set_easing', { comp: 'Main', index: 1, time: 1, property: 'Scale', easing: 'easeIn' });
+
+    expect(scale.temporalEases[0]!.inEase).toHaveLength(1);
+    expect(scale.temporalEases[0]!.outEase).toHaveLength(1);
+  });
+
   it('set_easing hold only changes the interpolation type', async () => {
     const { ctx, ae } = await payloadContext();
     createComp(ctx);

@@ -1502,12 +1502,16 @@ AEMCP.register('keyframe.remove', function (args) {
 
 // One KeyframeEase per dimension for setTemporalEaseAtKey: 2 for TwoD, 3 for
 // ThreeD, and 1 for every other value type (OneD, TwoD_SPATIAL, ThreeD_SPATIAL).
+// A spatial property always takes 1: a shape group's Position can report TwoD
+// while AE rejects 2 eases ("L'ensemble de valeurs ne contient pas 1 éléments").
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysettemporaleaseatkey
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertypropertyvaluetype
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyisspatial
 // Ref: https://ae-scripting.docsforadobe.dev/other/keyframeease/
 function aemcpEaseArray(prop, speed, influence) {
     var n = 1;
-    if (prop.propertyValueType === PropertyValueType.TwoD) n = 2;
+    if (prop.isSpatial) n = 1;
+    else if (prop.propertyValueType === PropertyValueType.TwoD) n = 2;
     else if (prop.propertyValueType === PropertyValueType.ThreeD) n = 3;
     var arr = [];
     var i;
