@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { operationDefinitionSchema } from '@ae-mcp/protocol';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -91,6 +94,58 @@ async function describeOp(client: Client, op: string): Promise<{ isError?: boole
   const [first] = result.content as Array<{ type: string; text: string }>;
   return { isError: result.isError === true, body: JSON.parse(first!.text) };
 }
+
+describe('ae_catalog version', () => {
+  it('returns unchanged when ifNoneMatch matches the current version', async () => {
+    const client = await connectServer(defaultOperationRegistry());
+    const first = await catalog(client, {});
+    const version = (first as unknown as { version: string }).version;
+    expect(typeof version).toBe('string');
+    const again = (await client.callTool({
+      name: 'ae_catalog',
+      arguments: { ifNoneMatch: version },
+    })) as { content: Array<{ text: string }> };
+    expect(JSON.parse(again.content[0]!.text)).toEqual({ unchanged: true, version });
+  });
+
+  it('returns the full catalog when ifNoneMatch does not match', async () => {
+    const client = await connectServer(registryWith(['layer.add_text', 'layer']));
+    const { operations } = await catalog(client, { ifNoneMatch: 'stale' });
+    expect(operations).toHaveLength(1);
+  });
+
+  it('changes when an operation schema changes', async () => {
+    const before = registryWith(['layer.add_text', 'layer']);
+    const after = new OperationRegistry();
+    after.register({
+      name: 'layer.add_text',
+      category: 'layer' as never,
+      description: 'Runs layer.add_text.',
+      readOnly: true,
+      destructive: false,
+      schema: { text: { type: 'string' } },
+    });
+    const versionOf = async (registry: OperationRegistry): Promise<string> =>
+      (await catalog(await connectServer(registry), {}) as unknown as { version: string }).version;
+    expect(await versionOf(before)).not.toBe(await versionOf(after));
+  });
+
+  it('reports the same catalogVersion from ae_context', async () => {
+    const root = join(await mkdtemp(join(tmpdir(), 'ae-mcp-catalog-')), '.ae-mcp');
+    await mkdir(root, { recursive: true, mode: 0o700 });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createServer({ root, operations: defaultOperationRegistry() });
+    await server.connect(serverTransport);
+    const client = new Client({ name: 'test-client', version: '0.0.0' });
+    await client.connect(clientTransport);
+    const context = await client.callTool({ name: 'ae_context', arguments: {} });
+    const { catalogVersion } = JSON.parse((context.content as Array<{ text: string }>)[0]!.text);
+    const { version } = await catalog(client, {});
+    expect(catalogVersion).toBe(version);
+    await client.close();
+    await server.close();
+  });
+});
 
 describe('ae_describe', () => {
   it('returns the full schema and required list of one operation', async () => {

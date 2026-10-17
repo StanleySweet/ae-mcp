@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { join, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
@@ -15,6 +16,7 @@ import {
   errorHintDetails,
   makeError,
   queueRoot,
+  type OperationDefinition,
   type ResultMessage,
 } from '@ae-mcp/protocol';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -377,6 +379,21 @@ export function createServer(options: ServerOptions = {}): McpServer {
     jobStore.fail(jobId, line ?? `aerender exited with code ${result.code ?? 'unknown'}`);
   };
 
+  /** Operations the current policy lets this client see (ae_catalog and ae_describe). */
+  const visibleOperations = async (category?: string): Promise<OperationDefinition[]> => {
+    const settings = await getSettings();
+    return operations
+      .list(category)
+      .filter((definition) => isPermitted(definition, settings) && evalRunEnabled(definition, settings));
+  };
+
+  /** Hash of the whole visible catalog, so clients can skip re-listing it (#255). */
+  const catalogVersion = async (): Promise<string> =>
+    createHash('sha256')
+      .update(JSON.stringify(await visibleOperations()))
+      .digest('hex')
+      .slice(0, 16);
+
   server.registerTool(
     'check_setup',
     {
@@ -404,7 +421,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         'Report the live connection: active transport, AE and bridge versions, capabilities and busy state.',
       inputSchema: {},
     },
-    async () => text(await buildAeContext(root)),
+    async () => text({ ...(await buildAeContext(root)), catalogVersion: await catalogVersion() }),
   );
 
   server.registerTool(
@@ -891,21 +908,24 @@ export function createServer(options: ServerOptions = {}): McpServer {
       inputSchema: {
         category: z.string().optional(),
         verbose: z.boolean().optional(),
+        ifNoneMatch: z.string().optional(),
       },
     },
     async (args) => {
-      const settings = await getSettings();
-      const allowed = operations
-        .list(args.category)
-        .filter((definition) => isPermitted(definition, settings) && evalRunEnabled(definition, settings));
+      const version = await catalogVersion();
+      if (args.ifNoneMatch !== undefined && args.ifNoneMatch === version) {
+        return text({ unchanged: true, version });
+      }
+      const allowed = await visibleOperations(args.category);
       if (args.verbose === true) {
-        return text({ operations: allowed });
+        return text({ operations: allowed, version });
       }
       return text({
         operations: allowed.map((definition) => ({
           name: definition.name,
           description: definition.description,
         })),
+        version,
       });
     },
   );

@@ -252,7 +252,7 @@ Short descriptions ship with each tool. The details below were removed from them
 - `ae_plan` and `ae_apply`: only operations in the `bulk` category can be planned. A plan expires after 10 minutes and is refused if the project changed since it was made.
 - `checkpoint_create`: the name is 1-64 characters of letters, digits, space, `_` or `-`. Reusing a name replaces it.
 - `checkpoint_revert`: runs File > Increment and Save first, so the current state is kept as a version.
-- `ae_catalog`: by default returns each operation's `name` and `description` only. Pass `verbose: true` for the full definitions (schema, `required`, `readOnly`, `destructive`, `category`). `category` filters either form.
+- `ae_catalog`: by default returns each operation's `name` and `description` only. Pass `verbose: true` for the full definitions (schema, `required`, `readOnly`, `destructive`, `category`). `category` filters either form. Every result carries `version`, a hash of the whole visible catalog (it changes when an operation is added, removed or its schema changes). The same value is `catalogVersion` in `ae_context`. Pass `ifNoneMatch: <version>` to get `{unchanged: true, version}` instead of the list when your copy is current.
 - `ae_describe`: `{op}` returns one operation's full definition (schema and `required`). An unknown name returns `INVALID_ARGS` with the closest names.
 
 ## Test drive
