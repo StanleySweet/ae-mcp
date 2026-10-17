@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { join, resolve, sep } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import {
   discoverAerenders,
@@ -40,6 +40,7 @@ import { selectTransport, type Runner } from './osascript-transport.js';
 import { PlanStore } from './plans.js';
 import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
 import { cleanupPartialOutput } from './render-output.js';
+import { batchJson, replayJsx, replaySteps } from './replay.js';
 import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks, type SetupDeps } from './setup-checks.js';
 
@@ -955,6 +956,63 @@ export function createServer(options: ServerOptions = {}): McpServer {
         instruction: `Press Cmd+Z ${groups.length} time(s) in After Effects (Edit > Undo). Claude cannot undo by script.`,
         warning:
           "AE's undo stack cannot be inspected by script. Any edit the user made after these steps is undone first, so check the Edit menu's undo label before pressing.",
+      });
+    },
+  );
+
+  server.registerTool(
+    'history_export',
+    {
+      description:
+        "Export Claude's recorded steps as a replay. format 'batch' returns and writes the args for batch.run (run it with ae_do op batch.run, no tokens needed). format 'jsx' writes a standalone ExtendScript file that runs in After Effects without the server, using the installed bridge. comp retargets every step that names a comp. Failed and read-only steps are left out. Writes to path, default ~/.ae-mcp/replays/.",
+      inputSchema: {
+        format: z.enum(['batch', 'jsx']).default('batch'),
+        n: z.number().int().positive().max(MAX_HISTORY_LIST).optional(),
+        comp: z.string().optional(),
+        path: z.string().optional(),
+      },
+    },
+    async (args) => {
+      const all = await history.all();
+      const entries = args.n === undefined ? all : all.slice(-args.n);
+      if (entries.length === 0) {
+        return text(makeError('INVALID_ARGS', 'the history is empty: nothing to export'), true);
+      }
+      const plan = replaySteps(entries, operations, args.comp);
+      if (plan.ops.length === 0) {
+        return text(
+          makeError('INVALID_ARGS', 'the history has no steps that can be replayed (only read-only or failed calls)'),
+          true,
+        );
+      }
+      const exportedAt = new Date().toISOString();
+      let content: string;
+      if (args.format === 'jsx') {
+        const payloadPath = join(root, 'bridge', 'current.jsx');
+        let payload: string;
+        try {
+          payload = await readFile(payloadPath, 'utf8');
+        } catch {
+          return text(
+            makeError('SCRIPT_ERROR', `no installed bridge payload at ${payloadPath}; run the Setup app to install it`),
+            true,
+          );
+        }
+        content = replayJsx(plan, payload, args.comp ?? null, exportedAt);
+      } else {
+        content = batchJson(plan);
+      }
+      const file =
+        args.path ??
+        join(root, 'replays', `replay-${exportedAt.replace(/[:.]/g, '-')}.${args.format === 'jsx' ? 'jsx' : 'json'}`);
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(file, content);
+      return text({
+        format: args.format,
+        path: file,
+        steps: plan.ops.length,
+        skipped: plan.skipped,
+        ...(args.format === 'batch' ? { batch: { ops: plan.ops } } : {}),
       });
     },
   );

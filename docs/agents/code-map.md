@@ -71,6 +71,8 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 ## History of Claude's steps (`packages/server/src/history.ts`, #236)
 
 - `HistoryLog(root)` appends one JSON line per `ae_do` call and per `ae_apply` (op, args, time, `undoGroup` = `Claude: <op>`, `mutating`, `ok`) to `<root>/history.jsonl` (root = `~/.ae-mcp`). `server.ts` `recordHistory` writes it right after the bridge call. Tools `history_list` (newest first) and `history_undo` (names the undo groups; never undoes, ADR-0009) are MCP tools in `server.ts` before `ae_catalog`. Tests: `history.test.ts`.
+- (#238) `replay.ts`: `replaySteps(entries, registry, comp?)` keeps successful mutating steps (flattens `batch.run`, drops `NOT_REPLAYABLE` save/open ops), `batchJson` (the `batch.run` args), `replayJsx(plan, payload, comp, time)` (installed `<root>/bridge/current.jsx` + a footer that runs `AEMCP.invoke('batch.run')`; `AEMCP_REPLAY_COMP` retargets at run time). Tool `history_export` (`format` batch|jsx, `n`, `comp`, `path`; default `<root>/replays/`) in `server.ts`. Tests: `replay.test.ts` (server) and `scripts/replay/replay.test.ts` (session vs batch vs jsx on the mock, project state compared).
+- `$`-free console: the bridge footer uses the global `writeLn` (MockAE `consoleLines`, `mock-ae.ts`).
 
 ## Plan store (`packages/server/src/plans.ts`, E9-1)
 

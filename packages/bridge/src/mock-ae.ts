@@ -1357,6 +1357,8 @@ export class MockAE {
     os: 'MockAE-OS',
     getenv: (name: string) => this.env[name],
   };
+  /** Lines written with the global `writeLn` (the Info panel). */
+  readonly consoleLines: string[] = [];
 
   now(): number {
     return this.clock;
@@ -1407,6 +1409,10 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
   const sandbox: Record<string, unknown> = {
     app: ae.app,
     $: ae.$,
+    // Ref: https://ae-scripting.docsforadobe.dev/general/globals/#writeln
+    writeLn: (text: string): void => {
+      ae.consoleLines.push(text);
+    },
     JSON: undefined,
     CompItem: MockCompItem,
     FolderItem: MockFolderItem,
