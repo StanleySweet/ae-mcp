@@ -224,7 +224,7 @@ __out.close();`,
             }
             step.after?.(result, state);
           })(),
-          STEP_TIMEOUT_MS,
+          step.timeoutMs ?? STEP_TIMEOUT_MS,
           step.id,
         );
       } catch (error) {

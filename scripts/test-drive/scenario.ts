@@ -62,6 +62,8 @@ export interface Step {
   skipOnResult?: (result: ToolResult) => string | undefined;
   /** Repeat the call every `intervalMs` until `until` holds (the step timeout still applies). */
   poll?: { intervalMs: number; until: (result: ToolResult) => boolean };
+  /** Step timeout in ms; default 60 s. aerender jobs can take longer on a loaded machine. */
+  timeoutMs?: number;
 }
 
 export function createState(now: Date = new Date()): DriveState {
@@ -816,6 +818,7 @@ export const scenario: Step[] = [
   // Wait for it before the next render: two aerender runs of one project at once
   // exited 0 without writing the preset file.
   tool('job_status.export_preset', 'job_status', (s) => ({ jobId: s.vars.presetJobId }), {
+    timeoutMs: 180_000,
     poll: { intervalMs: 500, until: (result) => jobStatusOf(result) !== 'running' },
     after: (result, state) => {
       if (jobStatusOf(result) !== 'succeeded') throw new Error(`preset render ended as ${result.text.slice(0, 300)}`);
@@ -840,6 +843,7 @@ export const scenario: Step[] = [
     },
   }),
   tool('job_status.versions_generate', 'job_status', (s) => ({ jobId: s.vars.versionJobId }), {
+    timeoutMs: 180_000,
     poll: { intervalMs: 500, until: (result) => jobStatusOf(result) !== 'running' },
     after: (result) => {
       if (jobStatusOf(result) !== 'succeeded') throw new Error(`version render ended as ${result.text.slice(0, 300)}`);
