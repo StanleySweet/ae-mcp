@@ -5,6 +5,15 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.6.1`**: six fixes reported by a v1.6.0 Claude Desktop session.
+  - `ae_render_frame` was dropped as invalid: `region` is now an array, not a tuple.
+  - The `batch.run` message no longer says "rolled back".
+  - `ae_layer_info` errors on an unknown comp, keeps every transform value, and hides unused X/Y/Z Position fields.
+  - The bridge is stamped with the release version (it was `0.0.0`, which failed the stale-bridge check on every install).
+  - `ae_catalog` lists `eval.run` under `disabled`.
+  - **Test drive on AE 26.5:** 200 passed, 1 failed (an aerender poll hit the 60 s step limit; render polls now get 180 s), 6 skipped.
+  - **Open:** the user is testing Setup's update path with this release.
+
 - **`chore(release): v1.6.0`**: epic E15 (results you can keep and check), `animate`, Setup `--check`, and fixes from a friend's Claude Desktop session.
   - **Motion:** `animate` (#260) sets keys on several properties in one call, eases them with real cubic-bezier curves (smooth, expo_out, expo_in_out, back_out, snappy, linear or custom), and has presets fade_in, slide_in and pop. Live check: an expo_out move is past half its distance at the midpoint. The skill and instructions now favour named motions (#266).
   - **E15:**
