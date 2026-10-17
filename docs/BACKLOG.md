@@ -371,6 +371,30 @@ script entry point, so there is nothing to apply. Story 14.5 covers the need ins
 
 Delay and stagger reuse E9-6.
 
+### E15 Results you can keep and check (Sprint 7)
+
+**What we learned.** Other After Effects AI tools (Jake In Motion's ChatGPT + Kbar scripts, MotionAmigo's in-AE panel, Higgsfield's plain-language motion) point at three gaps: Claude's work is lost once the chat ends, the user cannot see or hand context to Claude from inside AE, and Claude declares motion done without looking at it. Everything here stays local and free: no API key, no cloud, no paid plan.
+
+**Story 15.1.** As a user, I keep what Claude did as a script I can run again without Claude. AC: one call saves Claude's recent steps as a `.jsx` in AE's Scripts folder; it shows under File > Scripts and runs from Kbar; it uses the replay export (#238); it never overwrites an existing script unless asked.
+
+- **E15-1** feat(server): script.save installs a replay as an After Effects script
+
+**Story 15.2.** As a user, I see Claude's steps and hand Claude my context from inside AE. AC: a dockable ScriptUI panel lists Claude's recent steps from the history log and has a "Copy for Claude" button that copies the active comp and selection as text; no API key, works with the free Claude plan.
+
+- **E15-2** feat(bridge): Claude panel in After Effects with history and Copy for Claude
+
+**Story 15.3.** As Claude, I know right away when an expression I set is broken. AC: `expression.set` and `expression.snippet` read the property's expression error after setting it and return it; a broken expression is reported as an error with AE's text, so Claude fixes it in the same turn.
+
+- **E15-3** feat(bridge): expression.set reports AE's expression error at once
+
+**Story 15.4.** As Claude, I reach for a named motion before writing keys by hand. AC: the skill and the server instructions map common requests ("fade in", "slide in from the left", "pop", "settle") to the #260 presets; a test-drive step runs a named move end to end.
+
+- **E15-4** docs(skill): named motions first, keys by hand last (after #260)
+
+**Story 15.5.** As Claude, I look at the motion before saying it is done. AC: one call renders a contact sheet at a layer's or comp's key times (reusing #234); the skill tells Claude to check it after animating.
+
+- **E15-5** feat(server): contact sheet at key times to review motion
+
 ## 7. GitHub pipeline
 
 Before implementing, check the current major versions of each action and the exact mcpb CLI commands in their docs, and pin actions to a commit SHA if desired.
