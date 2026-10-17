@@ -9,6 +9,7 @@ const SHARED_SOURCES = ['es3-polyfills.js', 'es3-json2.js', 'bridge-fs.js'];
 
 const PAYLOAD_SOURCES = [...SHARED_SOURCES, 'job-runner.js', 'serializers.js', 'handlers.js', 'handlers-relink.js', 'handlers-project.js', 'handlers-eval.js', 'handlers-layers.js', 'handlers-housekeeping.js', 'handlers-verify.js', 'handlers-templates.js', 'handlers-lint.js', 'handlers-errors.js', 'handlers-versions.js', 'handlers-mogrt.js', 'handlers-audio.js', 'handlers-localize.js', 'handlers-animate.js', 'handlers-keytimes.js'];
 const LOADER_SOURCES = [...SHARED_SOURCES, 'loader.js'];
+const PANEL_SOURCES = [...SHARED_SOURCES, 'panel.js'];
 
 /** Short git revision, suffixed `-dirty` when the tree has uncommitted changes. Null outside a repo. */
 function gitRevision(): string | null {
@@ -58,16 +59,18 @@ async function concat(sources: string[]): Promise<string> {
 
 export async function build(
   options: { outDir?: string } = {},
-): Promise<{ loader: string; payload: string }> {
+): Promise<{ loader: string; payload: string; panel: string }> {
   const outDir = options.outDir ?? join(SRC_DIR, '..', 'dist');
   const version = await bridgeVersion();
   const head = stamp(version);
   const loader = `${head}${await concat(LOADER_SOURCES)}`;
   const payload = `${head}${await concat(PAYLOAD_SOURCES)}`;
+  const panel = `${head}${await concat(PANEL_SOURCES)}`;
   await mkdir(outDir, { recursive: true });
   await writeFile(join(outDir, 'loader.jsx'), loader);
   await writeFile(join(outDir, 'payload.jsx'), payload);
-  return { loader, payload };
+  await writeFile(join(outDir, 'ae-mcp-panel.jsx'), panel);
+  return { loader, payload, panel };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

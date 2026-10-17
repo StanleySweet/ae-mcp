@@ -57,56 +57,73 @@ public static class InstallLoader
     private static bool IsPermissionError(Exception error)
         => error is UnauthorizedAccessException;
 
-    private static string ManualInstructions(string path)
+    private static string ManualInstructions(string path, string fileName, string what)
         => string.Join(' ',
             $"Setup could not write {path}.",
-            "Approve the administrator prompt, or install the loader by hand:",
+            $"Approve the administrator prompt, or install {what} by hand:",
             "open the folder above in Finder (Go > Go to Folder),",
-            "copy ae-mcp-loader.jsx there, then quit and reopen After Effects.");
+            $"copy {fileName} there, then quit and reopen After Effects.");
 
     /// <summary>
     /// Installs the startup loader, writing directly when allowed and retrying
     /// with admin elevation on a permission error. Returns a <c>{check, status,
     /// fix}</c> row; a manual fallback string accompanies failures.
     /// </summary>
-    public static async Task<InstallLoaderResult> InstallAsync(
+    public static Task<InstallLoaderResult> InstallAsync(
         AeInstall install,
         string loader,
         string? fileName = null,
         ElevatedWrite? elevatedWrite = null)
     {
-        var path = Path.Combine(LoaderStartupDir(install), fileName ?? LoaderFileName);
+        var name = fileName ?? LoaderFileName;
+        var path = Path.Combine(LoaderStartupDir(install), name);
+        return InstallFileAsync(path, loader, "bridge_loader", name, "the loader", elevatedWrite);
+    }
+
+    /// <summary>
+    /// Writes <paramref name="contents"/> to <paramref name="path"/>, skipping an identical
+    /// file, with the same admin-elevation fallback as the loader. <paramref name="check"/>
+    /// names the result row; <paramref name="what"/> reads in the fix hint.
+    /// </summary>
+    public static async Task<InstallLoaderResult> InstallFileAsync(
+        string path,
+        string contents,
+        string check,
+        string fileName,
+        string what,
+        ElevatedWrite? elevatedWrite = null)
+    {
         var previous = await Io.ReadFileOrNullAsync(path);
-        if (previous == loader)
+        if (previous == contents)
         {
-            return new InstallLoaderResult("bridge_loader", "ok", false, path);
+            return new InstallLoaderResult(check, "ok", false, path);
         }
 
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            await File.WriteAllTextAsync(path, loader);
-            return new InstallLoaderResult("bridge_loader", "ok", true, path);
+            await File.WriteAllTextAsync(path, contents);
+            return new InstallLoaderResult(check, "ok", true, path);
         }
         catch (Exception error) when (IsPermissionError(error))
         {
             var elevate = elevatedWrite ?? OsascriptElevatedWriteAsync;
-            if (await elevate(path, loader))
+            if (await elevate(path, contents))
             {
-                return new InstallLoaderResult("bridge_loader", "ok", true, path);
+                return new InstallLoaderResult(check, "ok", true, path);
             }
 
-            return new InstallLoaderResult(
-                "bridge_loader", "fail", false, path,
-                $"Install the loader at {path} with an administrator, then reopen After Effects.",
-                Manual: ManualInstructions(path));
+            return Failed(check, path, fileName, what);
         }
         catch
         {
-            return new InstallLoaderResult(
-                "bridge_loader", "fail", false, path,
-                $"Install the loader at {path} with an administrator, then reopen After Effects.",
-                Manual: ManualInstructions(path));
+            return Failed(check, path, fileName, what);
         }
     }
+
+    private static InstallLoaderResult Failed(string check, string path, string fileName, string what)
+        => new(
+            check, "fail", false, path,
+            $"Install {what} at {path} with an administrator, then reopen After Effects.",
+            Manual: ManualInstructions(path, fileName, what));
 }

@@ -23,7 +23,8 @@ public static class RepairUninstall
         AeInstall install,
         string payload,
         string loader,
-        string? fileName = null)
+        string? fileName = null,
+        string? panel = null)
     {
         var loaderCheck = await InstallLoader.InstallAsync(install, loader, fileName);
         if (!loaderCheck.IsOk)
@@ -32,7 +33,14 @@ public static class RepairUninstall
         }
 
         var payloadCheck = await InstallPayload.InstallAsync(root, payload);
-        return new RepairResult(payloadCheck.IsOk, [loaderCheck, payloadCheck]);
+        if (panel is null)
+        {
+            return new RepairResult(payloadCheck.IsOk, [loaderCheck, payloadCheck]);
+        }
+
+        // The panel is optional: its row reports a failure, but it never fails the core install.
+        var panelCheck = await InstallPanel.InstallAsync(install, panel);
+        return new RepairResult(payloadCheck.IsOk, [loaderCheck, payloadCheck, panelCheck]);
     }
 
     /// <summary>
@@ -44,6 +52,7 @@ public static class RepairUninstall
         var targets = new[]
         {
             Path.Combine(InstallLoader.LoaderStartupDir(install), fileName ?? InstallLoader.LoaderFileName),
+            InstallPanel.PanelPath(install),
             Path.Combine(root, "bridge"),
         };
 

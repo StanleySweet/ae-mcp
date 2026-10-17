@@ -26,6 +26,7 @@
   <ItemGroup>
     <None Include="Resources/payload.jsx" Link="payload.jsx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('Resources/payload.jsx')" />
     <None Include="Resources/loader.jsx" Link="loader.jsx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('Resources/loader.jsx')" />
+    <None Include="Resources/ae-mcp-panel.jsx" Link="ae-mcp-panel.jsx" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('Resources/ae-mcp-panel.jsx')" />
     <None Include="Resources/ae-mcp.mcpb" Link="ae-mcp.mcpb" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Condition="Exists('Resources/ae-mcp.mcpb')" />
   </ItemGroup>
 

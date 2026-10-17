@@ -25,6 +25,9 @@ public sealed class SetupService
 
     public string LoaderPath => Path.Combine(_baseDir, "loader.jsx");
 
+    /// <summary>The bundled Claude panel, installed into Scripts/ScriptUI Panels.</summary>
+    public string PanelPath => Path.Combine(_baseDir, "ae-mcp-panel.jsx");
+
     public string McpbPath => Path.Combine(_baseDir, "ae-mcp.mcpb");
 
     public Task<DetectedEnvironment> DetectAsync()
@@ -43,10 +46,11 @@ public sealed class SetupService
 
         var payload = await ReadResourceAsync(PayloadPath);
         var loader = await ReadResourceAsync(LoaderPath);
+        var panel = await ReadResourceAsync(PanelPath);
 
         // The core install is all-or-nothing: the privileged loader runs first, and
         // a failure means nothing else is written (no half install).
-        var core = await RepairUninstall.RepairAsync(_root, resolved, payload, loader);
+        var core = await RepairUninstall.RepairAsync(_root, resolved, payload, loader, panel: panel.Length == 0 ? null : panel);
         if (!core.Ok)
         {
             return new RepairResult(false, core.Checks);

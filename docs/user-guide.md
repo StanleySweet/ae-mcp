@@ -234,6 +234,23 @@ Save writes. Checkpoints are stored in `~/.ae-mcp/checkpoints.json`.
   (`kind`, `name`, `description`, `ops`) adds the `template.user` op; `{{key}}` in its args is
   filled from `args`. Invalid files are skipped, and `check_setup` lists each with its reason.
 
+## Claude panel in After Effects
+
+Setup installs `ae-mcp-panel.jsx` into `Scripts/ScriptUI Panels` next to the startup loader.
+Open it from the Window menu in After Effects (quit and reopen After Effects after the first
+install). It is a floating palette, not a dockable panel: the dockable `this instanceof Panel`
+pattern is not in the JavaScript Tools Guide, so the panel does not use it.
+
+- **Steps**: the last 20 operations Claude ran, newest first, read from `~/.ae-mcp/history.jsonl`.
+  Press Refresh to read the log again.
+- **Copy for Claude**: copies the project name, the active comp (name, size, duration, fps) and
+  the selected layers (index, name, type) to the clipboard, and shows the same text in the box.
+  No API key is needed; paste it into any Claude chat.
+
+Manual install, if Setup could not write the file: copy `ae-mcp-panel.jsx` from the Setup app
+bundle (`Resources/`) into the `Scripts/ScriptUI Panels` folder of the After Effects app, then
+reopen After Effects.
+
 ## Project lint
 
 `ae_do` op `project.lint {comp?, naming?, fix?}` returns one report of findings, each with
