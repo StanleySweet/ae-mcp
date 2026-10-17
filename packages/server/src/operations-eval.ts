@@ -7,7 +7,12 @@ function operation(
   name: string,
   category: OperationCategory,
   description: string,
-  options: { readOnly?: boolean; destructive?: boolean; schema?: Record<string, unknown> } = {},
+  options: {
+    readOnly?: boolean;
+    destructive?: boolean;
+    schema?: Record<string, unknown>;
+    required?: string[];
+  } = {},
 ): OperationDefinition {
   return {
     name,
@@ -16,6 +21,7 @@ function operation(
     readOnly: options.readOnly ?? false,
     destructive: options.destructive ?? false,
     schema: options.schema ?? {},
+    required: options.required ?? [],
   };
 }
 
@@ -30,6 +36,7 @@ export function registerEvalOperations(register: Register): void {
       {
         destructive: true,
         schema: { code: { type: 'string' } },
+        required: ['code'],
       },
     ),
   );

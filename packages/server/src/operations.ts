@@ -215,6 +215,8 @@ export function defaultOperationRegistry(): OperationRegistry {
   register(operation('layer.delete', 'layer', 'Delete a layer.', {
     destructive: true,
     schema: { comp, index: layerIndex },
+    // Required: without it the handler would delete layer 1 (#220).
+    required: ['index'],
   }));
   register(operation('layer.bounds', 'layer', 'Report a layer bounds box in composition space.', {
     readOnly: true,
