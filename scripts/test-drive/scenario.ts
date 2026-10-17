@@ -611,6 +611,9 @@ export const scenario: Step[] = [
     amplitude: 15,
     octaves: 2,
   })),
+  // loopOut needs keyframes: AE reports "this property has no keyframes" otherwise (E15-3).
+  op('keyframe.add.null0', 'keyframe.add', (s) => ({ comp: s.comp, index: layerIndex(s, 'Null'), property: POS, time: 0, value: [960, 540, 0] })),
+  op('keyframe.add.null1', 'keyframe.add', (s) => ({ comp: s.comp, index: layerIndex(s, 'Null'), property: POS, time: 1, value: [1100, 540, 0] })),
   op('expression.snippet.loop_cycle', 'expression.snippet', (s) => ({
     comp: s.comp,
     index: layerIndex(s, 'Null'),
