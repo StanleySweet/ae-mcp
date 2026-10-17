@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { clearTimeout, setTimeout } from 'node:timers';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { resolveAeAppName } from '../../packages/server/src/osascript-transport.js';
 import { createServer } from '../../packages/server/src/server.js';
 import { DEFAULT_SETTINGS } from '../../packages/server/src/settings.js';
+import { findFfxPreset, writeToneWav } from './fixtures.js';
 import { createState, scenario, type DriveState, type Step, type ToolResult } from './scenario.js';
 import { queueRoot } from '@ae-mcp/protocol';
 
@@ -16,6 +17,11 @@ import { queueRoot } from '@ae-mcp/protocol';
  * Live test drive (#200): runs every step of `scenario.ts` through the real
  * MCP server against the After Effects that is open on this Mac. Manual gate,
  * never run in CI. `--keep` leaves the scratch items in the project.
+ *
+ * The drive never works in the user's project (#224): it refuses to start while
+ * the open project has unsaved changes (exit 2), otherwise it runs `project.new`
+ * and saves the scratch project to `.tmp/test-drive/drive.aep`. At the end it
+ * reopens the project that was open before, if there was one.
  */
 
 const execFileAsync = promisify(execFile);
@@ -54,6 +60,15 @@ async function main(): Promise<void> {
   await mkdir(outDir, { recursive: true });
   const state = createState();
   state.vars.outputDir = outDir;
+  // Fixtures: a 1 s tone for the audio ops, and any installed .ffx for the preset ops.
+  const toneFile = join(outDir, 'tone.wav');
+  writeToneWav(toneFile);
+  state.vars.toneFile = toneFile;
+  state.preset = findFfxPreset() ?? '';
+  // aerender refuses to overwrite an output, so clear the previous run's renders.
+  for (const stale of ['render.mov', 'render-cancel.mov', 'drive-copy.aep']) {
+    await rm(join(outDir, stale), { force: true });
+  }
   const appName = await resolveAeAppName();
 
   const runJsx = async (code: string): Promise<string> => {
@@ -108,10 +123,24 @@ __out.close();`,
     return { isError: raw.isError === true, text, json, images };
   };
 
+  const callUntil = async (step: Step, args: unknown): Promise<ToolResult> => {
+    const poll = step.poll;
+    if (poll === undefined) {
+      return call(step.name, args);
+    }
+    for (;;) {
+      const result = await call(step.name, args);
+      if (result.isError || poll.until(result)) {
+        return result;
+      }
+      await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
+    }
+  };
+
   const execute = async (step: Step): Promise<ToolResult> => {
     const args = step.args(state);
     if (step.kind === 'tool') {
-      return call(step.name, args);
+      return callUntil(step, args);
     }
     if (step.kind === 'op') {
       return call('ae_do', { op: step.name, args });
@@ -127,6 +156,31 @@ __out.close();`,
     state.planId = planId;
     return call('ae_apply', { planId });
   };
+
+  // #224: never drive the user's project. Refuse while it has unsaved changes.
+  const info = await call('ae_project_info', {});
+  const originalPath = (info.json as { file?: string | null } | null)?.file ?? null;
+  const dirty = await runJsx('String(app.project.dirty)');
+  if (dirty !== 'false') {
+    console.log(
+      red(
+        'The open After Effects project has unsaved changes (or Project.dirty is unavailable). Save or close it, then run the drive again. Nothing was changed.',
+      ),
+    );
+    await client.close();
+    process.exit(2);
+  }
+  state.vars.originalPath = originalPath;
+  const created = await call('ae_do', { op: 'project.new', args: {} });
+  if (created.isError) {
+    throw new Error(`project.new failed: ${created.text.slice(0, 300)}`);
+  }
+  const scratch = join(outDir, 'drive.aep');
+  const saved = await call('ae_do', { op: 'project.save', args: { path: scratch, overwrite: true } });
+  if (saved.isError) {
+    throw new Error(`could not save the scratch project: ${saved.text.slice(0, 300)}`);
+  }
+  console.log(grey(`scratch project: ${scratch} (the project open before: ${originalPath ?? 'none'})`));
 
   const existingIds = await runJsx(
     "var ids = []; for (var i = 1; i <= app.project.numItems; i++) { ids.push(app.project.item(i).id); } ids.join(',');",
@@ -150,6 +204,12 @@ __out.close();`,
             }
             const result = await execute(step);
             record.images = result.images.map((image) => `data:${image.mimeType};base64,${image.data}`);
+            const skipped = step.skipOnResult?.(result);
+            if (skipped !== undefined) {
+              record.status = 'skip';
+              record.note = skipped;
+              return;
+            }
             if (step.expectError) {
               if (!result.isError) {
                 throw new Error('expected an error but the call succeeded');
@@ -188,6 +248,16 @@ __out.close();`,
     } catch (error) {
       console.log(red(`cleanup failed: ${String(error)}`));
     }
+  }
+
+  if (typeof originalPath === 'string' && originalPath !== '') {
+    // The scratch project was saved, so force is safe here (#224).
+    const reopened = await call('ae_do', { op: 'project.open', args: { path: originalPath, force: true } });
+    console.log(
+      reopened.isError
+        ? red(`could not reopen ${originalPath}: ${reopened.text.slice(0, 300)}`)
+        : grey(`reopened ${originalPath}`),
+    );
   }
 
   await client.close();

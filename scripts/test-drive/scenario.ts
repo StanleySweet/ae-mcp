@@ -7,7 +7,8 @@
  * new operation cannot ship without a drive step.
  */
 
-import { dirname } from 'node:path';
+import { statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 export type StepKind = 'tool' | 'op' | 'plan';
 
@@ -57,6 +58,10 @@ export interface Step {
   skip?: string;
   /** Dynamic skip, decided from earlier results. */
   skipIf?: (state: DriveState) => string | undefined;
+  /** Skip decided from the call's own result (an environment limit, not a product bug). */
+  skipOnResult?: (result: ToolResult) => string | undefined;
+  /** Repeat the call every `intervalMs` until `until` holds (the step timeout still applies). */
+  poll?: { intervalMs: number; until: (result: ToolResult) => boolean };
 }
 
 export function createState(now: Date = new Date()): DriveState {
@@ -152,14 +157,15 @@ const skipOp = (name: string, reason: string): Step => ({
   skip: reason,
 });
 
-const skipTool = (name: string, reason: string): Step => ({
-  id: `skip:${name}`,
-  kind: 'tool',
-  name,
-  category: 'tools',
-  args: () => ({}),
-  skip: reason,
-});
+/** A file in the drive's output folder (`.tmp/test-drive`). */
+const outFile = (s: DriveState, name: string): string => join(s.vars.outputDir as string, name);
+
+/** ae_dialogs needs Accessibility to read AE's windows; without it the step is a skip, not a failure. */
+const accessibilitySkip = (result: ToolResult): string | undefined =>
+  result.isError && result.text.includes('Accessibility') ? 'grant Accessibility to run this' : undefined;
+
+const jobStatusOf = (result: ToolResult): string | undefined =>
+  (result.json as { status?: string } | null)?.status;
 
 const refreshLayers = (id: string): Step =>
   tool(id, 'ae_layer_info', (s) => ({ comp: s.comp }), {
@@ -216,7 +222,7 @@ export const scenario: Step[] = [
   tool('ae_context', 'ae_context', () => ({})),
   tool('ae_project_info', 'ae_project_info', () => ({})),
   tool('ae_catalog', 'ae_catalog', () => ({})),
-  tool('ae_dialogs.list', 'ae_dialogs', () => ({ action: 'list' })),
+  tool('ae_dialogs.list', 'ae_dialogs', () => ({ action: 'list' }), { skipOnResult: accessibilitySkip }),
   tool('get_selection', 'get_selection', () => ({})),
   op('project.info', 'project.info', () => ({})),
   op('project.report_usage', 'project.report_usage', () => ({})),
@@ -636,8 +642,9 @@ export const scenario: Step[] = [
 
   // --- presets ---------------------------------------------------------------
   op('preset.list', 'preset.list', () => ({}), {
+    // run.ts sets state.preset from the Presets folder; keep it when already set.
     after: (result, state) => {
-      state.preset = firstString(payload(result), '.ffx') ?? '';
+      state.preset = state.preset || (firstString(payload(result), '.ffx') ?? '');
     },
   }),
   op('preset.search', 'preset.search', () => ({ query: 'blur' })),
@@ -659,11 +666,6 @@ export const scenario: Step[] = [
     ],
   })),
   op('marker.list', 'marker.list', (s) => ({ comp: s.comp })),
-
-  // --- audio (the scratch comp has no audio layer) ---------------------------
-  skipOp('audio.info', 'no audio layer in the scratch comp'),
-  skipOp('audio.set_levels', 'no audio layer in the scratch comp'),
-  skipOp('audio.peaks_to_markers', 'no audio layer in the scratch comp'),
 
   // --- discovery -------------------------------------------------------------
   op('font.list', 'font.list', () => ({})),
@@ -702,9 +704,39 @@ export const scenario: Step[] = [
     file: `${s.vars.outputDir as string}/${s.prefix} queue.mov`,
   })),
   op('render.status', 'render.status', () => ({})),
-  skipTool('ae_render', 'aerender needs a saved project; the drive never saves the open project'),
-  skipTool('job_status', 'no aerender job exists (ae_render is skipped)'),
-  skipTool('job_cancel', 'no aerender job exists (ae_render is skipped)'),
+
+  // --- aerender: it reads the saved project file, so save the scratch project first
+  op('project.save.copy', 'project.save', (s) => ({ path: outFile(s, 'drive-copy.aep'), overwrite: true })),
+  op('project.save.scratch', 'project.save', (s) => ({ path: outFile(s, 'drive.aep'), overwrite: true })),
+  tool('ae_render', 'ae_render', (s) => ({ comp: s.comp, output: outFile(s, 'render.mov'), startFrame: 0, endFrame: 29 }), {
+    after: (result, state) => {
+      const jobId = (result.json as { jobId?: string } | null)?.jobId;
+      if (typeof jobId !== 'string') throw new Error('ae_render returned no jobId');
+      state.vars.renderJobId = jobId;
+    },
+  }),
+  tool('job_status', 'job_status', (s) => ({ jobId: s.vars.renderJobId }), {
+    poll: { intervalMs: 500, until: (result) => jobStatusOf(result) !== 'running' },
+    after: (result, state) => {
+      const status = jobStatusOf(result);
+      if (status !== 'succeeded') throw new Error(`render job ended as ${String(status)}: ${result.text.slice(0, 300)}`);
+      const file = outFile(state, 'render.mov');
+      if (statSync(file).size === 0) throw new Error(`render produced an empty file: ${file}`);
+    },
+  }),
+  tool('ae_render.cancel', 'ae_render', (s) => ({ comp: s.comp, output: outFile(s, 'render-cancel.mov'), startFrame: 0, endFrame: 29 }), {
+    after: (result, state) => {
+      const jobId = (result.json as { jobId?: string } | null)?.jobId;
+      if (typeof jobId !== 'string') throw new Error('ae_render returned no jobId');
+      state.vars.cancelJobId = jobId;
+    },
+  }),
+  // A render that already finished reports `succeeded`: cancel is then a no-op, which is fine.
+  tool('job_cancel', 'job_cancel', (s) => ({ jobId: s.vars.cancelJobId }), {
+    after: (result) => {
+      if (jobStatusOf(result) === 'failed') throw new Error(`cancelled render job failed: ${result.text.slice(0, 300)}`);
+    },
+  }),
 
   // --- footage ---------------------------------------------------------------
   op(
@@ -733,8 +765,6 @@ export const scenario: Step[] = [
       skipIf: (s) => (s.frames.length === 0 ? 'no rendered frame to import' : undefined),
     },
   ),
-  skipOp('project.reduce', "destructive on the user's whole project"),
-  skipOp('project.consolidate_footage', "destructive on the user's whole project"),
   skipOp('eval.run', 'off by default; runs arbitrary code'),
 
   // --- project snapshot round trip -------------------------------------------
@@ -872,6 +902,44 @@ export const scenario: Step[] = [
     },
   }),
 
+  // --- audio: a generated 1-second tone on the scene comp (last, so earlier layer indices hold)
+  op('project.import_file.tone', 'project.import_file', (s) => ({ path: s.vars.toneFile as string, folder: s.folder }), {
+    after: (result, state) => {
+      const items = payload(result).items as Array<{ name: string }> | undefined;
+      state.vars.toneName = items?.[0]?.name ?? '';
+    },
+  }),
+  op('layer.add_footage.tone', 'layer.add_footage', (s) => ({ comp: s.comp, name: s.vars.toneName })),
+  refreshLayers('ae_layer_info.audio'),
+  op('audio.info', 'audio.info', (s) => ({ comp: s.comp, layerIndex: layerIndex(s, s.vars.toneName as string) })),
+  op('audio.set_levels', 'audio.set_levels', (s) => ({
+    comp: s.comp,
+    layerIndex: layerIndex(s, s.vars.toneName as string),
+    levels: [-6, -6],
+  })),
+  op('audio.peaks_to_markers', 'audio.peaks_to_markers', (s) => ({
+    comp: s.comp,
+    layerIndex: layerIndex(s, s.vars.toneName as string),
+    peaks: [
+      { time: 0.25, comment: 'peak' },
+      { time: 0.5, comment: 'peak' },
+    ],
+  })),
+
+  // --- saved-project ops, then the reduce on a scratch comp (these reshape the project)
+  op('project.consolidate_footage', 'project.consolidate_footage', () => ({})),
+  op('project.increment_save', 'project.increment_save', () => ({})),
+  op('project.save.final', 'project.save', (s) => ({ path: outFile(s, 'drive.aep'), overwrite: true })),
+  op('project.open', 'project.open', (s) => ({ path: outFile(s, 'drive.aep'), force: true })),
+  op('comp.create.reduce', 'comp.create', (s) => ({
+    name: `${s.prefix} reduce`,
+    width: 320,
+    height: 180,
+    duration: 1,
+    fps: 30,
+  })),
+  op('project.reduce', 'project.reduce', (s) => ({ items: [`${s.prefix} reduce`] })),
+
   // --- final look ------------------------------------------------------------
   tool('ae_project_info.final', 'ae_project_info', () => ({})),
 
@@ -883,10 +951,7 @@ export const scenario: Step[] = [
   skipTool('checkpoint_revert', 'reopens the project; covered by unit tests'),
 
   // --- explicit skips --------------------------------------------------------
-  skipOp('project.new', 'replaces the open project (destructive); the drive never touches the user project file'),
-  skipOp('project.open', 'replaces the open project (destructive); the drive never touches the user project file'),
-  skipOp('project.save', 'would save or Save As the open project; the drive never writes the user project'),
-  skipOp('project.increment_save', 'saves the open project to disk; the drive never saves'),
+  skipOp('project.new', 'run.ts starts the drive with it (fresh scratch project); a mid-drive call would wipe the scratch comp'),
   skipOp('project.undo', 'Edit > Undo rewrites the user undo history'),
   skipOp('command.execute', 'runs arbitrary menu commands; unsafe in an unattended drive'),
 ];

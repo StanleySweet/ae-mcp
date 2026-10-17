@@ -240,12 +240,13 @@ in-process and calls every MCP tool and every `ae_do` operation once, as Claude 
 It is a manual gate (never run in CI) and needs After Effects open with the bridge
 installed. Pass `--keep` (`npm run test:drive -- --keep`) to leave the scratch items.
 
-What it touches: only items named `ae-mcp test drive <timestamp>` (a project folder, a
-1920x1080 scene comp, copies, a precomp, one imported PNG) plus the solid and null
-sources AE creates for them, and its own render queue item. It never opens, saves or
-closes your project, never uses `eval.run`, `command.execute` or `project.undo`, and
+The drive works in its own scratch project, never in yours. It refuses to start while
+the open project has unsaved changes (exit code 2, nothing changed). Otherwise it runs
+`project.new`, saves the scratch project to `.tmp/test-drive/drive.aep`, and at the end
+reopens the project that was open before, if there was one. Renders and copies go to
+`.tmp/test-drive`. It never uses `eval.run`, `command.execute` or `project.undo`, and
 runs `bulk.remove_unused` as a dry-run plan only. `batch.run` includes one deliberate
-failing step to exercise rollback (Edit > Undo). Everything is removed at the end.
+failing step to exercise rollback (Edit > Undo). The scratch items are removed at the end.
 
 Output: a live checklist in the terminal and `.tmp/test-drive/report.html` with counts,
 a per-category table, errors and the rendered frames. Exit code 1 when a step failed.
