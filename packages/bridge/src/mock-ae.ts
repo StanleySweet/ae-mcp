@@ -1375,8 +1375,18 @@ export class MockAE {
   context: vm.Context | null = null;
   private clock = 0;
   private undoDepth = 0;
+  private suppressDepth = 0;
+  /** Error dialogs AE would have shown (an error raised while dialogs were not suppressed). */
+  readonly errorDialogs: string[] = [];
   private nextTaskId = 1;
   private readonly tasks = new Map<number, MockTask>();
+
+  /** An AE API reporting an error: onError hears it; unsuppressed, it is also a modal. */
+  simulateError(message: string, severity = 'problem'): void {
+    const handler = this.app.onError;
+    if (typeof handler === 'function') (handler as (m: string, s: string) => void)(message, severity);
+    if (this.suppressDepth === 0) this.errorDialogs.push(message);
+  }
 
   app = {
     exitCode: 0,
@@ -1398,6 +1408,17 @@ export class MockAE {
       }
     },
     inUndoGroup: (): boolean => this.undoDepth > 0,
+    // Ref: https://ae-scripting.docsforadobe.dev/general/application/#apponerror
+    onError: null as unknown,
+    // Ref: https://ae-scripting.docsforadobe.dev/general/application/#appbeginsuppressdialogs
+    beginSuppressDialogs: (): void => {
+      this.suppressDepth += 1;
+    },
+    // Ref: https://ae-scripting.docsforadobe.dev/general/application/#appendsuppressdialogs
+    endSuppressDialogs: (alert: boolean): void => {
+      void alert;
+      this.suppressDepth = Math.max(0, this.suppressDepth - 1);
+    },
     // Ref: https://ae-scripting.docsforadobe.dev/general/application/#appopen
     open: (file: MockFile): MockProject | null => {
       if (!file.exists) return null;

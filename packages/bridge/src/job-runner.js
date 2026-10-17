@@ -70,6 +70,35 @@ function aemcpRunHandler(tool, args) {
 // so undoing the batch would revert the user's own last edit instead (#202).
 var AEMCP_NOT_IN_BATCH = { 'project.save': true, 'project.open': true, 'project.new': true, 'project.increment_save': true };
 
+// Errors After Effects reported while a job ran (app.onError). With dialogs suppressed
+// they would otherwise be modal "script error" dialogs that block the bridge; the job
+// returns their text instead.
+var AEMCP_AE_ERRORS = [];
+
+function aemcpOnAeError(message, severity) {
+    AEMCP_AE_ERRORS.push(String(message) + (severity ? ' [' + severity + ']' : ''));
+}
+
+// Ref: https://ae-scripting.docsforadobe.dev/general/application/#appbeginsuppressdialogs
+// Ref: https://ae-scripting.docsforadobe.dev/general/application/#appendsuppressdialogs
+// Ref: https://ae-scripting.docsforadobe.dev/general/application/#apponerror
+function aemcpReportAeErrors(outcome, errors) {
+    if (errors.length === 0) {
+        return outcome;
+    }
+    var text = errors.join('; ');
+    if (!outcome.ok) {
+        outcome.issue.message += ' (After Effects: ' + text + ')';
+        if (!outcome.issue.details) {
+            outcome.issue.details = {};
+        }
+        outcome.issue.details.aeErrors = errors;
+    } else if (outcome.value !== null && typeof outcome.value === 'object' && !(outcome.value instanceof Array)) {
+        outcome.value.aeErrors = errors;
+    }
+    return outcome;
+}
+
 function aemcpInvoke(tool, args, deadline) {
     if (typeof deadline === 'number' && new Date().getTime() >= deadline) {
         return { ok: false, issue: aemcpErrorIssue('TIMEOUT', 'job deadline exceeded') };
@@ -80,13 +109,20 @@ function aemcpInvoke(tool, args, deadline) {
     }
     app.beginUndoGroup('Claude: ' + tool);
     AEMCP_BUSY = true;
+    AEMCP_AE_ERRORS = [];
+    var previousOnError = app.onError;
+    app.onError = aemcpOnAeError;
+    app.beginSuppressDialogs();
     var outcome;
     try {
         outcome = aemcpCallHandler(handler, args);
     } finally {
+        app.endSuppressDialogs(false);
+        app.onError = previousOnError;
         app.endUndoGroup();
         AEMCP_BUSY = false;
     }
+    outcome = aemcpReportAeErrors(outcome, AEMCP_AE_ERRORS);
     // A failed batch is never undone by script: any scripted Edit > Undo makes AE
     // raise a modal "Undo group mismatch" that blocks every later job (ADR-0009).
     // The issue keeps `rollback: true`; the server tells the user to press Cmd+Z.
