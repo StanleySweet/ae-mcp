@@ -294,6 +294,137 @@ function aemcpSerializeLayer(layer) {
     return out;
 }
 
+// Compact layer report for ae_layer_info (#250). The default report drops transform
+// values that equal the After Effects factory default (no keyframes, no expression)
+// and empty arrays. `full` keeps everything; `fields` selects top-level keys; `summary`
+// returns index, name and type only. Only the match names compared below are checked,
+// so any other property is always kept.
+var AEMCP_LAYER_FIELDS = [
+    'index', 'id', 'name', 'type', 'enabled', 'solo', 'shy', 'locked', 'inPoint', 'outPoint',
+    'startTime', 'stretch', 'parentIndex', 'label', 'nullLayer', 'width', 'height', 'hasVideo',
+    'hasAudio', 'threeDLayer', 'sourceId', 'sourceName', 'solidColor', 'transform', 'effects',
+    'masks', 'markers', 'text'
+];
+
+function aemcpNear(a, b) {
+    return Math.abs(a - b) < 0.001;
+}
+
+// True when the vector matches `target` on every component it has (components past the
+// end of `target` count as 0).
+function aemcpVectorIs(value, target) {
+    var i;
+    if (typeof value !== 'object' || value === null || typeof value.length !== 'number' || value.length < 2) {
+        return false;
+    }
+    for (i = 0; i < value.length; i++) {
+        if (typeof value[i] !== 'number' || !aemcpNear(value[i], i < target.length ? target[i] : 0)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Factory defaults: Opacity 100, Rotation 0, Scale 100%, Position at the comp centre,
+// Anchor Point at the origin or (AV layers) the source centre. Animated or
+// expression-driven values are never defaults.
+function aemcpIsFactoryDefault(entry, out, comp) {
+    var match = entry.matchName;
+    var value = entry.value;
+    if (entry.keyframes !== undefined || entry.expression !== undefined) {
+        return false;
+    }
+    if (match === AEMCP_MATCH.OPACITY) {
+        return typeof value === 'number' && aemcpNear(value, 100);
+    }
+    if (match === AEMCP_MATCH.ROTATION) {
+        return typeof value === 'number' && aemcpNear(value, 0);
+    }
+    if (match === AEMCP_MATCH.SCALE) {
+        return aemcpVectorIs(value, [100, 100, 100]);
+    }
+    if (match === AEMCP_MATCH.POSITION) {
+        return aemcpVectorIs(value, [comp.width / 2, comp.height / 2, 0]);
+    }
+    if (match === AEMCP_MATCH.ANCHOR_POINT) {
+        return aemcpVectorIs(value, [0, 0, 0]) ||
+            (typeof out.width === 'number' && aemcpVectorIs(value, [out.width / 2, out.height / 2, 0]));
+    }
+    return false;
+}
+
+// Drops factory-default transform values and empty arrays from a serialized layer, in place.
+function aemcpCompactLayer(out, comp) {
+    var kept = [];
+    var keys = ['effects', 'masks', 'markers'];
+    var i;
+    if (out.transform) {
+        for (i = 0; i < out.transform.properties.length; i++) {
+            if (!aemcpIsFactoryDefault(out.transform.properties[i], out, comp)) {
+                kept.push(out.transform.properties[i]);
+            }
+        }
+        out.transform.properties = kept;
+        if (out.transform.properties.length === 0) {
+            delete out.transform.properties;
+        }
+        if (out.transform.groups.length === 0) {
+            delete out.transform.groups;
+        }
+    }
+    for (i = 0; i < keys.length; i++) {
+        if (out[keys[i]].length === 0) {
+            delete out[keys[i]];
+        }
+    }
+    return out;
+}
+
+// Checks the compact-report arguments of ae_layer_info and returns them normalised.
+function aemcpLayerReportOptions(args) {
+    var options = { full: !!(args && args.full), summary: !!(args && args.summary), fields: null };
+    var i, j, known;
+    if (args && args.fields) {
+        if (typeof args.fields.length !== 'number') {
+            aemcpAbortArgs('fields must be an array of layer field names');
+        }
+        for (i = 0; i < args.fields.length; i++) {
+            known = false;
+            for (j = 0; j < AEMCP_LAYER_FIELDS.length; j++) {
+                if (AEMCP_LAYER_FIELDS[j] === args.fields[i]) {
+                    known = true;
+                }
+            }
+            if (!known) {
+                aemcpAbortArgs('unknown layer field: ' + args.fields[i]);
+            }
+        }
+        options.fields = args.fields;
+    }
+    return options;
+}
+
+// Builds one ae_layer_info entry from a full serialized layer.
+function aemcpLayerReport(out, comp, options) {
+    var picked, i;
+    if (options.summary) {
+        return { index: out.index, name: out.name, type: out.type };
+    }
+    if (!options.full) {
+        aemcpCompactLayer(out, comp);
+    }
+    if (!options.fields) {
+        return out;
+    }
+    picked = { index: out.index };
+    for (i = 0; i < options.fields.length; i++) {
+        if (out.hasOwnProperty(options.fields[i])) {
+            picked[options.fields[i]] = out[options.fields[i]];
+        }
+    }
+    return picked;
+}
+
 AEMCP.serialize = {};
 AEMCP.serialize.project = aemcpSerializeProject;
 AEMCP.serialize.item = aemcpSerializeItem;

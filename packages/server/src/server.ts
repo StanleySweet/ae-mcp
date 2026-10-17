@@ -506,16 +506,22 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_layer_info',
     {
       description:
-        'Report layers of a composition (default: the active comp). Pass layer indices to select a subset, or omit to report every layer.',
+        'Report layers of a composition (default: the active comp). Pass layer indices to select a subset, or omit to report every layer. The default is compact: transform values at their After Effects defaults and empty arrays are omitted. fields (top-level keys to return; index is always kept), summary (only index, name and type) and full (every value, as before the compact default) shape the report.',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         layers: z.array(z.number()).optional(),
+        fields: z.array(z.string()).optional(),
+        summary: z.boolean().optional(),
+        full: z.boolean().optional(),
       },
     },
     async (args) => {
       const result = await callRaw('ae_layer_info', {
         comp: args.comp,
         layers: args.layers,
+        fields: args.fields,
+        summary: args.summary,
+        full: args.full,
       });
       if (!result.ok) {
         return toResult(result);

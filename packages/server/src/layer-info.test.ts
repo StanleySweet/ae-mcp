@@ -1,7 +1,7 @@
 import { chmod, mkdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createQueueConsumer, FakeProject, observeHandlers } from '@ae-mcp/fake-bridge';
+import { createQueueConsumer, FakeProject, observeHandlers, type HandlerMap } from '@ae-mcp/fake-bridge';
 import { layerInfoResultSchema } from '@ae-mcp/protocol';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -13,13 +13,14 @@ import { createServer } from './server.js';
 async function connectServer(
   project: FakeProject,
   options: Parameters<typeof createServer>[0] = {},
+  handlers: HandlerMap = observeHandlers(project),
 ): Promise<{ client: Client; close: () => Promise<void> }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-layer-info-'));
   const root = join(home, '.ae-mcp');
   await mkdir(root, { recursive: true, mode: 0o700 });
   await chmod(root, 0o700);
 
-  const consumer = createQueueConsumer(root, observeHandlers(project));
+  const consumer = createQueueConsumer(root, handlers);
   await consumer.start();
 
   const aeClient = createAEClient({ transport: new FileQueueTransport(root, 10), root });
@@ -94,6 +95,28 @@ describe('ae_layer_info', () => {
 
     const info = await call(client, { comp: 'Main' });
     expect(info.layers[0]!.markers).toEqual([{ time: 1.5, duration: 0.5, comment: 'Cut' }]);
+  });
+
+  it('forwards fields, summary and full to the bridge', async () => {
+    const project = new FakeProject();
+    project.addComp('Main', 1920, 1080);
+    const seen: unknown[] = [];
+    const handlers: HandlerMap = {
+      ...observeHandlers(project),
+      ae_layer_info: (args) => {
+        seen.push(args);
+        return { comp: 'Main', layers: [], missing: [] };
+      },
+    };
+    const { client, close } = await connectServer(project, {}, handlers);
+    closes.push(close);
+
+    await client.callTool({
+      name: 'ae_layer_info',
+      arguments: { comp: 'Main', fields: ['name'], summary: true, full: false },
+    });
+
+    expect(seen[0]).toMatchObject({ comp: 'Main', fields: ['name'], summary: true, full: false });
   });
 
   it('reports a null comp when the requested comp is unknown', async () => {
