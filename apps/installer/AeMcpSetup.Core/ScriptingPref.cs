@@ -210,20 +210,28 @@ public static partial class ScriptingPref
         }
 
         var newest = dirs[0];
-        var probe = isRunning ?? AeProcess.IsAfterEffectsRunningAsync;
-        if (await probe(appName))
-        {
-            return new InstallerCheck(
-                "scripting_pref", "fail",
-                "Quit After Effects (Cmd+Q), then click Retry.", NeedsQuit: true);
-        }
-
         var prefsFile = FindPrefsFile(newest.Dir);
         if (prefsFile is null)
         {
             return new InstallerCheck(
                 "scripting_pref", "fail",
                 "Open After Effects once so it writes its preferences, then run Setup again.");
+        }
+
+        // Already enabled: nothing to write, so a running AE is fine. Checking the process
+        // first asked to quit AE on every run, even with the pref set.
+        var current = await Io.ReadFileOrNullAsync(prefsFile);
+        if (current is not null && ReadScriptingPref(current) == 1)
+        {
+            return new InstallerCheck("scripting_pref", "ok");
+        }
+
+        var probe = isRunning ?? AeProcess.IsAfterEffectsRunningAsync;
+        if (await probe(appName))
+        {
+            return new InstallerCheck(
+                "scripting_pref", "fail",
+                "Quit After Effects (Cmd+Q), then click Retry.", NeedsQuit: true);
         }
 
         return await EnableScriptingPrefAsync(prefsFile);

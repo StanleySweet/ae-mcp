@@ -187,6 +187,22 @@ public class ScriptingPrefTests
     }
 
     [Fact]
+    public async Task EnsureScriptingPrefPassesWhileAfterEffectsRunsWhenThePrefIsAlreadySet()
+    {
+        var root = PrefsRootWithFile();
+        var file = Path.Combine(root, "26.5", "Adobe After Effects 26.5 Prefs.txt");
+        await File.WriteAllTextAsync(file, ScriptingPref.SetScriptingPref(await File.ReadAllTextAsync(file)).Content);
+
+        var result = await ScriptingPref.EnsureScriptingPrefAsync(
+            "Adobe After Effects 2026",
+            root,
+            _ => Task.FromResult(true));
+
+        Assert.Equal("ok", result.Status);
+        Assert.NotEqual(true, result.NeedsQuit);
+    }
+
+    [Fact]
     public async Task EnsureScriptingPrefEnablesThePrefOnceAfterEffectsIsQuit()
     {
         var root = PrefsRootWithFile();
