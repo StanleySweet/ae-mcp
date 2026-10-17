@@ -171,7 +171,10 @@ export class OsaScriptTransport implements Transport {
       return {
         protocolVersion: PROTOCOL_VERSION,
         ok: false,
-        error: makeError('SCRIPT_ERROR', `the bridge wrote no result for job ${job.id}`),
+        error: makeError(
+          'SCRIPT_ERROR',
+          `the bridge wrote no result for job ${job.id}; After Effects may be showing a dialog: call ae_dialogs with action "dismiss"`,
+        ),
       };
     }
   }

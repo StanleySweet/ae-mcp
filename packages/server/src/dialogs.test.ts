@@ -68,6 +68,16 @@ describe('dismissFrontDialog', () => {
     expect(await dismissFrontDialog(runnerReturning('none'))).toEqual({ ok: true, value: 'none' });
   });
 
+  // AE 26.5 exposes no window to Accessibility, so a modal cannot be found by subrole.
+  it('presses Escape blind when After Effects shows no window to Accessibility', async () => {
+    const scripts: string[] = [];
+    expect(await dismissFrontDialog(runnerReturning('escape-blind', scripts))).toEqual({
+      ok: true,
+      value: 'escape-blind',
+    });
+    expect(scripts.join('\n')).toContain('if (count of windows) is 0 then');
+  });
+
   it('only ever presses Cancel/Annuler or Escape, never a save button', async () => {
     const scripts: string[] = [];
     await dismissFrontDialog(runnerReturning('cancel', scripts));

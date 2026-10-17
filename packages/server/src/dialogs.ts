@@ -58,6 +58,14 @@ tell application "System Events"
         end if
       end try
     end repeat
+    -- AE 26.5 hides its windows, dialogs included, from Accessibility, so none
+    -- was found: press Escape blind, which closes a modal and is harmless without one.
+    if (count of windows) is 0 then
+      set frontmost to true
+      delay 0.3
+      key code 53
+      return "escape-blind"
+    end if
   end tell
 end tell
 return "none"
@@ -102,7 +110,7 @@ export async function listDialogs(
   return { ok: true, value: dialogs };
 }
 
-export type DismissMethod = 'cancel' | 'escape' | 'none';
+export type DismissMethod = 'cancel' | 'escape' | 'escape-blind' | 'none';
 
 export async function dismissFrontDialog(
   runner: Runner = defaultRunner,
@@ -111,7 +119,8 @@ export async function dismissFrontDialog(
   if (!out.ok) {
     return out;
   }
-  return { ok: true, value: out.value === 'cancel' || out.value === 'escape' ? out.value : 'none' };
+  const methods: DismissMethod[] = ['cancel', 'escape', 'escape-blind'];
+  return { ok: true, value: methods.find((method) => method === out.value) ?? 'none' };
 }
 
 export function describeDialog(dialog: AeDialog): string {
