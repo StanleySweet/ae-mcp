@@ -26,7 +26,24 @@ import { bridgeVersionWarning } from './bridge-version.js';
 import { isValidCheckpointName, readCheckpoints, saveCheckpoint } from './checkpoints.js';
 import { buildAeContext } from './context.js';
 import { dismissFrontDialog, listDialogs } from './dialogs.js';
-import { compareFrames, type FrameComparison } from './frame-compare.js';
+import {
+  compareFrames,
+  sipsToBmp,
+  type DecodedFrame,
+  type FrameComparison,
+  type ToBmp,
+} from './frame-compare.js';
+import {
+  contactSheet,
+  cropFrame,
+  decodeFrameFile,
+  encodePng,
+  fitSize,
+  pngSize,
+  scaleFrame,
+  type Size,
+  type SheetCell,
+} from './frame-image.js';
 import { DEFAULT_HISTORY_LIST, HistoryLog, MAX_HISTORY_LIST } from './history.js';
 import { ANIMATION_GUIDE_URI } from './instructions.js';
 import { JobStore } from './jobs.js';
@@ -80,6 +97,8 @@ export interface ServerOptions {
   frameCompare?: (beforePng: string, afterPng: string) => Promise<FrameComparison>;
   /** Scales a rendered PNG so its longest edge is `maxEdge`, returning the new path or null (test seam). */
   resizeFrame?: (file: string, maxEdge: number) => Promise<string | null>;
+  /** Converts a rendered PNG to BMP for pixel work (test seam; default macOS `sips`). */
+  toBmp?: ToBmp;
 }
 
 /** One operation invocation stored in a previewed bulk plan. */
@@ -137,8 +156,32 @@ async function persistSavedVersionPath(root: string, savedFile: string): Promise
 of a smaller file (or null when it cannot resize). */
 export type FrameDownscale = (file: string) => Promise<string | null>;
 
-/** Longest edge a returned frame is scaled to when maxEdge is not given (#253; vision-sized). */
+/** Longest edge of a returned frame when maxEdge is not given (#253; vision-sized, about 0.5 MP). */
 export const DEFAULT_RENDER_EDGE = 768;
+
+/** Most frames one contact sheet can hold (ae_render_frame times). */
+export const MAX_CONTACT_FRAMES = 36;
+
+/** What the `render.frame` bridge op returns. */
+type FrameResult = {
+  method?: string;
+  comp?: string | null;
+  file?: string;
+  time?: number;
+  frame?: number;
+  width?: number;
+  height?: number;
+};
+
+/** A frame rendered for a region or contact sheet, with its PNG size read from the header. */
+type RenderedFrame = {
+  file: string;
+  time: number;
+  frame: number | null;
+  method: string | null;
+  comp: string | null;
+  size: Size | null;
+};
 
 const execFileAsync = promisify(execFile);
 
@@ -183,14 +226,6 @@ async function waitForCompletePng(file: string, wait: FrameWait): Promise<Buffer
   }
 }
 
-/** Longest edge of a PNG read from its IHDR chunk; 0 when the bytes are not a PNG. */
-function pngLongestEdge(png: Buffer): number {
-  if (png.length < 24 || png.toString('ascii', 12, 16) !== 'IHDR') {
-    return 0;
-  }
-  return Math.max(png.readUInt32BE(16), png.readUInt32BE(20));
-}
-
 /** True when `file` resolves to `<root>/render` or a path inside it. */
 export function isInsideRenderDir(root: string, file: string): boolean {
   const renderDir = resolve(root, 'render');
@@ -218,7 +253,8 @@ export async function readRenderedFrame(
     };
   }
   // Downscale when the file is too large to return, or when its longest edge exceeds maxEdge.
-  const tooWide = maxEdge !== undefined && pngLongestEdge(buffer) > maxEdge;
+  const size = pngSize(buffer);
+  const tooWide = maxEdge !== undefined && size !== null && Math.max(size.width, size.height) > maxEdge;
   if ((buffer.length > maxBytes || tooWide) && downscale) {
     const smaller = await downscale(target);
     if (smaller) {
@@ -738,82 +774,191 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_render_frame',
     {
       description:
-        'Render one frame (default: active comp, frame 0) to PNG, returned as image plus metadata. maxEdge default 768. compareWith adds a diff. See docs/user-guide.md.',
+        'Render frame(s) to PNG (default: active comp, frame 0). maxEdge default 768. times: contact sheet (max 36). region [x,y,w,h]: crop. compareWith: diff. See docs/user-guide.md.',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         time: z.number().optional(),
+        times: z.array(z.number()).min(1).max(MAX_CONTACT_FRAMES).optional(),
+        region: z
+          .tuple([
+            z.number().int().min(0),
+            z.number().int().min(0),
+            z.number().int().positive(),
+            z.number().int().positive(),
+          ])
+          .optional(),
         maxEdge: z.number().int().positive().optional(),
         compareWith: z.string().optional(),
       },
     },
     async (args) => {
-      const result = await callRaw('render.frame', { comp: args.comp, time: args.time });
-      if (!result.ok) {
-        return toResult(result);
+      if (args.times !== undefined && args.time !== undefined) {
+        return text(makeError('INVALID_ARGS', 'pass time or times, not both'), true);
       }
-      const value = result.result as {
-        method?: string;
-        comp?: string | null;
-        file?: string;
-        time?: number;
-        frame?: number;
-        width?: number;
-        height?: number;
-      };
-      if (typeof value.file !== 'string') {
-        return text(
-          makeError('SCRIPT_ERROR', 'render.frame did not return a file path'),
-          true,
-        );
+      if (args.times !== undefined && args.compareWith !== undefined) {
+        return text(makeError('INVALID_ARGS', 'compareWith compares one frame; drop times'), true);
       }
       const maxEdge = args.maxEdge ?? DEFAULT_RENDER_EDGE;
-      const read = await readRenderedFrame(
-        root,
-        value.file,
-        MAX_RENDER_BYTES,
-        (file) => (options.resizeFrame ?? shrinkPng)(file, maxEdge),
-        options.frameWait,
-        maxEdge,
-      );
-      if (!read.ok) {
-        return text(makeError('SCRIPT_ERROR', read.message), true);
-      }
-      let compare: FrameComparison | undefined;
-      if (args.compareWith !== undefined) {
+      const wait = options.frameWait ?? DEFAULT_FRAME_WAIT;
+
+      // Compares the new frame with compareWith; returns an error result instead when that is invalid.
+      const compareNew = async (file: string): Promise<{ compare?: FrameComparison; error?: ToolResult }> => {
+        if (args.compareWith === undefined) {
+          return {};
+        }
         if (!isInsideRenderDir(root, args.compareWith)) {
-          return text(
-            makeError('INVALID_ARGS', `compareWith must be a frame inside the render directory: ${args.compareWith}`),
-            true,
-          );
+          return {
+            error: text(
+              makeError('INVALID_ARGS', `compareWith must be a frame inside the render directory: ${args.compareWith}`),
+              true,
+            ),
+          };
         }
         const before = resolve(args.compareWith);
         const exists = await stat(before).then((info) => info.isFile(), () => false);
         if (!exists) {
-          return text(makeError('INVALID_ARGS', `compareWith frame does not exist: ${args.compareWith}`), true);
+          return { error: text(makeError('INVALID_ARGS', `compareWith frame does not exist: ${args.compareWith}`), true) };
         }
         try {
-          compare = await (options.frameCompare ?? compareFrames)(before, resolve(value.file));
+          return { compare: await (options.frameCompare ?? compareFrames)(before, resolve(file)) };
         } catch (error) {
+          return {
+            error: text(
+              makeError('SCRIPT_ERROR', `frame comparison failed: ${error instanceof Error ? error.message : String(error)}`),
+              true,
+            ),
+          };
+        }
+      };
+
+      if (args.times === undefined && args.region === undefined) {
+        // One frame: the PNG from AE, scaled down only when it is larger than maxEdge.
+        const result = await callRaw('render.frame', { comp: args.comp, time: args.time });
+        if (!result.ok) {
+          return toResult(result);
+        }
+        const value = result.result as FrameResult;
+        if (typeof value.file !== 'string') {
+          return text(makeError('SCRIPT_ERROR', 'render.frame did not return a file path'), true);
+        }
+        const read = await readRenderedFrame(
+          root,
+          value.file,
+          MAX_RENDER_BYTES,
+          (file) => (options.resizeFrame ?? shrinkPng)(file, maxEdge),
+          wait,
+          maxEdge,
+        );
+        if (!read.ok) {
+          return text(makeError('SCRIPT_ERROR', read.message), true);
+        }
+        const compared = await compareNew(value.file);
+        if (compared.error) {
+          return compared.error;
+        }
+        return {
+          content: [
+            { type: 'image', data: read.data, mimeType: 'image/png' },
+            {
+              type: 'text',
+              text: JSON.stringify({
+                method: value.method ?? null,
+                comp: value.comp ?? null,
+                file: value.file,
+                time: value.time ?? null,
+                frame: value.frame ?? null,
+                width: value.width ?? null,
+                height: value.height ?? null,
+                image: pngSize(Buffer.from(read.data, 'base64')),
+                ...(compared.compare !== undefined ? { compare: compared.compare } : {}),
+              }),
+            },
+          ],
+        };
+      }
+
+      // Region crop and/or contact sheet: every frame is decoded and composed here.
+      const times = args.times ?? [args.time ?? 0];
+      const frames: RenderedFrame[] = [];
+      for (const requested of times) {
+        const result = await callRaw('render.frame', { comp: args.comp, time: requested });
+        if (!result.ok) {
+          return toResult(result);
+        }
+        const value = result.result as FrameResult;
+        if (typeof value.file !== 'string') {
+          return text(makeError('SCRIPT_ERROR', 'render.frame did not return a file path'), true);
+        }
+        const file = resolve(value.file);
+        if (!isInsideRenderDir(root, file)) {
+          return text(makeError('SCRIPT_ERROR', `refusing to read outside the render directory: ${value.file}`), true);
+        }
+        const buffer = await waitForCompletePng(file, wait);
+        if (!buffer) {
           return text(
-            makeError('SCRIPT_ERROR', `frame comparison failed: ${error instanceof Error ? error.message : String(error)}`),
+            makeError('SCRIPT_ERROR', `rendered frame was not finished writing after ${wait.timeoutMs} ms: ${value.file}`),
             true,
           );
         }
+        frames.push({
+          file: value.file,
+          time: value.time ?? requested,
+          frame: value.frame ?? null,
+          method: value.method ?? null,
+          comp: value.comp ?? null,
+          size: pngSize(buffer),
+        });
       }
+      const first = frames[0]!;
+      if (first.size === null) {
+        return text(makeError('SCRIPT_ERROR', `rendered frame is not a PNG: ${first.file}`), true);
+      }
+      const region: [number, number, number, number] = args.region ?? [0, 0, first.size.width, first.size.height];
+      const [x, y, w, h] = region;
+      if (x + w > first.size.width || y + h > first.size.height) {
+        return text(
+          makeError(
+            'INVALID_ARGS',
+            `region [${region.join(', ')}] is outside the ${first.size.width}x${first.size.height} frame`,
+          ),
+          true,
+        );
+      }
+      const cells: SheetCell[] = [];
+      for (const frame of frames) {
+        const decoded = await decodeFrameFile(resolve(frame.file), options.toBmp ?? sipsToBmp);
+        cells.push({ frame: cropFrame(decoded, x, y, w, h), label: `${frame.time.toFixed(2)}s` });
+      }
+      let image: DecodedFrame;
+      let compared: { compare?: FrameComparison; error?: ToolResult } = {};
+      if (args.times === undefined) {
+        const fitted = fitSize({ width: w, height: h }, maxEdge);
+        image = scaleFrame(cells[0]!.frame, fitted.width, fitted.height);
+        compared = await compareNew(first.file);
+        if (compared.error) {
+          return compared.error;
+        }
+      } else {
+        image = contactSheet(cells, Math.ceil(Math.sqrt(cells.length)), maxEdge);
+      }
+      const single = args.times === undefined;
       return {
         content: [
-          { type: 'image', data: read.data, mimeType: 'image/png' },
+          { type: 'image', data: encodePng(image).toString('base64'), mimeType: 'image/png' },
           {
             type: 'text',
             text: JSON.stringify({
-              method: value.method ?? null,
-              comp: value.comp ?? null,
-              file: value.file,
-              time: value.time ?? null,
-              frame: value.frame ?? null,
-              width: value.width ?? null,
-              height: value.height ?? null,
-              ...(compare !== undefined ? { compare } : {}),
+              method: first.method,
+              comp: first.comp,
+              file: single ? first.file : null,
+              time: single ? first.time : null,
+              frame: single ? first.frame : null,
+              width: first.size.width,
+              height: first.size.height,
+              region,
+              image: { width: image.width, height: image.height },
+              ...(single ? {} : { cells: frames.map((frame) => ({ time: frame.time, frame: frame.frame, file: frame.file })) }),
+              ...(compared.compare !== undefined ? { compare: compared.compare } : {}),
             }),
           },
         ],

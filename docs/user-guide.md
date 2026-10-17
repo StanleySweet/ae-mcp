@@ -153,6 +153,19 @@ once per operation inside a batch. When an increment happens, the result carries
 never been saved, the operation is refused with the error code `UNSAVED_PROJECT` and a hint
 to save once first.
 
+## Vision-sized frames
+
+`ae_render_frame` returns a PNG whose longest edge is `maxEdge` (default 768, enough to see
+motion and layout at a few image tokens). Ask for a larger `maxEdge` (1200 or 1568) when you
+need to read small text or fine detail. Two more shapes cut the number of images:
+
+- `times: [0, 0.5, 1, 1.5]` (up to 36 times) returns one contact sheet: a grid of those frames
+  with a time label (`0.50s`) on each cell. `cells` in the metadata lists the frames.
+- `region: [x, y, w, h]` crops every frame to that rectangle of the comp. A region outside the
+  frame is an `INVALID_ARGS` error.
+
+`time` and `times` cannot be combined, and `compareWith` works with one frame only.
+
 ## Comparing frames
 
 `ae_render_frame` takes an optional `compareWith`: the path of an earlier frame that
