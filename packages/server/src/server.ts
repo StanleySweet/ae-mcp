@@ -20,6 +20,8 @@ import {
   type ResultMessage,
 } from '@ae-mcp/protocol';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
 import { beginVerify, finishVerify } from './ae-do-verify.js';
@@ -67,6 +69,7 @@ import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks, type SetupDeps } from './setup-checks.js';
 import { loadUserSnippets, registerUserSnippets, resolveUserCall, TEMPLATE_OP } from './snippets.js';
 import { truncateLongStrings } from './truncate-values.js';
+import { buildVersions, formatForPath, parseDataRows, type PlainVersion, type VersionRow } from './versions.js';
 
 export const SERVER_NAME = 'ae-mcp';
 export const SERVER_VERSION = '1.4.1';
@@ -294,6 +297,18 @@ export function capArray<T>(
     }
   }
   return { items: [], truncated: true };
+}
+
+export interface RenderArgs {
+  comp?: string;
+  rqindex?: number;
+  output?: string;
+  omTemplate?: string;
+  rsTemplate?: string;
+  startFrame?: number;
+  endFrame?: number;
+  increment?: number;
+  project?: string;
 }
 
 export function createServer(options: ServerOptions = {}): McpServer {
@@ -975,6 +990,90 @@ export function createServer(options: ServerOptions = {}): McpServer {
     },
   );
 
+  /** Starts an aerender job for ae_render. The caller checks read-only first. extra carries the MCP progress token (#235). */
+  type RenderExtra = Pick<RequestHandlerExtra<ServerRequest, ServerNotification>, '_meta' | 'sendNotification'>;
+  const startRender = async (args: RenderArgs, extra?: RenderExtra): Promise<ToolResult> => {
+    if ((args.comp === undefined) === (args.rqindex === undefined)) {
+      return text(
+        makeError('INVALID_ARGS', 'aerender needs exactly one of comp or rqindex'),
+        true,
+      );
+    }
+    // Never overwrite, and never let cancel delete, a file that already exists (#201).
+    const outputExists =
+      args.output !== undefined && (await stat(args.output).then(() => true, () => false));
+    if (outputExists) {
+      return text(makeError('INVALID_ARGS', `output already exists: ${args.output}`), true);
+    }
+    const aerender = await findAerender();
+    if (aerender === null) {
+      return text(makeError('AERENDER_NOT_FOUND', 'no aerender executable was found'), true);
+    }
+    const project = await resolveProject(args.project);
+    if (!project.ok) {
+      return project.result;
+    }
+    const jobId = jobStore.start('render');
+    const startedAt = jobStore.get(jobId)?.createdAt ?? Date.now();
+    // Progress notifications only when the client asked for them with a progressToken (#235).
+    const progressToken = extra?._meta?.progressToken;
+    const progress =
+      progressToken === undefined
+        ? null
+        : createRenderProgress({
+            token: progressToken,
+            total:
+              args.startFrame !== undefined && args.endFrame !== undefined
+                ? args.endFrame - args.startFrame + 1
+                : undefined,
+            send: (params) => extra!.sendNotification({ method: 'notifications/progress', params }),
+          });
+    let handle: AerenderRunHandle;
+    try {
+      handle = runAerender({
+        aerender,
+        project: project.file,
+        comp: args.comp,
+        rqindex: args.rqindex,
+        output: args.output,
+        omTemplate: args.omTemplate,
+        rsTemplate: args.rsTemplate,
+        startFrame: args.startFrame,
+        endFrame: args.endFrame,
+        increment: args.increment,
+        spawn: options.spawnAerender,
+        onEvent: (event) => {
+          if (event.type === 'progress') {
+            jobStore.progress(jobId, {
+              frame: event.frame,
+              rendered: event.rendered,
+              seconds: event.seconds,
+            });
+            progress?.report(event.rendered);
+          }
+        },
+      });
+    } catch (error) {
+      const message = (error as Error).message;
+      progress?.stop();
+      jobStore.fail(jobId, message);
+      return text(makeError('SCRIPT_ERROR', `could not start aerender: ${message}`), true);
+    }
+    const done = handle.result.then((result) => {
+      progress?.stop();
+      return finishRenderJob(jobId, result, { output: args.output, startedAt });
+    });
+    runs.set(jobId, { cancel: handle.cancel, done });
+    void done.finally(() => runs.delete(jobId));
+    if (progress !== null) {
+      // A client accepts progress only while the request is open, so with a
+      // progressToken the call returns when the render ends (#235). Read the
+      // result with job_status, as without a token.
+      await done.catch(() => undefined);
+    }
+    return text({ jobId });
+  };
+
   server.registerTool(
     'ae_render',
     {
@@ -1000,85 +1099,109 @@ export function createServer(options: ServerOptions = {}): McpServer {
           true,
         );
       }
-      if ((args.comp === undefined) === (args.rqindex === undefined)) {
+      return startRender(args, extra);
+    },
+  );
+
+  // Data-driven versions (#239): CSV or JSON rows become one comp per row (versions.ts).
+  server.registerTool(
+    'versions_generate',
+    {
+      description:
+        'One comp per data row (rows, or a .csv/.json dataPath). mapping: column to layer text or footage. dryRun (default) returns a planId for ae_apply. render needs renderDir.',
+      inputSchema: {
+        comp: z.string(),
+        rows: z.array(z.record(z.string(), z.unknown())).optional(),
+        dataPath: z.string().optional(),
+        mapping: z
+          .array(
+            z.object({
+              layer: z.string(),
+              text: z.string().optional(),
+              footage: z.string().optional(),
+            }),
+          )
+          .min(1),
+        nameColumn: z.string().optional(),
+        dryRun: z.boolean().default(true),
+        render: z.boolean().default(false),
+        renderDir: z.string().optional(),
+      },
+    },
+    async (args) => {
+      const settings = await getSettings();
+      if (settings.readOnly && (!args.dryRun || args.render)) {
         return text(
-          makeError('INVALID_ARGS', 'aerender needs exactly one of comp or rqindex'),
+          makeError('FORBIDDEN', 'versions_generate changes the project and is not permitted in read-only mode'),
           true,
         );
       }
-      // Never overwrite, and never let cancel delete, a file that already exists (#201).
-      const outputExists =
-        args.output !== undefined && (await stat(args.output).then(() => true, () => false));
-      if (outputExists) {
-        return text(makeError('INVALID_ARGS', `output already exists: ${args.output}`), true);
+      if ((args.rows === undefined) === (args.dataPath === undefined)) {
+        return text(makeError('INVALID_ARGS', 'versions_generate needs exactly one of rows or dataPath'), true);
       }
-      const aerender = await findAerender();
-      if (aerender === null) {
-        return text(makeError('AERENDER_NOT_FOUND', 'no aerender executable was found'), true);
+      if (args.render && args.renderDir === undefined) {
+        return text(makeError('INVALID_ARGS', 'render needs renderDir'), true);
       }
-      const project = await resolveProject(args.project);
-      if (!project.ok) {
-        return project.result;
-      }
-      const jobId = jobStore.start('render');
-      const startedAt = jobStore.get(jobId)?.createdAt ?? Date.now();
-      // Progress notifications only when the client asked for them with a progressToken (#235).
-      const progressToken = extra._meta?.progressToken;
-      const progress =
-        progressToken === undefined
-          ? null
-          : createRenderProgress({
-              token: progressToken,
-              total:
-                args.startFrame !== undefined && args.endFrame !== undefined
-                  ? args.endFrame - args.startFrame + 1
-                  : undefined,
-              send: (params) => extra.sendNotification({ method: 'notifications/progress', params }),
-            });
-      let handle: AerenderRunHandle;
+      let versions: PlainVersion[];
       try {
-        handle = runAerender({
-          aerender,
-          project: project.file,
-          comp: args.comp,
-          rqindex: args.rqindex,
-          output: args.output,
-          omTemplate: args.omTemplate,
-          rsTemplate: args.rsTemplate,
-          startFrame: args.startFrame,
-          endFrame: args.endFrame,
-          increment: args.increment,
-          spawn: options.spawnAerender,
-          onEvent: (event) => {
-            if (event.type === 'progress') {
-              jobStore.progress(jobId, {
-                frame: event.frame,
-                rendered: event.rendered,
-                seconds: event.seconds,
-              });
-              progress?.report(event.rendered);
-            }
-          },
-        });
+        let rows: VersionRow[];
+        if (args.rows !== undefined) {
+          rows = args.rows.map((row) =>
+            Object.fromEntries(Object.entries(row).map(([key, value]) => [key, String(value ?? '')])),
+          );
+        } else {
+          const format = formatForPath(args.dataPath ?? '');
+          if (format === null) {
+            return text(makeError('INVALID_ARGS', 'dataPath must end in .csv or .json'), true);
+          }
+          rows = parseDataRows(await readFile(args.dataPath ?? '', 'utf8'), format);
+        }
+        versions = buildVersions(rows, args.mapping, args.nameColumn);
       } catch (error) {
-        const message = (error as Error).message;
-        progress?.stop();
-        jobStore.fail(jobId, message);
-        return text(makeError('SCRIPT_ERROR', `could not start aerender: ${message}`), true);
+        return text(makeError('INVALID_ARGS', (error as Error).message), true);
       }
-      const done = handle.result.then((result) => {
-        progress?.stop();
-        return finishRenderJob(jobId, result, { output: args.output, startedAt });
-      });
-      runs.set(jobId, { cancel: handle.cancel, done });
-      void done.finally(() => runs.delete(jobId));
-      if (progress !== null) {
-        // A client accepts progress only while the request is open, so with a
-        // progressToken the call returns when the render ends (#235). Read the
-        // result with job_status, as without a token.
-        await done.catch(() => undefined);
+
+      const dry = await callRaw('versions.generate', { comp: args.comp, versions, dryRun: true });
+      if (!dry.ok) {
+        return toResult(dry);
       }
-      return text({ jobId });
+      const plan = dry.result as { changes?: unknown[]; fingerprint?: unknown } | null;
+      if (typeof plan?.fingerprint !== 'string') {
+        return text(makeError('SCRIPT_ERROR', 'versions.generate did not return a plan fingerprint'), true);
+      }
+      if (args.dryRun) {
+        const planId = planStore.create(
+          [{ op: 'versions.generate', args: { comp: args.comp, versions } }],
+          plan.fingerprint,
+        );
+        return text({ planId, changes: plan.changes ?? [] });
+      }
+
+      const applied = await callRaw('versions.generate', { comp: args.comp, versions, dryRun: false });
+      if (!applied.ok) {
+        return toResult(applied);
+      }
+      const created = (applied.result as { created?: { name: string }[] } | null)?.created ?? [];
+      if (!args.render || args.renderDir === undefined) {
+        return text({ applied: created.length, created, changes: plan.changes ?? [] });
+      }
+      // aerender opens the saved project file, so save a version that holds the copies first.
+      const saved = await callRaw('project.increment_save');
+      if (!saved.ok) {
+        return toResult(saved);
+      }
+      const jobs: { comp: string; jobId: string }[] = [];
+      for (const copy of created) {
+        const safeName = copy.name.replace(/[\\:*?"<>|/]/g, '_');
+        const started = await startRender({ comp: copy.name, output: join(args.renderDir, `${safeName}.mov`) });
+        if (started.isError) {
+          return started;
+        }
+        const first = started.content[0];
+        const jobId = first?.type === 'text' ? (JSON.parse(first.text) as { jobId: string }).jobId : '';
+        jobs.push({ comp: copy.name, jobId });
+      }
+      return text({ applied: created.length, created, jobs });
     },
   );
 

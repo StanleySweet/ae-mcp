@@ -397,6 +397,17 @@ export const scenario: Step[] = [
     index: layerIndex(s, 'Text'),
     style: 'glitch',
   })),
+  // #239: one version comp per row, named with the drive prefix so the cleanup removes it.
+  plan('versions.generate', 'versions.generate', (s) => ({
+    comp: s.comp,
+    versions: [{ name: `${s.comp} version A`, texts: { Text: 'Version A' } }],
+  })),
+  tool('versions_generate', 'versions_generate', (s) => ({
+    comp: s.comp,
+    rows: [{ name: 'row', title: 'Row' }],
+    mapping: [{ layer: 'Text', text: 'title' }],
+    nameColumn: 'name',
+  })),
   op('text.animate.blur_in', 'text.animate', (s) => ({
     comp: s.comp,
     index: layerIndex(s, 'Text'),

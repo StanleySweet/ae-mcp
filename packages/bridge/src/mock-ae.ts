@@ -250,9 +250,7 @@ export class MockCompItem extends MockItem {
       this.project.add(copy);
     }
     for (const layer of this.layerList) {
-      const clone = Object.create(Object.getPrototypeOf(layer)) as MockLayer;
-      Object.assign(clone, layer);
-      copy.addLayer(clone);
+      copy.addLayer(layer.cloneTree());
     }
     return copy;
   }
@@ -297,6 +295,21 @@ export const PropertyValueType = {
   ThreeD: 4,
   ThreeD_SPATIAL: 5,
 } as const;
+
+// Values are copied so a duplicate never shares an array or object with its source.
+function mockCopyValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => mockCopyValue(item));
+  }
+  if (value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    const copy: Record<string, unknown> = {};
+    for (const key of Object.keys(value as Record<string, unknown>)) {
+      copy[key] = mockCopyValue((value as Record<string, unknown>)[key]);
+    }
+    return copy;
+  }
+  return value;
+}
 
 export class MockProperty {
   // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybaseenabled
@@ -490,6 +503,15 @@ export class MockProperty {
   }
 }
 
+// Independent copy for a duplicated comp: real AE gives each duplicate its own properties.
+function mockCloneProperty(prop: MockProperty): MockProperty {
+  const copy = Object.assign(Object.create(Object.getPrototypeOf(prop)), prop) as MockProperty;
+  (copy as unknown as { keys: unknown[] }).keys = prop.keys.map((key) => ({ ...key, value: mockCopyValue(key.value) }));
+  copy.selectedKeys = prop.selectedKeys.slice();
+  (copy as unknown as { storedValue: unknown }).storedValue = mockCopyValue((prop as unknown as { storedValue: unknown }).storedValue);
+  return copy;
+}
+
 export class MockPropertyGroup {
   protected readonly children: (MockProperty | MockPropertyGroup)[] = [];
   private parentGroup: MockPropertyGroup | null = null;
@@ -526,6 +548,16 @@ export class MockPropertyGroup {
       child.parentGroup = this;
     }
     return child;
+  }
+
+  /** An independent copy of this group and everything under it (see mockCloneProperty). */
+  cloneTree(): this {
+    const copy = Object.assign(Object.create(Object.getPrototypeOf(this)), this) as this;
+    (copy as unknown as { children: unknown[] }).children = [];
+    for (const child of this.children) {
+      copy.add(child instanceof MockPropertyGroup ? child.cloneTree() : mockCloneProperty(child));
+    }
+    return copy;
   }
 
   // Ref: https://ae-scripting.docsforadobe.dev/property/propertygroup/#propertygroupcanaddproperty
@@ -688,6 +720,14 @@ export class MockAVLayer extends MockLayer {
     const prop = transform ? (transform.property(matchName) as MockProperty | null) : null;
     return prop && Array.isArray(prop.value) ? (prop.value as number[]) : null;
   }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/avlayer/#avlayerreplacesource
+  replaceSource(newSource: MockItem, fixExpressions: boolean): void {
+    this.source = newSource;
+    this.fixedExpressions = fixExpressions;
+  }
+
+  fixedExpressions = false;
 
   sourceRectAtTime(): { top: number; left: number; width: number; height: number } {
     return { top: -this.height / 2, left: -this.width / 2, width: this.width, height: this.height };

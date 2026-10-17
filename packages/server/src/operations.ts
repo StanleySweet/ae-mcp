@@ -7,6 +7,7 @@ import { registerRelinkOperations } from './operations-relink.js';
 
 import { registerTemplateOperations } from './operations-templates.js';
 import { registerVerifyOperations } from './operations-verify.js';
+import { registerVersionOperations } from './operations-versions.js';
 
 export class OperationRegistry {
   private readonly byName = new Map<string, OperationDefinition>();
@@ -787,6 +788,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerTemplateOperations(register);
   registerEvalOperations(register);
   registerProjectOperations(register);
+  registerVersionOperations(register);
 
   return registry;
 }
