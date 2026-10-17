@@ -1371,6 +1371,19 @@ export class MockProject {
   }
 }
 
+// Ref: https://ae-scripting.docsforadobe.dev/text/fontobject/
+export class MockFontObject {
+  constructor(
+    readonly familyName: string,
+    readonly styleName: string,
+    readonly postScriptName: string,
+  ) {}
+
+  get fullName(): string {
+    return this.familyName + ' ' + this.styleName;
+  }
+}
+
 export class MockAE {
   readonly undoGroups: MockUndoGroup[] = [];
   readonly alerts: string[] = [];
@@ -1405,11 +1418,17 @@ export class MockAE {
     if (this.suppressDepth === 0) this.errorDialogs.push(message);
   }
 
+  // Ref: https://ae-scripting.docsforadobe.dev/text/fontsobject/#fontsobjectallfonts
+  // Family groups: each entry is an array of the FontObjects of one family.
+  readonly fontFamilies: MockFontObject[][] = [];
+
   app = {
     exitCode: 0,
     version: 'MockAE-25',
     project: this.project,
     effects: this.effects,
+    // Ref: https://ae-scripting.docsforadobe.dev/text/fontsobject/
+    fonts: { allFonts: this.fontFamilies },
     beginUndoGroup: (name?: string): void => {
       this.undoDepth += 1;
       this.undoGroups.push({ name, start: this.clock, end: -1 });

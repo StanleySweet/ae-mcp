@@ -2698,13 +2698,23 @@ AEMCP.register('audio.peaks_to_markers', function (args) {
 AEMCP.register('font.list', function (args) {
     var fonts = [];
     if (app.fonts && app.fonts.allFonts) {
-        var all = app.fonts.allFonts;
-        for (var i = 0; i < all.length; i++) {
-            fonts.push({
-                postScriptName: all[i].postScriptName,
-                family: all[i].family,
-                style: all[i].style
-            });
+        // allFonts is a list of family groups; each group is an array of Font objects (#273).
+        // Ref: https://ae-scripting.docsforadobe.dev/text/fontsobject/#fontsobjectallfonts
+        var groups = app.fonts.allFonts;
+        for (var g = 0; g < groups.length; g++) {
+            var group = groups[g];
+            for (var i = 0; i < group.length; i++) {
+                // Ref: https://ae-scripting.docsforadobe.dev/text/fontobject/#fontobjectfullname
+                // Ref: https://ae-scripting.docsforadobe.dev/text/fontobject/#fontobjectfamilyname
+                // Ref: https://ae-scripting.docsforadobe.dev/text/fontobject/#fontobjectstylename
+                // Ref: https://ae-scripting.docsforadobe.dev/text/fontobject/#fontobjectpostscriptname
+                fonts.push({
+                    name: group[i].fullName,
+                    family: group[i].familyName,
+                    style: group[i].styleName,
+                    postScriptName: group[i].postScriptName
+                });
+            }
         }
     }
     return { fonts: fonts };
