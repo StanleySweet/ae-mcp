@@ -397,6 +397,7 @@ export const scenario: Step[] = [
     index: layerIndex(s, 'Text'),
     style: 'glitch',
   })),
+  skipOp('mogrt.export', 'AE can prompt to save an unsaved project before a MOGRT export, which would block the drive; check it by hand'),
   // #239: one version comp per row, named with the drive prefix so the cleanup removes it.
   plan('versions.generate', 'versions.generate', (s) => ({
     comp: s.comp,

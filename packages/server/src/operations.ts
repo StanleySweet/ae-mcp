@@ -2,6 +2,7 @@ import type { ErrorDetails, OperationCategory, OperationDefinition } from '@ae-m
 import { registerEvalOperations } from './operations-eval.js';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
 import { registerLayerOperations } from './operations-layers.js';
+import { registerMogrtOperations } from './operations-mogrt.js';
 import { registerProjectOperations } from './operations-project.js';
 import { registerRelinkOperations } from './operations-relink.js';
 
@@ -789,6 +790,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerEvalOperations(register);
   registerProjectOperations(register);
   registerVersionOperations(register);
+  registerMogrtOperations(register);
 
   return registry;
 }

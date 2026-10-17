@@ -25,6 +25,7 @@ const COMP_OPERATIONS = [
   'comp.precompose',
   'comp.set_settings',
   'comp.snapshot',
+  'mogrt.export',
 ];
 
 async function connect(

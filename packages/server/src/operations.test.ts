@@ -60,6 +60,7 @@ const BRIDGE_OPS = [
   'template.logo_reveal',
   'look.apply',
   'versions.generate',
+  'mogrt.export',
   'rig.null_controller',
   'effect.apply',
   'effect.list_on_layer',
@@ -129,7 +130,8 @@ describe('server operation registry', () => {
       // look.apply is an effect-category op (#217), not a 'look' category.
       // look.apply is an effect-category op (#217), not a 'look' category.
       // versions.generate is a bulk op (#239) that ae_plan can preview.
-      const expectedCategory = name === 'versions.generate' ? 'bulk' : name.split('.')[0];
+      // mogrt.export is a comp-category op (#241).
+      const expectedCategory = name === 'versions.generate' ? 'bulk' : name === 'mogrt.export' ? 'comp' : name.split('.')[0];
       expect(definition!.category).toBe(name === 'look.apply' ? 'effect' : expectedCategory);
       expect(definition!.description.length).toBeGreaterThan(0);
       expect(typeof definition!.readOnly).toBe('boolean');

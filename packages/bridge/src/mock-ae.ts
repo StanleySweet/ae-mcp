@@ -241,6 +241,29 @@ export class MockCompItem extends MockItem {
     return null;
   }
 
+  // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemmotiongraphicstemplatename
+  motionGraphicsTemplateName = '';
+  // Essential graphics controls, by name, in panel order (added through Property.addToMotionGraphicsTemplateAs).
+  readonly egpControls: string[] = [];
+  // Each exportAsMotionGraphicsTemplate call, for tests (the mock writes no file).
+  readonly mogrtExports: { overwrite: boolean; folder: string }[] = [];
+
+  // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemmotiongraphicstemplatecontrollercount
+  get motionGraphicsTemplateControllerCount(): number {
+    return this.egpControls.length;
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemgetmotiongraphicstemplatecontrollername
+  getMotionGraphicsTemplateControllerName(index: number): string {
+    return this.egpControls[index - 1] ?? '';
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemexportasmotiongraphicstemplate
+  exportAsMotionGraphicsTemplate(overwrite: boolean, folder?: string): boolean {
+    this.mogrtExports.push({ overwrite, folder: folder ?? '' });
+    return true;
+  }
+
   duplicate(): MockCompItem {
     const id = this.project ? this.project.allocateId() : this.id;
     const copy = new MockCompItem(id, `${this.name} Copy`, this.width, this.height, this.frameRate, this.duration);
@@ -336,6 +359,22 @@ export class MockProperty {
   // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertypropertyvaluetype
   propertyValueType: number = PropertyValueType.OneD;
   private storedValue: unknown;
+
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertycanaddtomotiongraphicstemplate
+  // Mock accepts the documented kinds: a number (Numerical Slider) or a text document (Source Text).
+  canAddToMotionGraphicsTemplate(comp: MockCompItem): boolean {
+    void comp;
+    const value = this.storedValue;
+    if (typeof value === 'number') return true;
+    return value !== null && typeof value === 'object' && !Array.isArray(value) && 'text' in (value as object);
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyaddtomotiongraphicstemplateas
+  addToMotionGraphicsTemplateAs(comp: MockCompItem, name: string): boolean {
+    if (!this.canAddToMotionGraphicsTemplate(comp)) return false;
+    comp.egpControls.push(name);
+    return true;
+  }
 
   constructor(
     readonly name: string,
