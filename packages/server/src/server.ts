@@ -60,6 +60,7 @@ import { PlanStore } from './plans.js';
 import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
 import { cleanupPartialOutput } from './render-output.js';
 import { batchJson, replayJsx, replaySteps } from './replay.js';
+import { registerResources } from './resources.js';
 import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks, type SetupDeps } from './setup-checks.js';
 import { loadUserSnippets, registerUserSnippets, resolveUserCall, TEMPLATE_OP } from './snippets.js';
@@ -93,6 +94,10 @@ export interface ServerOptions {
   instructions?: string;
   /** Full animation principles, served as the resource ANIMATION_GUIDE_URI (docs/agents/animation-principles.md). */
   guide?: string;
+  /** Text of skills/ae/SKILL.md: the `ae://skill/ae` resource and the prompt recipes (#231, #232). */
+  skill?: string;
+  /** A docs/findings directory served as `ae://docs/findings/*` resources (#231). */
+  docsDir?: string;
   /** How long `ae_render_frame` waits for AE to finish writing the PNG (test seam). */
   frameWait?: FrameWait;
   /** Compares two rendered frames for `ae_render_frame` `compareWith` (test seam). */
@@ -1539,6 +1544,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
       return applied.ok ? text(applied.value) : applied.result;
     },
   );
+
+  registerResources(server, { call: callRaw, skill: options.skill, docsDir: options.docsDir });
 
   return server;
 }

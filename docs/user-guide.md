@@ -226,6 +226,18 @@ Add `naming.fix {match, replace, regex?, flags?}` to make a rename a safe fix.
   `ae_plan` and `ae_apply`. Removing items, relinking footage and fixing expressions are never
   applied; they stay in the report.
 
+## Resources
+
+Clients that support MCP resources can read the project without a tool call:
+
+- `ae://project/items`: the open project and every item (`ae_project_info`).
+- `ae://active-comp`: a summary of the active composition.
+- `ae://comp/{name}`: one composition by name. The list shows every composition.
+- `ae://skill/ae`: the ae skill (recipes for the ae-mcp tools).
+- `ae://docs/findings/<file>`: the design findings, one resource per file. These exist when
+  the server runs from a source checkout.
+
+
 ## Expression-driven properties
 
 A property whose value comes from an expression (for example one added by a preset, or a
