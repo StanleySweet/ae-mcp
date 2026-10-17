@@ -271,6 +271,27 @@ Slider Control effect per requested slider name, and parents the given layers to
 null.
 
 
+## Animate: real easing curves and presets
+
+`animate` sets keys on several properties of one layer in one call. Pass
+`tracks: {<property>: [[time, value], ...]}` (times in seconds, strictly increasing; a
+position or scale value is an array) and a `curve`. The curve is a name (`linear`, `smooth`
+(default), `expo_out`, `expo_in_out`, `back_out`, `snappy`) or `[x1, y1, x2, y2]` with
+`0 < x1 <= 1` and `0 <= x2 < 1`. Each key's outgoing influence is `x1 * 100` with speed
+`(y1 / x1) * delta / duration`, and its incoming influence is `(1 - x2) * 100` with speed
+`((1 - y2) / (1 - x2)) * delta / duration`. A multi-dimension value gets one ease per
+dimension; a spatial property (Position on most layers) gets one ease whose speed is the
+distance between the two points. The first key's incoming side and the last key's
+outgoing side are speed 0. Influence is clamped to AE's 0.1 to 100.
+
+Presets are one call each (`preset` instead of `tracks`): `fade_in` takes opacity 0 to 100,
+`slide_in` moves position from one `distance` (default 200) before its current value
+(`direction` is the side it enters from, default `left`), and `pop` scales from 0 to the
+current scale with `back_out`. All take `start` (default 0) and `duration` (default 0.5).
+
+The keys are written with `setValueAtTime`, then `setInterpolationTypeAtKey(BEZIER)`, then
+`setTemporalEaseAtKey`. Undo with Cmd+Z in After Effects (the server never undoes by script).
+
 ## Modal dialogs
 
 A dialog open in After Effects blocks every script, so calls would only time out. When a

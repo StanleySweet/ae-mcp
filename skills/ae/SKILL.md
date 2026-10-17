@@ -18,6 +18,10 @@ Recipes for the ae-mcp tools. `ae_catalog` lists every operation with its argume
 
 Read `docs/agents/animation-principles.md` first. Hand-authored motion gets keyframes. Procedural, random or linked motion gets an expression.
 
+Animate in one call (prefer this over per-key calls):
+- `ae_do {op: "animate", args: {comp, layer, tracks: {"ADBE Transform Group/ADBE Position": [[0, [200, 540]], [1, [960, 540]]]}, curve: "expo_out"}}` sets every key and eases it from a real bezier. Curves: linear, smooth, expo_out, expo_in_out, back_out, snappy, or `[x1, y1, x2, y2]`.
+- Presets in one call: `{comp, layer, preset: "fade_in" | "slide_in" | "pop", start, duration}`; `slide_in` also takes `direction` (left, right, up, down) and `distance`.
+
 Keyframed move with easing:
 1. `ae_do {op: "keyframe.add", args: {comp, index: 3, property: "ADBE Transform Group/ADBE Position", time: 0, value: [200, 540]}}`
 2. Same call at `time: 1` with `value: [960, 540]`.

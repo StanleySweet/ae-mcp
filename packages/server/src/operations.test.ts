@@ -62,6 +62,7 @@ const BRIDGE_OPS = [
   'versions.generate',
   'mogrt.export',
   'audio.to_keyframes',
+  'animate',
   'localize.apply',
   'rig.null_controller',
   'effect.apply',
@@ -132,9 +133,9 @@ describe('server operation registry', () => {
       // look.apply is an effect-category op (#217), not a 'look' category.
       // look.apply is an effect-category op (#217), not a 'look' category.
       // versions.generate is a bulk op (#239) that ae_plan can preview.
-      // mogrt.export is a comp-category op (#241).
+      // mogrt.export is a comp-category op (#241). animate is a keyframe-category op (#260).
       const expectedCategory =
-        name === 'versions.generate' ? 'bulk' : name === 'mogrt.export' ? 'comp' : name === 'localize.apply' ? 'text' : name.split('.')[0];
+        name === 'versions.generate' ? 'bulk' : name === 'mogrt.export' ? 'comp' : name === 'localize.apply' ? 'text' : name === 'animate' ? 'keyframe' : name.split('.')[0];
       expect(definition!.category).toBe(name === 'look.apply' ? 'effect' : expectedCategory);
       expect(definition!.description.length).toBeGreaterThan(0);
       expect(typeof definition!.readOnly).toBe('boolean');

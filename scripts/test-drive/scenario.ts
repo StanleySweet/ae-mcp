@@ -1065,6 +1065,32 @@ export const scenario: Step[] = [
     targetLayer: layerIndex(s, 'Drive Audio Null'),
     property: 'Opacity',
   })),
+  // #260: a fresh null, one animate call for a position track eased with expo_out, then a sample.
+  // expo_out is an ease-out: by the midpoint the layer has covered well over half the distance.
+  op('layer.add_null.animate', 'layer.add_null', (s) => ({ comp: s.comp, name: 'Drive Animate Null' })),
+  refreshLayers('ae_layer_info.animate-null'),
+  op('animate', 'animate', (s) => ({
+    comp: s.comp,
+    layer: layerIndex(s, 'Drive Animate Null'),
+    tracks: { [POS]: [[0, [100, 300]], [1, [500, 300]]] },
+    curve: 'expo_out',
+  }), {
+    after: (result) => {
+      if (payload(result).keyframes !== 2) throw new Error(`animate set no keys: ${result.text.slice(0, 300)}`);
+    },
+  }),
+  op('property.sample.animate', 'property.sample', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Drive Animate Null'),
+    property: POS,
+    times: [0, 0.5, 1],
+  }), {
+    after: (result) => {
+      const samples = (payload(result).samples as Array<{ time: number; value: number[] }> | undefined) ?? [];
+      const mid = samples[1]?.value?.[0] ?? NaN;
+      if (!(mid > 300)) throw new Error(`expo_out ease-out should pass half the distance by 0.5 s, x was ${mid}`);
+    },
+  }),
   // #245 with apply: import a uniquely named copy of the tone and delete it on disk; the
   // relink runs after project.open, since AE only marks footage missing when the project loads.
   op('project.import_file.missing', 'project.import_file', (s) => {
