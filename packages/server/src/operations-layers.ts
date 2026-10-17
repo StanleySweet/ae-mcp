@@ -6,7 +6,12 @@ function operation(
   name: string,
   category: OperationCategory,
   description: string,
-  options: { readOnly?: boolean; destructive?: boolean; schema?: Record<string, unknown> } = {},
+  options: {
+    readOnly?: boolean;
+    destructive?: boolean;
+    schema?: Record<string, unknown>;
+    required?: string[];
+  } = {},
 ): OperationDefinition {
   return {
     name,
@@ -15,11 +20,13 @@ function operation(
     readOnly: options.readOnly ?? false,
     destructive: options.destructive ?? false,
     schema: options.schema ?? {},
+    required: options.required ?? [],
   };
 }
 
 export function registerLayerOperations(register: (d: OperationDefinition) => void): void {
   register(operation('layer.rename', 'layer', 'Rename a layer.', {
+      required: ['index', 'name'],
     schema: { comp: { type: 'string' }, index: { type: 'number' }, name: { type: 'string' } },
   }));
 }

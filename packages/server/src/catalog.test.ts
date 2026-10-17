@@ -2,7 +2,7 @@ import { operationDefinitionSchema } from '@ae-mcp/protocol';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, it, expect } from 'vitest';
-import { OperationRegistry } from './operations.js';
+import { defaultOperationRegistry, OperationRegistry } from './operations.js';
 import { createServer } from './server.js';
 
 function registryWith(...names: [string, string][]): OperationRegistry {
@@ -55,6 +55,17 @@ describe('ae_catalog', () => {
     const { operations } = await catalog(client, { category: 'layer' });
     expect(operations).toHaveLength(1);
     expect(operationDefinitionSchema.parse(operations[0]).name).toBe('layer.add_text');
+  });
+
+  it('includes the schema and required arguments of each operation', async () => {
+    const client = await connectServer(defaultOperationRegistry());
+    const { operations } = await catalog(client, { category: 'layer' });
+    const rename = operations.find((op) => (op as { name: string }).name === 'layer.rename') as {
+      schema: Record<string, unknown>;
+      required: string[];
+    };
+    expect(rename.required).toEqual(['index', 'name']);
+    expect(Object.keys(rename.schema)).toEqual(expect.arrayContaining(['index', 'name']));
   });
 
   it('returns an empty list when nothing is registered', async () => {

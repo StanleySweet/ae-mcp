@@ -20,6 +20,7 @@ function registry(): OperationRegistry {
     readOnly: false,
     destructive: false,
     schema: { index: { type: 'number' }, name: { type: 'string' } },
+    required: ['index', 'name'],
   });
   registry.register({
     name: 'comp.create',
@@ -188,6 +189,20 @@ describe('ae_do', () => {
     expect(isError).toBe(true);
     const error = errorSchema.parse(JSON.parse(text));
     expect(error.code).toBe('INVALID_ARGS');
+    expect(calls).toEqual([]);
+  });
+
+  it('rejects a missing required argument, naming it, before reaching AE', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls);
+    closes.push(close);
+
+    const { isError, text } = await call(client, { op: 'layer.rename', args: { index: 1 } });
+    expect(isError).toBe(true);
+    const error = errorSchema.parse(JSON.parse(text));
+    expect(error.code).toBe('INVALID_ARGS');
+    expect(error.message).toContain("missing required argument 'name'");
+    expect(error.hint).toBe("Call ae_catalog for the operation's schema and required arguments.");
     expect(calls).toEqual([]);
   });
 

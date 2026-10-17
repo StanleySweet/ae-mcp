@@ -751,7 +751,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
           true,
         );
       }
-      const validation = validateOperationArgs(definition.schema, toolArgs.args);
+      const validation = validateOperationArgs(definition.schema, toolArgs.args, definition.required);
       if (!validation.ok) {
         return text(makeError('INVALID_ARGS', validation.message), true);
       }
@@ -845,7 +845,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
           true,
         );
       }
-      const validation = validateOperationArgs(definition.schema, toolArgs.args);
+      const validation = validateOperationArgs(definition.schema, toolArgs.args, definition.required);
       if (!validation.ok) {
         return text(makeError('INVALID_ARGS', validation.message), true);
       }
@@ -856,7 +856,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
           true,
         );
       }
-      const dry = await callRaw(definition.name, { ...validation.args, dryRun: true });
+      const dry =await callRaw(definition.name, { ...validation.args, dryRun: true });
       if (!dry.ok) {
         return toResult(dry);
       }

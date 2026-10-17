@@ -7,7 +7,12 @@ function operation(
   name: string,
   category: OperationCategory,
   description: string,
-  options: { readOnly?: boolean; destructive?: boolean; schema?: Record<string, unknown> } = {},
+  options: {
+    readOnly?: boolean;
+    destructive?: boolean;
+    schema?: Record<string, unknown>;
+    required?: string[];
+  } = {},
 ): OperationDefinition {
   return {
     name,
@@ -16,6 +21,7 @@ function operation(
     readOnly: options.readOnly ?? false,
     destructive: options.destructive ?? false,
     schema: options.schema ?? {},
+    required: options.required ?? [],
   };
 }
 
@@ -23,6 +29,7 @@ function operation(
 export function registerHousekeepingOperations(register: Register): void {
   register(
     operation('project.import_folder', 'project', 'Import every visible file under a folder into a project folder named after it (or folder). Files AE refuses are reported in skipped.', {
+      required: ['path'],
       schema: {
         path: { type: 'string' },
         recursive: { type: 'boolean' },
@@ -32,6 +39,7 @@ export function registerHousekeepingOperations(register: Register): void {
   );
   register(
     operation('project.reduce', 'project', 'Remove everything from the project except the given comps (File > Reduce Project). Destructive.', {
+      required: ['items'],
       destructive: true,
       schema: {
         items: { type: 'array', items: { oneOf: [{ type: 'number' }, { type: 'string' }] } },

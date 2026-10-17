@@ -19,6 +19,7 @@ export function registerVerifyOperations(register: (d: OperationDefinition) => v
     description: 'Compare the comp with a snapshot from comp.snapshot: added and removed layers (by index and name) and changed fields.',
     readOnly: true,
     destructive: false,
+    required: ['snapshot'],
     schema: { comp, snapshot: { type: 'object' } },
   });
   register({
@@ -27,6 +28,7 @@ export function registerVerifyOperations(register: (d: OperationDefinition) => v
     description: 'Sample a layer property at the given times (Property.valueAtTime).',
     readOnly: true,
     destructive: false,
+    required: ['index', 'property', 'times'],
     schema: { comp, index: layerIndex, property: { type: 'string' }, times: { type: 'array' } },
   });
 }

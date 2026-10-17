@@ -30,7 +30,7 @@ export const errorHints: Record<ErrorCode, string> = {
   BRIDGE_NOT_LOADED: 'Restart After Effects so the startup loader runs, then retry.',
   UNKNOWN_TOOL: 'Call ae_catalog to list the available tools.',
   INVALID_MESSAGE: 'Client and server protocol versions differ; restart the client after upgrading.',
-  INVALID_ARGS: 'Check the tool description for the expected arguments.',
+  INVALID_ARGS: "Call ae_catalog for the operation's schema and required arguments.",
   FORBIDDEN: 'Adjust ~/.ae-mcp/settings.json or the environment override.',
   UNSAVED_PROJECT: 'Save the project once (File > Save) so Increment and Save can version it.',
   SCRIPT_ERROR: 'Open Window > Console in After Effects for the script error.',

@@ -10,7 +10,8 @@ export class OperationRegistry {
   private readonly byName = new Map<string, OperationDefinition>();
 
   register(definition: OperationDefinition): void {
-    this.byName.set(definition.name, definition);
+    // Every listed operation carries a `required` list, empty when it has none.
+    this.byName.set(definition.name, { ...definition, required: definition.required ?? [] });
   }
 
   get(name: string): OperationDefinition | undefined {
@@ -32,7 +33,12 @@ function operation(
   name: string,
   category: OperationCategory,
   description: string,
-  options: { readOnly?: boolean; destructive?: boolean; schema?: Record<string, unknown> } = {},
+  options: {
+    readOnly?: boolean;
+    destructive?: boolean;
+    schema?: Record<string, unknown>;
+    required?: string[];
+  } = {},
 ): OperationDefinition {
   return {
     name,
@@ -41,6 +47,7 @@ function operation(
     readOnly: options.readOnly ?? false,
     destructive: options.destructive ?? false,
     schema: options.schema ?? {},
+    required: options.required ?? [],
   };
 }
 
@@ -78,6 +85,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('footage.replace', 'footage', 'Replace the source file of a footage item.', {
+      required: ['item', 'path'],
       schema: {
         item: { oneOf: [{ type: 'number' }, { type: 'string' }] },
         path: { type: 'string' },
@@ -88,10 +96,12 @@ export function defaultOperationRegistry(): OperationRegistry {
     schema: { path: { type: 'string' }, overwrite: { type: 'boolean' } },
   }));
   register(operation('project.open', 'project', 'Open a project file, replacing the open project. Refuses unless force: true when the open project has unsaved changes or that cannot be told.', {
+      required: ['path'],
     destructive: true,
     schema: { path: { type: 'string' }, force: { type: 'boolean' } },
   }));
   register(operation('project.import_json', 'project', 'Recreate comps and solid/text/null/shape layers (with transforms) from an aemcp-project/v1 snapshot (project.export_json); other layers are reported as skipped.', {
+      required: ['snapshot'],
     schema: { snapshot: { type: 'object' } },
   }));
   register(operation('project.undo', 'project', 'Undo the last change.'));
@@ -144,6 +154,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('comp.layer_clip_frames', 'comp', 'Set layer in-point and out-point from frame numbers.', {
+      required: ['from', 'to'],
       schema: {
         comp,
         name: comp,
@@ -176,6 +187,7 @@ export function defaultOperationRegistry(): OperationRegistry {
     },
   }));
   register(operation('layer.set_3d', 'layer', 'Turn the 3D switch on or off for a layer (not camera/light).', {
+      required: ['index'],
     schema: { comp, index: layerIndex, enabled: { type: 'boolean' } },
   }));
   register(operation('layer.add_solid', 'layer', 'Add a solid layer.', {
@@ -183,9 +195,10 @@ export function defaultOperationRegistry(): OperationRegistry {
   }));
   register(operation('layer.add_adjustment', 'layer', 'Add an adjustment layer.', { schema: { comp, name: { type: 'string' } } }));
   register(operation('layer.add_null', 'layer', 'Add a null layer.', { schema: { comp, name: { type: 'string' } } }));
-  register(operation('layer.add_footage', 'layer', 'Add a footage layer.', { schema: { comp, name: comp } }));
+  register(operation('layer.add_footage', 'layer', 'Add a footage layer.', { required: ['name'], schema: { comp, name: comp } }));
   register(operation('layer.center', 'layer', 'Center selected layers.', { schema: { comp } }));
   register(operation('layer.set_transform', 'layer', "Set a layer's anchor point, position, scale, rotation and/or opacity.", {
+      required: ['index'],
     schema: {
       comp,
       index: layerIndex,
@@ -210,6 +223,7 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Property.
   register(operation('property.get', 'property', 'Read a property value from a layer.', {
+      required: ['name'],
     readOnly: true,
     schema: { comp, index: layerIndex, name: propertyName },
   }));
@@ -218,19 +232,23 @@ export function defaultOperationRegistry(): OperationRegistry {
     schema: { comp, index: layerIndex, depth: { type: 'number' } },
   }));
   register(operation('property.set', 'property', 'Set a property value on a layer.', {
+      required: ['name', 'value'],
     schema: { comp, index: layerIndex, name: propertyName, value: {} },
   }));
 
   // Keyframe.
   register(operation('keyframe.add', 'keyframe', 'Add a keyframe on a property.', {
+      required: ['property', 'time', 'value'],
     schema: { comp, index: layerIndex, time: { type: 'number' }, value: {}, property: propertyName },
   }));
   register(operation('keyframe.remove', 'keyframe', 'Remove a keyframe on a property.', {
+      required: ['property', 'time'],
     destructive: true,
     schema: { comp, index: layerIndex, time: { type: 'number' }, property: propertyName },
   }));
   register(
     operation('keyframe.set_easing', 'keyframe', 'Set easing on a keyframe.', {
+      required: ['property', 'time', 'easing'],
       schema: {
         comp,
         index: layerIndex,
@@ -242,6 +260,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('keyframe.ease_preset', 'keyframe', 'Apply an easing preset to the keyframes selected on a property.', {
+      required: ['property', 'preset'],
       schema: {
         comp,
         index: layerIndex,
@@ -257,21 +276,25 @@ export function defaultOperationRegistry(): OperationRegistry {
   };
   register(
     operation('keyframe.copy', 'keyframe', 'Copy every keyframe (time, value, interpolation, temporal ease) onto another property.', {
+      required: ['from', 'to'],
       schema: { comp, from: keyTarget, to: keyTarget, offset: { type: 'number' } },
     }),
   );
   register(
     operation('keyframe.offset', 'keyframe', 'Shift every keyframe of a property by a number of seconds, keeping easing.', {
+      required: ['property', 'seconds'],
       schema: { comp, index: layerIndex, property: propertyName, seconds: { type: 'number' } },
     }),
   );
   register(
     operation('keyframe.reverse', 'keyframe', 'Mirror the keyframe times of a property within its first-to-last span.', {
+      required: ['property'],
       schema: { comp, index: layerIndex, property: propertyName },
     }),
   );
   register(
     operation('keyframe.scale_time', 'keyframe', 'Scale keyframe times around the first key by a factor greater than 0.', {
+      required: ['property', 'factor'],
       schema: { comp, index: layerIndex, property: propertyName, factor: { type: 'number' } },
     }),
   );
@@ -287,17 +310,21 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Expression.
   register(operation('expression.set', 'expression', 'Set an expression on a layer property.', {
+      required: ['property', 'value'],
     schema: { comp, index: layerIndex, property: propertyName, value: {} },
   }));
   register(operation('expression.clear', 'expression', 'Clear the expression on a layer property.', {
+      required: ['property'],
     schema: { comp, index: layerIndex, property: propertyName },
   }));
   register(operation('expression.check_errors', 'expression', 'Check a layer property expression for errors.', {
+      required: ['property'],
     readOnly: true,
     schema: { comp, index: layerIndex, property: propertyName },
   }));
   register(
     operation('expression.snippet', 'expression', 'Apply a named expression snippet to a property: wiggle, loop, delay, overshoot, loop_pingpong, inertia, bounce (amplitude 0.1, frequency 2, decay 5), time_counter (Source Text, rate 1/s), countdown (Source Text, from seconds, default 10), wiggle_smooth (frequency 2, amplitude 10, octaves 1), loop_cycle, loop_offset, spring (damped oscillation after the last key: frequency 2, decay 5), clock (Source Text, elapsed time as MM:SS).', {
+      required: ['snippet', 'property'],
       schema: {
         comp,
         index: layerIndex,
@@ -330,6 +357,7 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Effect (targets layer 1 unless the handler reads an index).
   register(operation('effect.apply', 'effect', 'Add an effect to a layer (display name or match name).', {
+      required: ['effect'],
     schema: { comp, index: layerIndex, effect: effectName },
   }));
   register(operation('effect.list_on_layer', 'effect', 'List the effects on a layer.', {
@@ -340,9 +368,11 @@ export function defaultOperationRegistry(): OperationRegistry {
     readOnly: true,
   }));
   register(operation('effect.set_property', 'effect', 'Set a property of an effect on a layer.', {
+      required: ['effect', 'property', 'value'],
     schema: { comp, index: layerIndex, effect: effectName, property: propertyName, value: {} },
   }));
   register(operation('effect.set_keyframe', 'effect', 'Set a keyframe on a property of an effect on a layer.', {
+      required: ['effect', 'property', 'time', 'value'],
     schema: {
       comp,
       index: layerIndex,
@@ -353,12 +383,14 @@ export function defaultOperationRegistry(): OperationRegistry {
     },
   }));
   register(operation('effect.remove', 'effect', 'Remove an effect from a layer.', {
+      required: ['effect'],
     destructive: true,
     schema: { comp, index: layerIndex, effect: effectName },
   }));
 
   // Preset.
   register(operation('preset.apply_ffx', 'preset', 'Apply an .ffx preset to a layer.', {
+      required: ['path'],
     schema: { comp, index: layerIndex, path: comp },
   }));
   register(operation('preset.list', 'preset', 'List installed presets.', {
@@ -383,6 +415,7 @@ export function defaultOperationRegistry(): OperationRegistry {
     }),
   );
   register(operation('marker.add_bulk', 'marker', 'Add several markers to a comp or layer.', {
+      required: ['markers'],
     schema: { comp, layerIndex: { type: 'number' }, markers: { type: 'array' } },
   }));
   register(operation('marker.list', 'marker', 'List markers on a comp or layer.', {
@@ -477,6 +510,7 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Text.
   register(operation('text.animate', 'text', 'Animate a layer with an expression preset: typewriter (text layer, Source Text), fade_in (Opacity) or slide_up (Position), over duration seconds (default 1) from the layer in point.', {
+      required: ['preset'],
     schema: {
       comp,
       index: layerIndex,
@@ -485,9 +519,11 @@ export function defaultOperationRegistry(): OperationRegistry {
     },
   }));
   register(operation('template.lower_third', 'template', 'Build a lower third (bar, title, optional subtitle) sliding in with eased Position keyframes; returns the created layer indices. duration is the on-screen time in seconds (default 4).', {
+      required: ['title'],
     schema: { comp, title: { type: 'string' }, subtitle: { type: 'string' }, duration: { type: 'number' } },
   }));
   register(operation('text.add', 'text', 'Add a text layer with optional styling.', {
+      required: ['text'],
     schema: {
       comp,
       text: comp,
@@ -521,6 +557,7 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Audio.
   register(operation('audio.set_levels', 'audio', 'Set audio levels on a layer.', {
+      required: ['levels'],
     schema: { comp, layerIndex, levels: { type: 'array' } },
   }));
   register(operation('audio.info', 'audio', 'Report audio state on a layer.', {
@@ -528,6 +565,7 @@ export function defaultOperationRegistry(): OperationRegistry {
     schema: { comp, layerIndex },
   }));
   register(operation('audio.peaks_to_markers', 'audio', 'Write peak times as layer markers.', {
+      required: ['peaks'],
     schema: { comp, layerIndex, peaks: { type: 'array' } },
   }));
 
@@ -560,6 +598,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   // Font and command.
   register(operation('font.list', 'font', 'List installed fonts.', { readOnly: true }));
   register(operation('command.find', 'command', 'Find a menu command ID by name.', {
+      required: ['name'],
     readOnly: true,
     schema: { name: comp },
   }));
@@ -592,6 +631,7 @@ export function defaultOperationRegistry(): OperationRegistry {
       'bulk',
       'Set a property to the same value on many layers, optionally across several comps.',
       {
+      required: ['property', 'value'],
         schema: {
           comp,
           comps: { type: 'array' },
@@ -605,6 +645,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('bulk.apply_effect', 'bulk', 'Add an effect to every selected layer.', {
+      required: ['effect'],
       schema: {
         comp,
         layers: { type: 'array' },
@@ -615,6 +656,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('bulk.set_expression', 'bulk', 'Set an expression on a property of every selected layer.', {
+      required: ['property', 'expression'],
       schema: {
         comp,
         layers: { type: 'array' },
@@ -626,6 +668,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('bulk.apply_preset', 'bulk', 'Apply a .ffx preset to every selected layer.', {
+      required: ['preset'],
       schema: {
         comp,
         layers: { type: 'array' },
@@ -636,6 +679,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('bulk.replace_text', 'bulk', 'Find and replace text on the text layers of one or more comps.', {
+      required: ['find'],
       schema: {
         comp,
         comps: { type: 'array' },
@@ -650,6 +694,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('bulk.stagger', 'bulk', 'Offset layer start times or keyframe times by a fixed or proportional step.', {
+      required: ['offset'],
       schema: {
         comp,
         layers: { type: 'array' },
@@ -663,6 +708,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('bulk.set_label', 'bulk', 'Set the label colour (0-16) on every selected layer.', {
+      required: ['label'],
       schema: {
         comp,
         comps: { type: 'array' },
@@ -682,6 +728,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('bulk.duplicate_comp', 'bulk', 'Duplicate a composition with a new name and optional new size.', {
+      required: ['name'],
       schema: {
         comp,
         name: { type: 'string' },
@@ -693,6 +740,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('bulk.organize_items', 'bulk', 'Move items into project folders, creating missing folders.', {
+      required: ['folders'],
       schema: {
         folders: { type: 'array' },
         dryRun: { type: 'boolean' },
@@ -701,6 +749,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
   register(
     operation('bulk.resize_comp', 'bulk', 'Batch resize a composition into several named formats.', {
+      required: ['formats'],
       schema: {
         comp,
         formats: { type: 'array' },
@@ -712,6 +761,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   // Batch (container; the E13 guard checks its sub-operations).
   register(
     operation('batch.run', 'batch', 'Run many operations as one undo group. If a step fails after a changing step succeeded, the whole batch is rolled back (Edit > Undo) unless atomic is false.', {
+      required: ['ops'],
       schema: { ops: { type: 'array', items: { type: 'object' } }, atomic: { type: 'boolean' } },
     }),
   );
@@ -737,18 +787,24 @@ const typeChecks: Record<string, (value: unknown) => boolean> = {
   null: (value) => value === null,
 };
 
-/** Validates operation arguments against the operation's JSON-Schema-shaped property map. */
+/**
+ * Validates operation arguments against the operation's JSON-Schema-shaped property map,
+ * and checks that every name in `required` is present.
+ */
 export function validateOperationArgs(
   schema: Record<string, unknown>,
   args: unknown,
+  required: readonly string[] = [],
 ): { ok: true; args: Record<string, unknown> } | { ok: false; message: string } {
-  if (args === undefined || args === null) {
-    return { ok: true, args: {} };
-  }
-  if (typeof args !== 'object' || Array.isArray(args)) {
+  if (args !== undefined && args !== null && (typeof args !== 'object' || Array.isArray(args))) {
     return { ok: false, message: 'arguments must be an object' };
   }
-  const values = args as Record<string, unknown>;
+  const values = (args ?? {}) as Record<string, unknown>;
+  for (const name of required) {
+    if (values[name] === undefined) {
+      return { ok: false, message: `missing required argument '${name}'` };
+    }
+  }
   for (const [key, value] of Object.entries(values)) {
     const property = schema[key] as PropertySchema | undefined;
     if (property === undefined) {

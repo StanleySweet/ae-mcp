@@ -145,4 +145,55 @@ describe('server operation registry', () => {
     const schema = defaultOperationRegistry().get('render.frame')!.schema;
     expect(validateOperationArgs(schema, { file: '/tmp/x.png' }).ok).toBe(false);
   });
+
+  it('names every required argument that is a key of its schema', () => {
+    const registry = defaultOperationRegistry();
+    for (const name of registry.names()) {
+      const definition = registry.get(name)!;
+      expect(Array.isArray(definition.required)).toBe(true);
+      for (const arg of definition.required ?? []) {
+        expect(Object.keys(definition.schema), `${name} requires ${arg}`).toContain(arg);
+      }
+    }
+  });
+
+  it('lists the required arguments of layer.rename and keyframe.add', () => {
+    const registry = defaultOperationRegistry();
+    expect(registry.get('layer.rename')!.required).toEqual(['index', 'name']);
+    expect(registry.get('keyframe.add')!.required).toEqual(['property', 'time', 'value']);
+    expect(registry.get('render.frame')!.required).toEqual([]);
+  });
+});
+
+describe('validateOperationArgs required arguments', () => {
+  const schema = { index: { type: 'number' }, name: { type: 'string' } };
+
+  it('rejects a missing required argument, naming it', () => {
+    expect(validateOperationArgs(schema, { index: 1 }, ['index', 'name'])).toEqual({
+      ok: false,
+      message: "missing required argument 'name'",
+    });
+  });
+
+  it('rejects a missing required argument when no args are given at all', () => {
+    expect(validateOperationArgs(schema, undefined, ['index'])).toEqual({
+      ok: false,
+      message: "missing required argument 'index'",
+    });
+  });
+
+  it('accepts the call when every required argument is present', () => {
+    expect(validateOperationArgs(schema, { index: 1, name: 'Hero' }, ['index', 'name'])).toEqual({
+      ok: true,
+      args: { index: 1, name: 'Hero' },
+    });
+  });
+
+  it('accepts falsy required values such as 0 and an empty string', () => {
+    expect(validateOperationArgs(schema, { index: 0, name: '' }, ['index', 'name']).ok).toBe(true);
+  });
+
+  it('keeps accepting calls without args when nothing is required', () => {
+    expect(validateOperationArgs(schema, undefined)).toEqual({ ok: true, args: {} });
+  });
 });

@@ -40,7 +40,11 @@ export function batchRunBlock(
     if (definition === undefined) {
       return makeError('UNKNOWN_TOOL', `unknown operation '${name}' inside batch.run`);
     }
-    const validation = validateOperationArgs(definition.schema, (sub as { args?: unknown }).args);
+    const validation = validateOperationArgs(
+      definition.schema,
+      (sub as { args?: unknown }).args,
+      definition.required,
+    );
     if (!validation.ok) {
       return makeError('INVALID_ARGS', `ops[${index}] (${name}): ${validation.message}`);
     }

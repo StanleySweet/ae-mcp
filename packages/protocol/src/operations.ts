@@ -35,6 +35,8 @@ export const operationDefinitionSchema = z.object({
   readOnly: z.boolean(),
   destructive: z.boolean(),
   schema: z.record(z.string(), z.unknown()),
+  /** Argument names the bridge handler cannot work without (each is a key of `schema`). */
+  required: z.array(z.string()).optional(),
 });
 
 export type OperationCategory = z.infer<typeof operationCategorySchema>;
