@@ -44,6 +44,20 @@ describe('mcp server skeleton', () => {
     await server.close();
   });
 
+  // Tool descriptions are sent on every session, so their total size is pinned.
+  // Update this number in the same commit as any description change.
+  it('keeps each tool description short and the total within the snapshot', async () => {
+    const { client, server } = await connect({ root: await tempRoot() });
+    const tools = await client.listTools();
+    for (const tool of tools.tools) {
+      expect(tool.description?.length ?? 0, tool.name).toBeLessThan(200);
+    }
+    const total = tools.tools.reduce((sum, tool) => sum + (tool.description?.length ?? 0), 0);
+    expect(total).toBe(2213);
+    await client.close();
+    await server.close();
+  });
+
   it('lists check_setup and returns one JSON row per check', async () => {
     const { client, server } = await connect({
       root: await tempRoot(),

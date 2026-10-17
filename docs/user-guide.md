@@ -240,6 +240,17 @@ in After Effects inside one undo group, so Edit > Undo reverts it. The result is
 Empty `code` returns `INVALID_ARGS`. An exception thrown by the code returns
 `SCRIPT_ERROR` with its message.
 
+## Tool details
+
+Short descriptions ship with each tool. The details below were removed from them to save tokens.
+
+- `ae_render_frame`: a frame larger than `maxEdge` (default 1568) is downscaled so its longest edge is `maxEdge`. `compareWith` must be a previous frame inside the render folder and adds `compare: {changedPercent, meanDelta, bbox}`.
+- `ae_render`: exactly one of `comp` or `rqindex`. Never overwrites an existing `output`.
+- `ae_dialogs`: `list` returns each open dialog's title and text. `dismiss` presses Cancel or Escape on the frontmost dialog and never Save or Don't Save. Needs Accessibility permission for the MCP client.
+- `ae_plan` and `ae_apply`: only operations in the `bulk` category can be planned. A plan expires after 10 minutes and is refused if the project changed since it was made.
+- `checkpoint_create`: the name is 1-64 characters of letters, digits, space, `_` or `-`. Reusing a name replaces it.
+- `checkpoint_revert`: runs File > Increment and Save first, so the current state is kept as a version.
+
 ## Test drive
 
 `npm run test:drive` takes the open After Effects for a spin: it starts the server

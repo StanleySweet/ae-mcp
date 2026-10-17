@@ -362,7 +362,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_context',
     {
       description:
-        'Report the live connection context: active transport, AE and bridge versions, capabilities and busy state.',
+        'Report the live connection: active transport, AE and bridge versions, capabilities and busy state.',
       inputSchema: {},
     },
     async () => text(await buildAeContext(root)),
@@ -439,7 +439,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_expression_report',
     {
       description:
-        'List every expression-driven property on the layers of a composition (default: the active comp). Pass layer indices to select a subset, or omit to report every layer.',
+        'List expression-driven properties on the layers of a comp (default: active comp). Pass layer indices to narrow.',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         layers: z.array(z.number()).optional(),
@@ -473,7 +473,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'checkpoint_create',
     {
       description:
-        'Name a restore point: runs File > Increment and Save and records the new versioned project file under name (1-64 characters: letters, digits, space, _ or -). Reusing a name replaces it. Needs a saved project.',
+        'Name a restore point: File > Increment and Save, recorded under name (1-64 chars). Reusing a name replaces it. Needs a saved project.',
       inputSchema: { name: z.string() },
     },
     async (args) => {
@@ -521,7 +521,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'checkpoint_revert',
     {
       description:
-        'Reopen the project file of a named checkpoint (destructive). Runs File > Increment and Save first so the current state is kept as a version. Refused in read-only mode.',
+        'Reopen a named checkpoint (destructive). Saves the current state first. Refused in read-only mode.',
       inputSchema: { name: z.string() },
     },
     async (args) => {
@@ -614,7 +614,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_render_frame',
     {
       description:
-        'Render a single frame of a composition (default: the active comp, frame 0) to PNG and return it as image content plus metadata. Frames too large to return are downscaled so their longest edge is maxEdge (default 1568). compareWith (a previous frame path inside the render folder) adds compare: {changedPercent, meanDelta, bbox} against the new frame.',
+        'Render one frame (default: active comp, frame 0) to PNG, returned as image plus metadata. compareWith adds a diff. See docs/user-guide.md.',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         time: z.number().optional(),
@@ -700,7 +700,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_render',
     {
       description:
-        'Start an aerender render of a composition (comp) or a render-queue item (rqindex) as a background job and return its jobId. Poll progress and the result with job_status.',
+        'Start an aerender render of a comp or render-queue item as a background job; returns jobId. Poll with job_status.',
       inputSchema: {
         comp: z.string().optional(),
         rqindex: z.number().int().positive().optional(),
@@ -785,7 +785,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_dialogs',
     {
       description:
-        "List the modal dialogs open in After Effects (title and text), or dismiss the frontmost one. A dialog blocks every other tool. 'dismiss' presses Cancel (or Escape) and never Save or Don't Save. Needs Accessibility permission for the MCP client.",
+        "List modal dialogs open in After Effects, or dismiss the frontmost (Cancel or Escape, never Save). A dialog blocks other tools. Needs Accessibility.",
       inputSchema: { action: z.enum(['list', 'dismiss']).default('list') },
     },
     async (args) => {
@@ -824,7 +824,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'job_cancel',
     {
       description:
-        'Cancel a running background job, stop its aerender process and remove any partial output. Returns the final job record.',
+        'Cancel a background job, stop its aerender and remove partial output. Returns the final job record.',
       inputSchema: {
         jobId: z.string(),
       },
@@ -848,7 +848,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_catalog',
     {
       description:
-        'List the operations available through ae_do, optionally filtered to one category.',
+        'List operations available through ae_do, optionally filtered by category.',
       inputSchema: {
         category: z.string().optional(),
       },
@@ -866,7 +866,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_do',
     {
       description:
-        'Run a named operation from ae_catalog. Arguments are validated against the operation schema before reaching After Effects. Call get_selection for the active comp and selection.',
+        'Run a named operation from ae_catalog. Args are validated against its schema first. Call get_selection for the active comp and selection.',
       inputSchema: {
         op: z.string(),
         args: z.record(z.string(), z.unknown()).optional(),
@@ -969,7 +969,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_plan',
     {
       description:
-        'Preview a bulk operation (an ae_catalog operation in the "bulk" category) and register it as a plan without changing the project. Returns {planId, changes}. Apply it with ae_apply.',
+        'Preview a bulk operation as a plan without changing the project. Returns {planId, changes}. Apply with ae_apply.',
       inputSchema: {
         op: z.string(),
         args: z.record(z.string(), z.unknown()).optional(),
@@ -1022,7 +1022,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_apply',
     {
       description:
-        'Apply a bulk plan registered by ae_plan, running the planned operation as one undo group. Refuses a plan that has expired or was made before the project changed.',
+        'Apply a plan from ae_plan as one undo group. Refuses expired plans and plans made before the project changed.',
       inputSchema: {
         planId: z.string(),
       },
