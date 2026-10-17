@@ -802,6 +802,16 @@ export const scenario: Step[] = [
       state.vars.presetOutput = jobs[0]!.output;
     },
   }),
+  // Wait for it before the next render: two aerender runs of one project at once
+  // exited 0 without writing the preset file.
+  tool('job_status.export_preset', 'job_status', (s) => ({ jobId: s.vars.presetJobId }), {
+    poll: { intervalMs: 500, until: (result) => jobStatusOf(result) !== 'running' },
+    after: (result, state) => {
+      if (jobStatusOf(result) !== 'succeeded') throw new Error(`preset render ended as ${result.text.slice(0, 300)}`);
+      const file = state.vars.presetOutput as string;
+      if (statSync(file).size === 0) throw new Error(`preset render produced an empty file: ${file}`);
+    },
+  }),
   // #239 with render: one copy named with the drive prefix (removed by the cleanup), one aerender job.
   tool('versions_generate.render', 'versions_generate', (s) => ({
     comp: s.comp,
@@ -822,14 +832,6 @@ export const scenario: Step[] = [
     poll: { intervalMs: 500, until: (result) => jobStatusOf(result) !== 'running' },
     after: (result) => {
       if (jobStatusOf(result) !== 'succeeded') throw new Error(`version render ended as ${result.text.slice(0, 300)}`);
-    },
-  }),
-  tool('job_status.export_preset', 'job_status', (s) => ({ jobId: s.vars.presetJobId }), {
-    poll: { intervalMs: 500, until: (result) => jobStatusOf(result) !== 'running' },
-    after: (result, state) => {
-      if (jobStatusOf(result) !== 'succeeded') throw new Error(`preset render ended as ${result.text.slice(0, 300)}`);
-      const file = state.vars.presetOutput as string;
-      if (statSync(file).size === 0) throw new Error(`preset render produced an empty file: ${file}`);
     },
   }),
   tool('ae_render', 'ae_render', (s) => ({ comp: s.comp, output: outFile(s, 'render.mov'), startFrame: 0, endFrame: 29 }), {

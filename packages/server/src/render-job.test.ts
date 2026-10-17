@@ -195,6 +195,20 @@ describe('ae_render / job_status', () => {
     expect(done.finishedAt).toBeTypeOf('number');
   });
 
+  it('fails a job whose aerender exits 0 without writing its literal output file', async () => {
+    const harness = await start({ aerender: '/fake/aerender', projectFile: '/projects/demo.aep' });
+    const output = join(await mkdtemp(join(tmpdir(), 'ae-mcp-render-')), 'never-written.mov');
+    const started = (await harness.client.callTool({ name: 'ae_render', arguments: { comp: 'Main', output } })) as {
+      content: unknown[];
+    };
+    const { jobId } = textContent(started);
+
+    harness.processes[0]!.close(0);
+
+    const failed = await waitForStatus(harness.client, jobId, 'failed');
+    expect(failed.error).toContain('wrote no file');
+  });
+
   it('resolves the project file from the open project when omitted', async () => {
     const harness = await start({ aerender: '/fake/aerender', projectFile: '/projects/open.aep' });
     await harness.client.callTool({ name: 'ae_render', arguments: { comp: 'Main' } });

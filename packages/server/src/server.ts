@@ -487,6 +487,13 @@ export function createServer(options: ServerOptions = {}): McpServer {
       return;
     }
     if (result.code === 0) {
+      // aerender can exit 0 without writing anything (seen with two renders of one
+      // project at once). Check a literal output path; [name] or #### patterns can't be.
+      const literal = cleanup.output !== undefined && !/[[#]/.test(cleanup.output);
+      if (literal && !(await stat(cleanup.output!).then(() => true, () => false))) {
+        jobStore.fail(jobId, `aerender exited with code 0 but wrote no file at ${cleanup.output}`);
+        return;
+      }
       jobStore.succeed(jobId, { exitCode: 0 });
       return;
     }
