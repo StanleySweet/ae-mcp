@@ -81,8 +81,22 @@ export class MockFolder {
     this.path = path.replace(/^~/, homeOf(ae));
   }
 
+  get name(): string {
+    const i = this.path.lastIndexOf('/');
+    return i >= 0 ? this.path.slice(i + 1) : this.path;
+  }
+
+  // A folder also exists when some file lives under it.
   get exists(): boolean {
-    return this.ae.dirs.has(this.path);
+    if (this.ae.dirs.has(this.path)) {
+      return true;
+    }
+    for (const path of this.ae.fs.keys()) {
+      if (path.startsWith(`${this.path}/`)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   create(): boolean {
@@ -90,12 +104,33 @@ export class MockFolder {
     return true;
   }
 
-  getFiles(mask: string): MockFile[] {
-    const out: MockFile[] = [];
+  // Mirrors Folder.getFiles: direct child files and sub-folders (as MockFolder
+  // objects), both filtered by the optional name mask.
+  getFiles(mask?: string): Array<MockFile | MockFolder> {
+    const pattern = mask ?? '*';
+    const out: Array<MockFile | MockFolder> = [];
+    const subfolders = new Set<string>();
     for (const path of this.ae.fs.keys()) {
       const rest = path.slice(this.path.length + 1);
-      if (path.startsWith(`${this.path}/`) && !rest.includes('/') && globMatch(rest, mask)) {
-        out.push(new MockFile(this.ae, path));
+      if (!path.startsWith(`${this.path}/`)) {
+        continue;
+      }
+      if (!rest.includes('/')) {
+        if (globMatch(rest, pattern)) {
+          out.push(new MockFile(this.ae, path));
+        }
+      } else {
+        subfolders.add(rest.slice(0, rest.indexOf('/')));
+      }
+    }
+    for (const dir of this.ae.dirs) {
+      if (dir.startsWith(`${this.path}/`) && !dir.slice(this.path.length + 1).includes('/')) {
+        subfolders.add(dir.slice(this.path.length + 1));
+      }
+    }
+    for (const name of subfolders) {
+      if (globMatch(name, pattern)) {
+        out.push(new MockFolder(this.ae, `${this.path}/${name}`));
       }
     }
     return out;
@@ -1072,6 +1107,23 @@ export class MockProject {
     return item;
   }
 
+  // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectreduceproject
+  // Removes every item not in `keep` and returns how many were removed.
+  reduceProject(keep: MockItem[]): number {
+    const kept = new Set<MockItem>(keep);
+    const doomed = this.all.filter((item) => !kept.has(item));
+    for (const item of doomed) {
+      this.removeItem(item);
+    }
+    return doomed.length;
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectconsolidatefootage
+  // Mock keeps no duplicate footage, so nothing is consolidated.
+  consolidateFootage(): number {
+    return 0;
+  }
+
   allocateId(): number {
     this.idCounter += 1;
     return 1000 + this.idCounter;
@@ -1242,7 +1294,19 @@ const MockAVLayerInSandbox = {
     value instanceof MockAVLayer && !(value instanceof MockShapeLayer) && !(value instanceof MockTextLayer),
 };
 
+// `new Folder(path)` yields a MockFolder; `instanceof Folder` must match it too.
+function folderConstructorFor(ae: MockAE): unknown {
+  const ctor = function (path: string): MockFolder {
+    return new MockFolder(ae, path);
+  };
+  Object.defineProperty(ctor, Symbol.hasInstance, {
+    value: (value: unknown): boolean => value instanceof MockFolder,
+  });
+  return ctor;
+}
+
 export function runInMockAE(code: string, ae: MockAE): vm.Context {
+  const folderConstructor = folderConstructorFor(ae);
   const sandbox: Record<string, unknown> = {
     app: ae.app,
     $: ae.$,
@@ -1269,9 +1333,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     File: function (path: string): MockFile {
       return new MockFile(ae, path);
     },
-    Folder: function (path: string): MockFolder {
-      return new MockFolder(ae, path);
-    },
+    Folder: folderConstructor,
   };
   const context = vm.createContext(sandbox);
   ae.context = context;

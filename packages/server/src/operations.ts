@@ -1,4 +1,5 @@
 import type { OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
+import { registerHousekeepingOperations } from './operations-housekeeping.js';
 
 import { registerLayerOperations } from './operations-layers.js';
 
@@ -712,6 +713,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   );
 
   registerLayerOperations(register);
+  registerHousekeepingOperations(register);
 
   return registry;
 }

@@ -57,7 +57,7 @@ const DOCUMENTED = new Set([
 // Only add to this list after reading the name back from a running AE.
 const READ_FROM_LIVE_AE = new Set(['ADBE Mask Atom', 'ADBE Mask Shape']);
 
-const BRIDGE_SOURCES = ['job-runner.js', 'serializers.js', 'handlers.js', 'handlers-layers.js'];
+const BRIDGE_SOURCES = ['job-runner.js', 'serializers.js', 'handlers.js', 'handlers-layers.js', 'handlers-housekeeping.js'];
 
 function source(file: string): string {
   return readFileSync(join(import.meta.dirname, file), 'utf8');

@@ -98,6 +98,9 @@ const BRIDGE_OPS = [
   'bulk.duplicate_comp',
   'bulk.organize_items',
   'bulk.resize_comp',
+  'project.import_folder',
+  'project.reduce',
+  'project.consolidate_footage',
   'batch.run',
 ];
 

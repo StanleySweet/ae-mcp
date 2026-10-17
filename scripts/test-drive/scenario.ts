@@ -7,6 +7,8 @@
  * new operation cannot ship without a drive step.
  */
 
+import { dirname } from 'node:path';
+
 export type StepKind = 'tool' | 'op' | 'plan';
 
 export interface ToolResult {
@@ -622,6 +624,17 @@ export const scenario: Step[] = [
   op('footage.replace', 'footage.replace', (s) => ({ item: s.importedName, path: s.frames[1]!.file }), {
     skipIf: (s) => (s.frames.length < 2 ? 'no second rendered frame' : undefined),
   }),
+  // The render folder (~/.ae-mcp/render) holds the frames written above.
+  op(
+    'project.import_folder',
+    'project.import_folder',
+    (s) => ({ path: dirname(s.frames[0]!.file), recursive: false, folder: s.folder }),
+    {
+      skipIf: (s) => (s.frames.length === 0 ? 'no rendered frame to import' : undefined),
+    },
+  ),
+  skipOp('project.reduce', "destructive on the user's whole project"),
+  skipOp('project.consolidate_footage', "destructive on the user's whole project"),
 
   // --- project snapshot round trip -------------------------------------------
   op('project.export_json', 'project.export_json', () => ({}), {
