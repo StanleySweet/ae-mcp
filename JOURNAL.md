@@ -5,6 +5,22 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.6.0`**: epic E15 (results you can keep and check), `animate`, Setup `--check`, and fixes from a friend's Claude Desktop session.
+  - **Motion:** `animate` (#260) sets keys on several properties in one call, eases them with real cubic-bezier curves (smooth, expo_out, expo_in_out, back_out, snappy, linear or custom), and has presets fade_in, slide_in and pop. Live check: an expo_out move is past half its distance at the midpoint. The skill and instructions now favour named motions (#266).
+  - **E15:**
+    - `script_save` writes a replay into AE's Scripts folder (#263).
+    - `expression.set` returns AE's expression error and restores the previous expression (#265). On its first live run it caught the drive's own loopOut on an unkeyed property.
+    - `ae_render_frame atKeys` renders a contact sheet at key times (#267), via a new `keyframe.times` op.
+    - A Claude panel inside AE shows history and has Copy for Claude (#264, Refs). It is a floating palette: docking is undocumented. ADR-0011 accepts the JavaScript Tools Guide for ScriptUI.
+  - **Setup:** `--check` prints the checklist headless (#261). The scripting-pref row no longer asks to quit AE when the pref is already set.
+  - **Fixes:**
+    - one ease for spatial properties (a shape group's Position failed with "L'ensemble de valeurs ne contient pas 1 éléments");
+    - argument errors name the wrong argument, the fix and the accepted list (a session had looped on `name` for `property`);
+    - a render that wrote no file is a failed job;
+    - tests no longer write into the real `~/.ae-mcp`.
+  - **Agents:** cheap-worker agent and literal-parallel-execution skill added.
+  - **Test drive on AE 26.5:** 201 passed, 0 failed, 6 skipped.
+
 - **`chore(release): v1.5.2`**: AE modals no longer freeze the bridge.
   - **Dialog suppression:** every job runs inside `app.beginSuppressDialogs()`, and `app.onError` collects AE's error text into the result (`details.aeErrors`). Increment and Save and the MOGRT export used to open modals; they no longer do.
   - **Self-recovery:** the client tracks jobs that never finished. Before sending a new job it presses Escape blind and waits for the held job's result, instead of stacking "script already running" dialogs. After four presses it returns `DIALOG_OPEN` and sends nothing. AE 26.5 hides its windows from Accessibility, so dialogs cannot be read by script (finding added).
