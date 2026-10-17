@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -9,7 +9,7 @@ const root = join(here, '..');
 
 /**
  * Assemble the `.mcpb`: a runnable server (esbuild inlines every dependency),
- * the manifest and the icon, zipped at the archive root.
+ * the manifest, the icon and the bridge payload (`bridge/payload.jsx`), zipped at the archive root.
  */
 export async function packBundle(outDir: string): Promise<string> {
   const staging = join(outDir, 'staging');
@@ -28,6 +28,14 @@ export async function packBundle(outDir: string): Promise<string> {
 
   cpSync(join(here, 'manifest.json'), join(staging, 'manifest.json'));
   cpSync(join(here, 'icon.png'), join(staging, 'icon.png'));
+
+  // The bridge payload lets an installed Setup app take this release's bridge (#277).
+  // Optional so a tree without a bridge build still packs (the Setup app then keeps its own).
+  const payload = join(root, 'packages/bridge/dist/payload.jsx');
+  if (existsSync(payload)) {
+    mkdirSync(join(staging, 'bridge'), { recursive: true });
+    cpSync(payload, join(staging, 'bridge', 'payload.jsx'));
+  }
 
   const artifact = join(outDir, 'ae-mcp.mcpb');
   rmSync(artifact, { force: true });

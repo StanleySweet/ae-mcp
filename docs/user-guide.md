@@ -38,6 +38,14 @@ installs the rest:
 Click **Install**. Any row that still shows **Fix** explains what to do; click
 **Retry** after you have done it.
 
+Before the admin prompt, Setup checks GitHub for the latest release. If it is newer than
+the payload Setup shipped with, Setup downloads its `ae-mcp.mcpb` and `SHA256SUMS.txt`,
+checks the bundle's SHA-256 against the sums file, and installs the bridge payload from
+that bundle, together with the same bundle for Claude. If you are offline, the check
+takes longer than 10 seconds, an asset is missing or the checksum does not match, Setup
+installs its own bundled payload and says why in one line. Setup never installs an
+unverified download.
+
 ### 3. Restart After Effects
 
 The startup loader only runs when AE starts, so quit and reopen After Effects

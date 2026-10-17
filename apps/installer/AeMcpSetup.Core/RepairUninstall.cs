@@ -1,6 +1,7 @@
 namespace AeMcpSetup.Core;
 
-public sealed record RepairResult(bool Ok, IReadOnlyList<InstallerCheck> Checks);
+/// <summary>Outcome of a repair. <paramref name="Notice"/> is one line for the user, or null (#277).</summary>
+public sealed record RepairResult(bool Ok, IReadOnlyList<InstallerCheck> Checks, string? Notice = null);
 
 public sealed record UninstallResult(
     string Check,

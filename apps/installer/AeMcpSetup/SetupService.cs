@@ -13,12 +13,18 @@ public sealed class SetupService
     private readonly string _root;
     private readonly string _baseDir;
     private readonly string _applicationsDir;
+    private readonly IReleaseHttp _releases;
 
-    public SetupService(string? root = null, string? baseDir = null, string? applicationsDir = null)
+    public SetupService(
+        string? root = null,
+        string? baseDir = null,
+        string? applicationsDir = null,
+        IReleaseHttp? releases = null)
     {
         _root = root ?? Path.Combine(Home(), AeMcpRootName);
         _baseDir = baseDir ?? AppContext.BaseDirectory;
         _applicationsDir = applicationsDir ?? "/Applications";
+        _releases = releases ?? new HttpReleaseClient();
     }
 
     public string PayloadPath => Path.Combine(_baseDir, "payload.jsx");
@@ -44,7 +50,10 @@ public sealed class SetupService
                 [new InstallerCheck("after_effects", "fail", "Install After Effects, then reopen Setup.")]);
         }
 
-        var payload = await ReadResourceAsync(PayloadPath);
+        // Before the admin prompt: pick the newest verified release payload (#277).
+        var bundled = await ReadResourceAsync(PayloadPath);
+        var chosen = await ReleaseUpdate.ChooseAsync(bundled, _releases);
+        var payload = chosen.Payload;
         var loader = await ReadResourceAsync(LoaderPath);
         var panel = await ReadResourceAsync(PanelPath);
 
@@ -53,7 +62,7 @@ public sealed class SetupService
         var core = await RepairUninstall.RepairAsync(_root, resolved, payload, loader, panel: panel.Length == 0 ? null : panel);
         if (!core.Ok)
         {
-            return new RepairResult(false, core.Checks);
+            return new RepairResult(false, core.Checks, chosen.Notice);
         }
 
         // A step can report success yet leave a missing or stale file, so re-read
@@ -69,11 +78,19 @@ public sealed class SetupService
             var failed = new List<InstallerCheck>(core.Checks);
             failed.AddRange(mismatches.Select(result =>
                 new InstallerCheck(result.Id, InstallerCheck.FailStatus, result.Reason)));
-            return new RepairResult(false, failed);
+            return new RepairResult(false, failed, chosen.Notice);
         }
 
         var scriptingPref = await ScriptingPref.EnsureScriptingPrefAsync(resolved.AppName);
-        var extension = await InstallMcpb.HandToClaudeAsync(McpbPath, environment.ClaudeDesktop);
+        // A release payload comes with its own bundle: hand that one to Claude so the bridge and extension match.
+        var mcpbPath = McpbPath;
+        if (chosen.Mcpb is not null)
+        {
+            mcpbPath = Path.Combine(_root, "bridge", "ae-mcp.mcpb");
+            await File.WriteAllBytesAsync(mcpbPath, chosen.Mcpb);
+        }
+
+        var extension = await InstallMcpb.HandToClaudeAsync(mcpbPath, environment.ClaudeDesktop);
         var checks = new List<InstallerCheck>(core.Checks) { scriptingPref, extension };
 
         // The bridge is installed, so prove it works even if the pref or extension
@@ -82,7 +99,7 @@ public sealed class SetupService
         LiveCall call = (tool, args) => bridge.CallAsync(tool, args);
         checks.Add(await LiveTest.RunAsync(_root, resolved.AppName, call));
 
-        return new RepairResult(checks.All(check => check.IsOk), checks);
+        return new RepairResult(checks.All(check => check.IsOk), checks, chosen.Notice);
     }
 
     /// <summary>Reads what is already installed for <paramref name="install"/>, compared with the bundled payload.</summary>

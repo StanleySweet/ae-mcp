@@ -96,7 +96,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 Apply(Checklist.Build(_environment, result.Checks));
             }
 
-            Progress = result.Ok ? "Everything is set up." : "Some steps need attention.";
+            var done = result.Ok ? "Everything is set up." : "Some steps need attention.";
+            Progress = result.Notice is null ? done : $"{result.Notice} {done}";
         }
         finally
         {
