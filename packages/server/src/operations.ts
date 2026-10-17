@@ -839,8 +839,8 @@ export function validateOperationArgs(
   }
   for (const [key, value] of Object.entries(values)) {
     const property = schema[key] as PropertySchema | undefined;
-    // `layer` is accepted wherever an operation takes `index`.
-    if (property === undefined && key === 'layer' && schema.index !== undefined) continue;
+    // `layer` is accepted wherever an operation takes `index` or `layerIndex`.
+    if (property === undefined && key === 'layer' && (schema.index !== undefined || schema.layerIndex !== undefined)) continue;
     if (property === undefined) {
       const closest = closeNames(Object.keys(schema), key);
       return {

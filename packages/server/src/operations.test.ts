@@ -211,6 +211,13 @@ describe('validateOperationArgs required arguments', () => {
     expect(validateOperationArgs(schema, { layer: { id: 7 }, name: 'Hero2' }, ['index', 'name']).ok).toBe(true);
   });
 
+  it('accepts layer by name or {id} in place of layerIndex', () => {
+    const markerSchema = { comp: { type: 'string' }, layerIndex: { type: 'number' } };
+    expect(validateOperationArgs(markerSchema, { comp: 'Main', layer: 'Hero' }).ok).toBe(true);
+    expect(validateOperationArgs(markerSchema, { comp: 'Main', layer: { id: 7 } }).ok).toBe(true);
+    expect(validateOperationArgs(markerSchema, { comp: 'Main', layerIndex: 2 }).ok).toBe(true);
+  });
+
   it('rejects layer on an operation whose schema has no index', () => {
     expect(validateOperationArgs({ name: { type: 'string' } }, { layer: 'Hero' })).toMatchObject({
       ok: false,

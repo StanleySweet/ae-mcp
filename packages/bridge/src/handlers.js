@@ -374,14 +374,26 @@ function aemcpRequireComp(key) {
     return comp;
 }
 
+// The index given by the older index arguments: `index`, then `layerIndex`. Undefined when neither is set.
+function aemcpIndexArg(args) {
+    if (args && args.index) return args.index;
+    if (args && typeof args.layerIndex === 'number') return args.layerIndex;
+    return undefined;
+}
+
+// True when the call names a layer by any of `layer`, `index` or `layerIndex`.
+function aemcpHasLayerArg(args) {
+    return (args && args.layer !== undefined && args.layer !== null) || aemcpIndexArg(args) !== undefined;
+}
+
 // Resolve the layer an operation targets. `layer` is a 1-based index, an exact name,
-// or {id}; `index` is the older index-only argument. With neither, use defaultIndex
-// when given, else abort. Ref: https://ae-scripting.docsforadobe.dev/item/compitem/ (layer(index), numLayers)
+// or {id}; `index` and `layerIndex` are the older index-only arguments. With none of them, use
+// defaultIndex when given, else abort. Ref: https://ae-scripting.docsforadobe.dev/item/compitem/ (layer(index), numLayers)
 // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerid
 function aemcpRequireLayer(comp, args, defaultIndex) {
     var key = args ? args.layer : undefined;
     if (key === undefined || key === null) {
-        var index = args && args.index ? args.index : defaultIndex;
+        var index = aemcpIndexArg(args) || defaultIndex;
         if (!index) {
             aemcpAbortArgs('layer is required: pass layer (index, name or {id}) or index');
         }
@@ -2123,14 +2135,14 @@ AEMCP.register('preset.search', function (args) {
 // Ref: https://ae-scripting.docsforadobe.dev/other/markerValue.html
 AEMCP.register('marker.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
+    var hasLayer = aemcpHasLayerArg(args);
     var time = args && typeof args.time === 'number' ? args.time : 0;
     var comment = args && args.comment ? args.comment : '';
     var duration = args && typeof args.duration === 'number' ? args.duration : 0;
     var comp = aemcpRequireComp(compName);
     var markerProp;
-    if (layerIndex !== null) {
-        var markerLayer = comp.layer(layerIndex);
+    if (hasLayer) {
+        var markerLayer = aemcpRequireLayer(comp, args);
         if (!markerLayer) return { success: false, error: 'Layer not found' };
         markerProp = markerLayer.property(AEMCP_MATCH.MARKER);
     } else {
@@ -2147,12 +2159,12 @@ AEMCP.register('marker.add', function (args) {
 
 AEMCP.register('marker.add_bulk', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
+    var hasLayer = aemcpHasLayerArg(args);
     var markers = args && args.markers ? args.markers : [];
     var comp = aemcpRequireComp(compName);
     var markerProp;
-    if (layerIndex !== null) {
-        var markerLayer = comp.layer(layerIndex);
+    if (hasLayer) {
+        var markerLayer = aemcpRequireLayer(comp, args);
         if (!markerLayer) return { success: false, error: 'Layer not found' };
         markerProp = markerLayer.property(AEMCP_MATCH.MARKER);
     } else {
@@ -2170,11 +2182,11 @@ AEMCP.register('marker.add_bulk', function (args) {
 
 AEMCP.register('marker.list', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
+    var hasLayer = aemcpHasLayerArg(args);
     var comp = aemcpRequireComp(compName);
     var markerProp;
-    if (layerIndex !== null) {
-        var markerLayer = comp.layer(layerIndex);
+    if (hasLayer) {
+        var markerLayer = aemcpRequireLayer(comp, args);
         if (!markerLayer) return { success: false, error: 'Layer not found' };
         markerProp = markerLayer.property(AEMCP_MATCH.MARKER);
     } else {
@@ -2201,9 +2213,8 @@ AEMCP.register('marker.list', function (args) {
 
 AEMCP.register('mask.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var masks = layer.property(AEMCP_MATCH.MASKS);
     if (!masks) return { success: false, error: 'Masks property not found' };
@@ -2221,10 +2232,9 @@ AEMCP.register('mask.add', function (args) {
 
 AEMCP.register('mask.set', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var maskIndex = args && typeof args.maskIndex === 'number' ? args.maskIndex : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var masks = layer.property(AEMCP_MATCH.MASKS);
     var mask = masks ? masks.property(maskIndex) : null;
@@ -2241,10 +2251,9 @@ AEMCP.register('mask.set', function (args) {
 
 AEMCP.register('mask.read', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var maskIndex = args && typeof args.maskIndex === 'number' ? args.maskIndex : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var masks = layer.property(AEMCP_MATCH.MASKS);
     var mask = masks ? masks.property(maskIndex) : null;
@@ -2364,14 +2373,13 @@ function aemcpReadShapeGroup(group, index) {
 
 AEMCP.register('shape.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : null;
+    var hasLayer = aemcpHasLayerArg(args);
     var shapeType = args && args.type ? args.type : 'path'; // 'path', 'rect', 'ellipse'
     aemcpShapeCheckArgs(args, shapeType);
     var comp = aemcpRequireComp(compName);
     var layer;
-    if (layerIndex !== null) {
-        layer = comp.layer(layerIndex);
-        if (!layer) aemcpAbortArgs('layer not found: ' + layerIndex);
+    if (hasLayer) {
+        layer = aemcpRequireLayer(comp, args);
     } else {
         layer = comp.layers.addShape();
         if (args && args.layerName) layer.name = args.layerName;
@@ -2429,12 +2437,10 @@ AEMCP.register('shape.add', function (args) {
 
 AEMCP.register('shape.set', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var groupIndex = args && typeof args.group === 'number' ? args.group : 1;
     aemcpShapeCheckArgs(args, null);
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
-    if (!layer) aemcpAbortArgs('layer not found: ' + layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
     var group = contents ? contents.property(groupIndex) : null;
     if (!group) aemcpAbortArgs('group not found: ' + groupIndex);
@@ -2479,10 +2485,8 @@ AEMCP.register('shape.set', function (args) {
 
 AEMCP.register('shape.read', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
-    if (!layer) aemcpAbortArgs('layer not found: ' + layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     var contents = layer.property(AEMCP_MATCH.SHAPE_ROOT);
     var groups = [];
     var count = contents ? contents.numProperties : 0;
@@ -2555,9 +2559,8 @@ AEMCP.register('text.add', function (args) {
 
 AEMCP.register('text.set', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var textProp = aemcpSourceText(layer);
     if (!textProp) return { success: false, error: 'Source Text not found' };
@@ -2570,9 +2573,8 @@ AEMCP.register('text.set', function (args) {
 
 AEMCP.register('text.read', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var textProp = aemcpSourceText(layer);
     if (!textProp) return { success: false, error: 'Source Text not found' };
@@ -2593,10 +2595,9 @@ AEMCP.register('text.read', function (args) {
 // Ref: https://ae-scripting.docsforadobe.dev/layers/avLayer.html
 AEMCP.register('audio.set_levels', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var levels = args && args.levels ? args.levels : [0, 0];
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var audioLevels = aemcpAudioLevels(layer);
     if (!audioLevels) return { success: false, error: 'Audio Levels property not found' };
@@ -2620,9 +2621,8 @@ function aemcpAudioLevels(layer) {
 
 AEMCP.register('audio.info', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var hasAudio = layer.hasAudio;
     var audioActive = layer.audioActive;
@@ -2636,10 +2636,9 @@ AEMCP.register('audio.info', function (args) {
 
 AEMCP.register('audio.peaks_to_markers', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && typeof args.layerIndex === 'number' ? args.layerIndex : 1;
     var peaks = args && args.peaks ? args.peaks : [];
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var markerProp = layer.property(AEMCP_MATCH.MARKER);
     if (!markerProp) return { success: false, error: 'Marker property not found' };

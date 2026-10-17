@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import vm from 'node:vm';
 import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
-import { MockAE, MockCompItem, runInMockAE } from './mock-ae.js';
+import { MockAE, MockAVLayer, MockCompItem, MockMaskParade, runInMockAE } from './mock-ae.js';
 
 async function payloadContext(): Promise<{ ctx: vm.Context; ae: MockAE }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-address-'));
@@ -110,5 +110,68 @@ describe('layer addressing by index, name or id', () => {
 
     expect(r.issue?.code).toBe('INVALID_ARGS');
     expect(r.issue?.message).toContain('layer');
+  });
+});
+
+// Shape, mask, marker and text ops took only layerIndex; they now take layer too.
+// 'Mask Host' is an AV layer with a Masks group (as in mask-handlers.test.ts), since the
+// mock shape layer has none. Lookups go by name, so the stacking order does not matter.
+async function typedSetup(): Promise<{ ctx: vm.Context; ae: MockAE }> {
+  const { ctx, ae } = await payloadContext();
+  invoke(ctx, 'comp.create', { name: 'Main', width: 800, height: 600, fps: 24, duration: 5 });
+  invoke(ctx, 'text.add', { comp: 'Main', text: 'Hi' });
+  invoke(ctx, 'layer.rename', { comp: 'Main', index: 1, name: 'Title' });
+  invoke(ctx, 'layer.add_shape', { comp: 'Main' });
+  const host = new MockAVLayer('Mask Host', 'Layer');
+  host.add(new MockMaskParade());
+  (ae.project.item(1) as MockCompItem).addLayer(host);
+  return { ctx, ae };
+}
+
+function idOf(ae: MockAE, name: string): number {
+  const comp = ae.project.item(1) as MockCompItem;
+  for (let i = 1; i <= comp.numLayers; i++) {
+    if (comp.layer(i)?.name === name) return comp.layer(i)?.id as number;
+  }
+  throw new Error(`no layer named ${name}`);
+}
+
+describe('layer addressing on shape, mask, marker and text ops', () => {
+  it('shape.read takes a layer name or {id}, and still takes layerIndex', async () => {
+    const { ctx, ae } = await typedSetup();
+    expect(invoke(ctx, 'shape.read', { comp: 'Main', layer: 'Shape' }).ok).toBe(true);
+    expect(invoke(ctx, 'shape.read', { comp: 'Main', layer: { id: idOf(ae, 'Shape') } }).ok).toBe(true);
+    expect(invoke(ctx, 'shape.read', { comp: 'Main', layerIndex: 2 }).ok).toBe(true);
+  });
+
+  it('mask.add and mask.read take a layer name', async () => {
+    const { ctx } = await typedSetup();
+    const vertices = [[0, 0], [10, 0], [10, 10]];
+
+    const added = invoke(ctx, 'mask.add', { comp: 'Main', layer: 'Mask Host', vertices, closed: true });
+    expect(added.ok).toBe(true);
+
+    const read = invoke(ctx, 'mask.read', { comp: 'Main', layer: 'Mask Host', maskIndex: 1 });
+    expect(read.value).toMatchObject({ vertices, closed: true });
+  });
+
+  it('marker.add and marker.list take a layer name and leave comp markers alone', async () => {
+    const { ctx } = await typedSetup();
+
+    expect(invoke(ctx, 'marker.add', { comp: 'Main', layer: 'Shape', time: 1, comment: 'cue' }).ok).toBe(true);
+
+    expect(invoke(ctx, 'marker.list', { comp: 'Main', layer: 'Shape' }).value).toEqual({
+      markers: [{ index: 1, time: 1, comment: 'cue', duration: 0 }],
+    });
+    expect(invoke(ctx, 'marker.list', { comp: 'Main' }).value).toEqual({ markers: [] });
+  });
+
+  it('text.set and text.read take a layer name or {id}', async () => {
+    const { ctx, ae } = await typedSetup();
+
+    expect(invoke(ctx, 'text.set', { comp: 'Main', layer: 'Title', tracking: 50 }).ok).toBe(true);
+
+    const read = invoke(ctx, 'text.read', { comp: 'Main', layer: { id: idOf(ae, 'Title') } });
+    expect(read.value).toMatchObject({ text: 'Hi', tracking: 50 });
   });
 });
