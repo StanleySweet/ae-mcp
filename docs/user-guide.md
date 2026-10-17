@@ -192,8 +192,17 @@ Rules that always apply:
   [Destructive operations](#destructive-operations).
 - It is refused in read-only mode (`AE_MCP_READ_ONLY=1` or `readOnly: true`).
 - While it is off, `ae_catalog` does not list it and `ae_do` returns `FORBIDDEN`.
-- Status: the gate is in place, but this build does not yet register the `eval.run`
-  operation, so enabling it adds nothing to `ae_catalog` until the operation ships.
+
+Call it through `ae_do` with `op: "eval.run"` and `args: { code: "..." }`. The code runs
+in After Effects inside one undo group, so Edit > Undo reverts it. The result is
+`{ result: value }`, where `value` is the value of the code's last expression:
+
+- `null`, booleans, numbers and strings come back as they are.
+- Arrays and objects come back as JSON when they can be serialised.
+- Anything else (`undefined`, functions, cyclic objects) comes back as its string form.
+
+Empty `code` returns `INVALID_ARGS`. An exception thrown by the code returns
+`SCRIPT_ERROR` with its message.
 
 ## Test drive
 

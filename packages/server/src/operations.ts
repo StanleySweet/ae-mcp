@@ -1,4 +1,5 @@
 import type { OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
+import { registerEvalOperations } from './operations-eval.js';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
 
 import { registerLayerOperations } from './operations-layers.js';
@@ -719,6 +720,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerHousekeepingOperations(register);
   registerVerifyOperations(register);
   registerTemplateOperations(register);
+  registerEvalOperations(register);
 
   return registry;
 }

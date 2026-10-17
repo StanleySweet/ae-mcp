@@ -726,6 +726,7 @@ export const scenario: Step[] = [
   ),
   skipOp('project.reduce', "destructive on the user's whole project"),
   skipOp('project.consolidate_footage', "destructive on the user's whole project"),
+  skipOp('eval.run', 'off by default; runs arbitrary code'),
 
   // --- project snapshot round trip -------------------------------------------
   op('project.export_json', 'project.export_json', () => ({}), {
