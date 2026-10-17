@@ -63,6 +63,21 @@ describe('layer.rename', () => {
 });
 
 describe('layer.set_transform', () => {
+  // AE refuses setValue on a keyframed property; the test drive hit this (#223).
+  it('sets a key at the comp time when the property is keyframed', async () => {
+    const { ctx, ae } = await setup();
+    const scale = transformProp(ae, 'ADBE Scale');
+    scale.setValueAtTime(0, [100, 100, 100]);
+    scale.setValueAtTime(2, [120, 120, 100]);
+    (ae.project.item(1) as MockCompItem).time = 1;
+
+    const r = invoke(ctx, 'layer.set_transform', { comp: 'Main', index: 1, scale: [50, 50, 100] });
+
+    expect(r.ok).toBe(true);
+    expect(scale.numKeys).toBe(3);
+    expect(scale.keyValue(scale.nearestKeyIndex(1))).toEqual([50, 50, 100]);
+  });
+
   it('sets only scale and leaves position alone', async () => {
     const { ctx, ae } = await setup();
 
@@ -134,5 +149,19 @@ describe('layer.add_null naming', () => {
     invoke(ctx, 'layer.add_null', { comp: 'Main' });
 
     expect((ae.project.item(1) as MockCompItem).layer(1)?.name).toBe('Null');
+  });
+});
+
+describe('property.set on a keyframed property', () => {
+  it('sets a key at the comp time instead of failing', async () => {
+    const { ctx, ae } = await setup();
+    const opacity = transformProp(ae, 'ADBE Opacity');
+    opacity.setValueAtTime(0, 100);
+    (ae.project.item(1) as MockCompItem).time = 0.5;
+
+    const r = invoke(ctx, 'property.set', { comp: 'Main', index: 1, name: 'ADBE Transform Group/ADBE Opacity', value: 40 });
+
+    expect(r.ok).toBe(true);
+    expect(opacity.keyValue(opacity.nearestKeyIndex(0.5))).toBe(40);
   });
 });

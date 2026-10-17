@@ -176,6 +176,8 @@ export class MockCompItem extends MockItem {
   motionBlur = false;
   workAreaStart = 0;
   workAreaDuration = 0;
+  // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemtime (current time)
+  time = 0;
   private readonly layerList: MockLayer[] = [];
   selectedLayers: MockLayer[] = [];
   private nextId = 100;
@@ -478,7 +480,12 @@ export class MockProperty {
     return best.value;
   }
 
+  // Real AE refuses setValue on a keyframed property: "use setValueAtTime() or
+  // setValueAtKey() instead" (found by the test drive).
   setValue(value: unknown): void {
+    if (this.numKeys > 0) {
+      throw new Error('mock AE: cannot call setValue() on a property with keyframes; use setValueAtTime()');
+    }
     this.value = value;
   }
 }

@@ -70,6 +70,20 @@ function aemcpLayerName(args, fallback) {
     return args && typeof args.name === 'string' && args.name !== '' ? args.name : fallback;
 }
 
+// Set a property's value. AE refuses setValue on a keyframed property ("use
+// setValueAtTime"), so set a key at the comp's current time instead, as editing
+// a keyframed property in the AE UI does (#223).
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetvalue
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetvalueattime
+// Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemtime
+function aemcpSetValue(prop, value, time) {
+    if (prop.numKeys > 0) {
+        prop.setValueAtTime(time, value);
+    } else {
+        prop.setValue(value);
+    }
+}
+
 // Observe handlers: read-only tools that serialize the open project.
 // Registered into the heartbeat capabilities via AEMCP.register.
 AEMCP.register('ae_project_info', function () {
@@ -1045,7 +1059,7 @@ AEMCP.register('layer.center', function (args) {
             var transform = layer.property(AEMCP_MATCH.TRANSFORM);
             if (transform) {
                 var position = transform.property(AEMCP_MATCH.POSITION);
-                if (position) position.setValue([comp.width / 2, comp.height / 2]);
+                if (position) aemcpSetValue(position, [comp.width / 2, comp.height / 2], comp.time);
             }
         }
     }
@@ -1078,7 +1092,7 @@ AEMCP.register('layer.set_transform', function (args) {
     var transform = layer.property(AEMCP_MATCH.TRANSFORM);
     var set = [];
     for (var j = 0; j < given.length; j++) {
-        transform.property(given[j].match).setValue(args[given[j].arg]);
+        aemcpSetValue(transform.property(given[j].match), args[given[j].arg], comp.time);
         set.push(given[j].arg);
     }
     return { index: layer.index, set: set };
@@ -1198,7 +1212,7 @@ AEMCP.register('property.set', function (args) {
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
-    prop.setValue(value);
+    aemcpSetValue(prop, value, comp.time);
     return aemcpWithExpressionWarning(prop, { success: true });
 });
 
@@ -1564,8 +1578,8 @@ AEMCP.register('anchor.move_preserving', function (args) {
     var delta = [pNew[0] - pOld[0], pNew[1] - pOld[1]];
     var posVal = posProp.value;
     var posNew = [posVal[0] + delta[0], posVal[1] + delta[1]];
-    anchorProp.setValue(newAnchor);
-    posProp.setValue(posNew);
+    aemcpSetValue(anchorProp, newAnchor, comp.time);
+    aemcpSetValue(posProp, posNew, comp.time);
     return aemcpWithExpressionWarning(anchorProp, { success: true, anchorPoint: newAnchor });
 });
 
@@ -1920,7 +1934,7 @@ AEMCP.register('effect.set_property', function (args) {
     if (!effect) return { success: false, error: 'Effect not found: ' + effectName };
     var prop = aemcpResolveProperty(effect, propertyName);
     if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
-    prop.setValue(value);
+    aemcpSetValue(prop, value, comp.time);
     return aemcpWithExpressionWarning(prop, { success: true });
 });
 
@@ -2819,7 +2833,7 @@ AEMCP.register('bulk.set_property', function (args) {
             if (JSON.stringify(from) !== JSON.stringify(targetValue)) {
                 changes.push({ comp: comp.name, index: indices[t], from: from, to: targetValue });
                 if (!dryRun) {
-                    prop.setValue(targetValue);
+                    aemcpSetValue(prop, targetValue, comp.time);
                 }
             }
         }
