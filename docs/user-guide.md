@@ -166,6 +166,14 @@ need to read small text or fine detail. Two more shapes cut the number of images
 
 `time` and `times` cannot be combined, and `compareWith` works with one frame only.
 
+## Rendering
+
+`ae_render` starts an aerender job and returns its `jobId`; read the result with `job_status`.
+A client that sends a progress token (MCP `_meta.progressToken`) gets `notifications/progress`
+for each frame aerender reports, with `total` when `startFrame` and `endFrame` are both given.
+Such a call returns when the render ends, because a client accepts progress only while its
+request is open. Without a token nothing extra is sent and the call returns at once.
+
 ## Comparing frames
 
 `ae_render_frame` takes an optional `compareWith`: the path of an earlier frame that

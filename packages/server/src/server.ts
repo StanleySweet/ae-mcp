@@ -60,6 +60,7 @@ import { PlanStore } from './plans.js';
 import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
 import { registerPrompts } from './prompts.js';
 import { cleanupPartialOutput } from './render-output.js';
+import { createRenderProgress } from './render-progress.js';
 import { batchJson, replayJsx, replaySteps } from './replay.js';
 import { registerResources } from './resources.js';
 import { loadSettings, type Settings } from './settings.js';
@@ -991,7 +992,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         project: z.string().optional(),
       },
     },
-    async (args) => {
+    async (args, extra) => {
       const settings = await getSettings();
       if (settings.readOnly) {
         return text(
@@ -1021,6 +1022,19 @@ export function createServer(options: ServerOptions = {}): McpServer {
       }
       const jobId = jobStore.start('render');
       const startedAt = jobStore.get(jobId)?.createdAt ?? Date.now();
+      // Progress notifications only when the client asked for them with a progressToken (#235).
+      const progressToken = extra._meta?.progressToken;
+      const progress =
+        progressToken === undefined
+          ? null
+          : createRenderProgress({
+              token: progressToken,
+              total:
+                args.startFrame !== undefined && args.endFrame !== undefined
+                  ? args.endFrame - args.startFrame + 1
+                  : undefined,
+              send: (params) => extra.sendNotification({ method: 'notifications/progress', params }),
+            });
       let handle: AerenderRunHandle;
       try {
         handle = runAerender({
@@ -1042,19 +1056,28 @@ export function createServer(options: ServerOptions = {}): McpServer {
                 rendered: event.rendered,
                 seconds: event.seconds,
               });
+              progress?.report(event.rendered);
             }
           },
         });
       } catch (error) {
         const message = (error as Error).message;
+        progress?.stop();
         jobStore.fail(jobId, message);
         return text(makeError('SCRIPT_ERROR', `could not start aerender: ${message}`), true);
       }
-      const done = handle.result.then((result) =>
-        finishRenderJob(jobId, result, { output: args.output, startedAt }),
-      );
+      const done = handle.result.then((result) => {
+        progress?.stop();
+        return finishRenderJob(jobId, result, { output: args.output, startedAt });
+      });
       runs.set(jobId, { cancel: handle.cancel, done });
       void done.finally(() => runs.delete(jobId));
+      if (progress !== null) {
+        // A client accepts progress only while the request is open, so with a
+        // progressToken the call returns when the render ends (#235). Read the
+        // result with job_status, as without a token.
+        await done.catch(() => undefined);
+      }
       return text({ jobId });
     },
   );
