@@ -50,6 +50,11 @@ function aemcpAddProperty(group, matchName) {
     return group.addProperty(matchName);
 }
 
+// The name a creation op gives its new layer: args.name when it is a non-empty string, else the default.
+function aemcpLayerName(args, fallback) {
+    return args && typeof args.name === 'string' && args.name !== '' ? args.name : fallback;
+}
+
 // Observe handlers: read-only tools that serialize the open project.
 // Registered into the heartbeat capabilities via AEMCP.register.
 AEMCP.register('ae_project_info', function () {
@@ -917,7 +922,7 @@ AEMCP.register('layer.add_shape', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addShape();
-    layer.name = 'Shape';
+    layer.name = aemcpLayerName(args, 'Shape');
     return { name: layer.name, id: layer.id };
 });
 
@@ -971,7 +976,7 @@ AEMCP.register('layer.add_solid', function (args) {
     var color = args && args.color ? args.color : [1, 1, 1];
     var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addSolid(color, 'Solid', comp.width, comp.height, comp.pixelAspect, comp.duration);
-    layer.name = 'Solid';
+    layer.name = aemcpLayerName(args, 'Solid');
     return { name: layer.name, id: layer.id };
 });
 
@@ -979,7 +984,7 @@ AEMCP.register('layer.add_adjustment', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addSolid([0.5, 0.5, 0.5], 'Adjustment', comp.width, comp.height, comp.pixelAspect, comp.duration);
-    layer.name = 'Adjustment';
+    layer.name = aemcpLayerName(args, 'Adjustment');
     layer.adjustmentLayer = true;
     return { name: layer.name, id: layer.id };
 });
@@ -988,7 +993,7 @@ AEMCP.register('layer.add_null', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addNull(comp.duration);
-    layer.name = 'Null';
+    layer.name = aemcpLayerName(args, 'Null');
     return { name: layer.name, id: layer.id };
 });
 
@@ -1032,21 +1037,36 @@ AEMCP.register('layer.center', function (args) {
     return { success: true };
 });
 
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetvalue
 AEMCP.register('layer.set_transform', function (args) {
-    var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
-    var position = args && args.position ? args.position : [comp.width / 2, comp.height / 2];
-    var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
-    if (!layer) return { success: false, error: 'Layer not found' };
-    if (layer.property) {
-        var transform = layer.property(AEMCP_MATCH.TRANSFORM);
-        if (transform) {
-            var pos = transform.property(AEMCP_MATCH.POSITION);
-            if (pos) pos.setValue(position);
+    var fields = [
+        { arg: 'anchorPoint', match: AEMCP_MATCH.ANCHOR_POINT },
+        { arg: 'position', match: AEMCP_MATCH.POSITION },
+        { arg: 'scale', match: AEMCP_MATCH.SCALE },
+        { arg: 'rotation', match: AEMCP_MATCH.ROTATION },
+        { arg: 'opacity', match: AEMCP_MATCH.OPACITY }
+    ];
+    var given = [];
+    for (var i = 0; i < fields.length; i++) {
+        if (args && args[fields[i].arg] !== undefined && args[fields[i].arg] !== null) {
+            given.push(fields[i]);
         }
     }
-    return { success: true };
+    if (given.length === 0) {
+        aemcpAbortArgs('nothing to set: pass anchorPoint, position, scale, rotation or opacity');
+    }
+    var comp = aemcpRequireComp(args && args.comp);
+    var layer = comp.layer(args.index);
+    if (!layer) {
+        aemcpAbortArgs('layer not found: ' + args.index);
+    }
+    var transform = layer.property(AEMCP_MATCH.TRANSFORM);
+    var set = [];
+    for (var j = 0; j < given.length; j++) {
+        transform.property(given[j].match).setValue(args[given[j].arg]);
+        set.push(given[j].arg);
+    }
+    return { index: layer.index, set: set };
 });
 
 AEMCP.register('layer.set_parent', function (args) {

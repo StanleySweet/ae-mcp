@@ -335,6 +335,8 @@ export const scenario: Step[] = [
     comp: s.comp,
     index: layerIndex(s, 'Shapes'),
     position: [960, 540, 0],
+    scale: [100, 100, 100],
+    opacity: 100,
   })),
   op('layer.set_parent', 'layer.set_parent', (s) => ({
     comp: s.comp,
@@ -654,7 +656,13 @@ export const scenario: Step[] = [
     (s) => ({ comp: s.comp }),
     { before: (s) => selectLayerJsx(s.comp, layerIndex(s, 'Null')) },
   ),
-  op('layer.delete', 'layer.delete', (s) => ({ comp: s.comp, index: layerIndex(s, 'Adjustment') })),
+  op('layer.rename', 'layer.rename', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Adjustment'),
+    name: 'Adjustment Scratch',
+  })),
+  refreshLayers('ae_layer_info.after-layer-rename'),
+  op('layer.delete', 'layer.delete', (s) => ({ comp: s.comp, index: layerIndex(s, /^Adjustment/) })),
   refreshLayers('ae_layer_info.after-delete'),
 
   // --- bulk operations: ae_plan then ae_apply on scratch layers only ---------

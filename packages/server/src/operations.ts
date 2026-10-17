@@ -1,5 +1,7 @@
 import type { OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
 
+import { registerLayerOperations } from './operations-layers.js';
+
 export class OperationRegistry {
   private readonly byName = new Map<string, OperationDefinition>();
 
@@ -156,7 +158,7 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Layer.
   register(operation('layer.add_text', 'layer', 'Add a text layer.', { schema: { comp, text: comp, name: { type: 'string' } } }));
-  register(operation('layer.add_shape', 'layer', 'Add a shape layer.', { schema: { comp } }));
+  register(operation('layer.add_shape', 'layer', 'Add a shape layer.', { schema: { comp, name: { type: 'string' } } }));
   const centerPoint = { type: 'array', description: '[x, y]; defaults to the comp centre.' };
   register(operation('layer.add_camera', 'layer', 'Add a camera layer.', {
     schema: { comp, name: { type: 'string' }, centerPoint },
@@ -173,14 +175,22 @@ export function defaultOperationRegistry(): OperationRegistry {
     schema: { comp, index: layerIndex, enabled: { type: 'boolean' } },
   }));
   register(operation('layer.add_solid', 'layer', 'Add a solid layer.', {
-    schema: { comp, color: { type: 'array' } },
+    schema: { comp, color: { type: 'array' }, name: { type: 'string' } },
   }));
-  register(operation('layer.add_adjustment', 'layer', 'Add an adjustment layer.', { schema: { comp } }));
-  register(operation('layer.add_null', 'layer', 'Add a null layer.', { schema: { comp } }));
+  register(operation('layer.add_adjustment', 'layer', 'Add an adjustment layer.', { schema: { comp, name: { type: 'string' } } }));
+  register(operation('layer.add_null', 'layer', 'Add a null layer.', { schema: { comp, name: { type: 'string' } } }));
   register(operation('layer.add_footage', 'layer', 'Add a footage layer.', { schema: { comp, name: comp } }));
   register(operation('layer.center', 'layer', 'Center selected layers.', { schema: { comp } }));
-  register(operation('layer.set_transform', 'layer', 'Set a layer transform position.', {
-    schema: { comp, index: layerIndex, position: { type: 'array' } },
+  register(operation('layer.set_transform', 'layer', "Set a layer's anchor point, position, scale, rotation and/or opacity.", {
+    schema: {
+      comp,
+      index: layerIndex,
+      anchorPoint: { type: 'array' },
+      position: { type: 'array' },
+      scale: { type: 'array' },
+      rotation: { type: 'number' },
+      opacity: { type: 'number' },
+    },
   }));
   register(operation('layer.set_parent', 'layer', 'Parent a layer to another layer.', {
     schema: { comp, index: layerIndex, parent: layerIndex },
@@ -683,6 +693,8 @@ export function defaultOperationRegistry(): OperationRegistry {
       schema: { ops: { type: 'array', items: { type: 'object' } }, atomic: { type: 'boolean' } },
     }),
   );
+
+  registerLayerOperations(register);
 
   return registry;
 }

@@ -29,6 +29,7 @@ const BRIDGE_OPS = [
   'layer.add_footage',
   'layer.center',
   'layer.set_transform',
+  'layer.rename',
   'layer.set_parent',
   'layer.delete',
   'layer.bounds',
