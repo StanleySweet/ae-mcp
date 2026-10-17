@@ -806,6 +806,10 @@ export const scenario: Step[] = [
   op('footage.replace', 'footage.replace', (s) => ({ item: s.importedName, path: s.frames[1]!.file }), {
     skipIf: (s) => (s.frames.length < 2 ? 'no second rendered frame' : undefined),
   }),
+  // Dry run only: nothing in the project is missing, so nothing is relinked.
+  op('footage.relink', 'footage.relink', (s) => ({ folder: dirname(s.frames[0]!.file), recursive: false }), {
+    skipIf: (s) => (s.frames.length === 0 ? 'no rendered frame to search' : undefined),
+  }),
   // The render folder (~/.ae-mcp/render) holds the frames written above.
   op(
     'project.import_folder',

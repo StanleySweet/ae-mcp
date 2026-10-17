@@ -830,8 +830,16 @@ export class MockSolidSource {
   constructor(public color: number[]) {}
 }
 
+// Ref: https://ae-scripting.docsforadobe.dev/sources/filesource/
+export class MockFileSource {
+  constructor(
+    public file: MockFile | null,
+    public missingFootagePath = '',
+  ) {}
+}
+
 export class MockFootageItem extends MockItem {
-  mainSource: MockSolidSource | null = null;
+  mainSource: MockSolidSource | MockFileSource | null = null;
   pixelAspect = 1;
   frameRate = 0;
   duration = 0;
@@ -851,6 +859,7 @@ export class MockFootageItem extends MockItem {
   // Ref: https://ae-scripting.docsforadobe.dev/item/footageitem/#footageitemreplace
   replace(file: MockFile): void {
     this.file = file;
+    this.mainSource = new MockFileSource(file);
     this.footageMissing = false;
   }
 }
