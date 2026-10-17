@@ -14,6 +14,7 @@ import {
   MockAVLayer,
   MockProperty,
   MockPropertyGroup,
+  PropertyValueType,
   runInMockAE,
 } from './mock-ae.js';
 
@@ -697,6 +698,7 @@ describe('keyframe handlers', () => {
     const comp = ae.project.item(1) as MockCompItem;
     const layer = new MockAVLayer('Layer', 'Layer');
     const scale = new MockProperty('Scale', 'ADBE Scale', [100, 100, 100]);
+    scale.propertyValueType = PropertyValueType.ThreeD;
     layer.add(scale);
     comp.addLayer(layer);
     return scale;

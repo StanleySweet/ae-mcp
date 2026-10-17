@@ -49,6 +49,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - Build: `bridge/src/build.ts` prepends polyfills + `job-runner.js` + `serializers.js` + `handlers.js`.
 
 - (#217) `handlers-templates.js` (in `PAYLOAD_SOURCES` after `handlers.js`): `template.title_card`, `template.transition` (fade/push/zoom; wipe dropped, guide has no Transition Completion name), `template.logo_reveal` (fade_scale/slide/spin), `look.apply` (category `effect`; glow/soft_blur/film_grain/drop_shadow/vignette via `AEMCP_MATCH` `GLOW`/`SOFT_BLUR`/`FILM_GRAIN`/`DROP_SHADOW`/`VIGNETTE`, defaults only). `aemcpSnippetCode` gains `wiggle_smooth`/`loop_cycle`/`loop_offset`/`spring`/`clock`. Ops registered in `packages/server/src/operations-templates.ts` (`registerTemplateOperations`). Tests: `templates.test.ts`; `scenario.ts` has steps for each.
+- (#222) `aemcpEaseArray(prop, speed, influence)` in `handlers.js` (before `keyframe.set_easing`) builds the `KeyframeEase` array for `setTemporalEaseAtKey` by `propertyValueType`: 2 for TwoD, 3 for ThreeD, 1 otherwise (OneD, TwoD_SPATIAL, ThreeD_SPATIAL). Used by `keyframe.set_easing`, `keyframe.ease_preset`, `template.lower_third` and `aemcpTplEasedPair` in `handlers-templates.js`. The mock layer Position is `ThreeD_SPATIAL` and Scale `ThreeD`.
 
 ## Live test drive (`scripts/test-drive/`, #200)
 

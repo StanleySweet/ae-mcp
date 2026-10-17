@@ -1412,6 +1412,21 @@ AEMCP.register('keyframe.remove', function (args) {
     return { success: false, error: 'No keyframe at time ' + time };
 });
 
+// One KeyframeEase per dimension for setTemporalEaseAtKey: 2 for TwoD, 3 for
+// ThreeD, and 1 for every other value type (OneD, TwoD_SPATIAL, ThreeD_SPATIAL).
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysettemporaleaseatkey
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertypropertyvaluetype
+// Ref: https://ae-scripting.docsforadobe.dev/other/keyframeease/
+function aemcpEaseArray(prop, speed, influence) {
+    var n = 1;
+    if (prop.propertyValueType === PropertyValueType.TwoD) n = 2;
+    else if (prop.propertyValueType === PropertyValueType.ThreeD) n = 3;
+    var arr = [];
+    var i;
+    for (i = 0; i < n; i++) arr.push(new KeyframeEase(speed, influence));
+    return arr;
+}
+
 AEMCP.register('keyframe.set_easing', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var layerIndex = args && args.index ? args.index : 1;
@@ -1443,16 +1458,8 @@ AEMCP.register('keyframe.set_easing', function (args) {
         interp = KeyframeInterpolationType.BEZIER;
         prop.setInterpolationTypeAtKey(keyIndex, interp, interp);
         var easeAmt = easing === 'easeIn' ? 0 : (easing === 'easeOut' ? 1 : 0.5);
-        var easeIn = new KeyframeEase(easeAmt, 33.33);
-        var easeOut = new KeyframeEase(1 - easeAmt, 33.33);
-        // setTemporalEaseAtKey needs one KeyframeEase per value dimension.
-        // Use numDimensions (the definitive AE API) with a fallback.
-        var dims = 1;
-        try { dims = prop.numDimensions || 1; } catch (e) { dims = 1; }
-        var easeInArr = [];
-        var easeOutArr = [];
-        var d;
-        for (d = 0; d < dims; d++) { easeInArr.push(easeIn); easeOutArr.push(easeOut); }
+        var easeInArr = aemcpEaseArray(prop, easeAmt, 33.33);
+        var easeOutArr = aemcpEaseArray(prop, 1 - easeAmt, 33.33);
         prop.setTemporalEaseAtKey(keyIndex, easeInArr, easeOutArr);
     }
     return { success: true, easing: easing, keyIndex: keyIndex };
@@ -1480,18 +1487,12 @@ AEMCP.register('keyframe.ease_preset', function (args) {
     if (!selection.length) {
         return { success: false, error: 'No keyframes selected on ' + propertyName + '. Select them in the Timeline or Graph Editor first.' };
     }
-    var dims = 1;
-    try { dims = prop.numDimensions || 1; } catch (e) { dims = 1; }
     var s;
     for (s = 0; s < selection.length; s++) {
         var keyIndex = selection[s];
         prop.setInterpolationTypeAtKey(keyIndex, KeyframeInterpolationType.BEZIER, KeyframeInterpolationType.BEZIER);
-        var easeInArr = [];
-        var easeOutArr = [];
-        for (var d = 0; d < dims; d++) {
-            easeInArr.push(new KeyframeEase(0, curve[0]));
-            easeOutArr.push(new KeyframeEase(0, curve[1]));
-        }
+        var easeInArr = aemcpEaseArray(prop, 0, curve[0]);
+        var easeOutArr = aemcpEaseArray(prop, 0, curve[1]);
         prop.setTemporalEaseAtKey(keyIndex, easeInArr, easeOutArr);
     }
     return aemcpWithExpressionWarning(prop, { success: true, preset: preset, property: propertyName, keyframes: selection.length });
@@ -1756,11 +1757,10 @@ AEMCP.register('template.lower_third', function (args) {
         position = m.layer.property(AEMCP_MATCH.TRANSFORM).property(AEMCP_MATCH.POSITION);
         position.setValueAtTime(m.layer.inPoint, [m.pos[0] - barWidth, m.pos[1]]);
         position.setValueAtTime(m.layer.inPoint + 0.5, m.pos);
-        // Easy-ease both keys, influence only (as keyframe.ease_preset); a
-        // spatial property takes a single KeyframeEase per direction.
-        // Ref: https://ae-scripting.docsforadobe.dev/other/keyframeease/
-        easeIn = [new KeyframeEase(0, 66.67)];
-        easeOut = [new KeyframeEase(0, 66.67)];
+        // Easy-ease both keys, influence only (as keyframe.ease_preset). The
+        // helper sizes the arrays by the property's value type.
+        easeIn = aemcpEaseArray(position, 0, 66.67);
+        easeOut = aemcpEaseArray(position, 0, 66.67);
         position.setTemporalEaseAtKey(1, easeIn, easeOut);
         position.setTemporalEaseAtKey(2, easeIn, easeOut);
         indices.push(m.layer.index);

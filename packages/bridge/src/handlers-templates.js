@@ -29,28 +29,26 @@ function aemcpTplLayerById(comp, id) {
 }
 
 // Two keys on one property, Easy Ease on both (influence 66.67, speed 0).
-// dims is the property's dimension count: 1 for Opacity or Rotation, 2 for
-// Position or Scale (the guide wants one KeyframeEase per dimension).
+// aemcpEaseArray sizes the eases by the property's value type.
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysetvalueattime
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertynearestkeyindex
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertysettemporaleaseatkey
 // Ref: https://ae-scripting.docsforadobe.dev/other/keyframeease/
-function aemcpTplEasedPair(prop, t0, a, t1, b, dims) {
+function aemcpTplEasedPair(prop, t0, a, t1, b) {
     prop.setValueAtTime(t0, a);
     prop.setValueAtTime(t1, b);
-    var ease = [], i;
-    for (i = 0; i < dims; i++) ease.push(new KeyframeEase(0, 66.67));
+    var ease = aemcpEaseArray(prop, 0, 66.67);
     prop.setTemporalEaseAtKey(prop.nearestKeyIndex(t0), ease, ease);
     prop.setTemporalEaseAtKey(prop.nearestKeyIndex(t1), ease, ease);
 }
 
-// Opacity (1 dim) and Scale (2 dims) of a layer as value pairs over [t0, t1].
+// Opacity and Scale of a layer as value pairs over [t0, t1].
 function aemcpTplFade(layer, t0, from, t1, to) {
-    aemcpTplEasedPair(aemcpTplTransform(layer).property(AEMCP_MATCH.OPACITY), t0, from, t1, to, 1);
+    aemcpTplEasedPair(aemcpTplTransform(layer).property(AEMCP_MATCH.OPACITY), t0, from, t1, to);
 }
 
 function aemcpTplScale(layer, t0, from, t1, to) {
-    aemcpTplEasedPair(aemcpTplTransform(layer).property(AEMCP_MATCH.SCALE), t0, from, t1, to, 2);
+    aemcpTplEasedPair(aemcpTplTransform(layer).property(AEMCP_MATCH.SCALE), t0, from, t1, to);
 }
 
 // template.title_card: dark full-comp solid, centred title (fades and scales in
@@ -113,8 +111,8 @@ AEMCP.register('template.transition', function (args) {
     } else if (style === 'push') {
         var fromPos = aemcpTplTransform(from).property(AEMCP_MATCH.POSITION).value;
         var toPos = aemcpTplTransform(to).property(AEMCP_MATCH.POSITION).value;
-        aemcpTplEasedPair(aemcpTplTransform(from).property(AEMCP_MATCH.POSITION), start, fromPos, end, [fromPos[0] - comp.width, fromPos[1]], 2);
-        aemcpTplEasedPair(aemcpTplTransform(to).property(AEMCP_MATCH.POSITION), start, [toPos[0] + comp.width, toPos[1]], end, toPos, 2);
+        aemcpTplEasedPair(aemcpTplTransform(from).property(AEMCP_MATCH.POSITION), start, fromPos, end, [fromPos[0] - comp.width, fromPos[1]]);
+        aemcpTplEasedPair(aemcpTplTransform(to).property(AEMCP_MATCH.POSITION), start, [toPos[0] + comp.width, toPos[1]], end, toPos);
         set = ['from.position', 'to.position'];
     } else {
         var fromScale = aemcpTplTransform(from).property(AEMCP_MATCH.SCALE).value;
@@ -147,10 +145,10 @@ AEMCP.register('template.logo_reveal', function (args) {
     } else if (style === 'slide') {
         var pos = transform.property(AEMCP_MATCH.POSITION);
         var rest = pos.value;
-        aemcpTplEasedPair(pos, t0, [rest[0], rest[1] + 200], t1, rest, 2);
+        aemcpTplEasedPair(pos, t0, [rest[0], rest[1] + 200], t1, rest);
         set = ['position'];
     } else {
-        aemcpTplEasedPair(transform.property(AEMCP_MATCH.ROTATION), t0, -90, t1, 0, 1);
+        aemcpTplEasedPair(transform.property(AEMCP_MATCH.ROTATION), t0, -90, t1, 0);
         aemcpTplFade(layer, t0, 0, t1, 100);
         set = ['rotation', 'opacity'];
     }

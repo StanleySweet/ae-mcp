@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import vm from 'node:vm';
 import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
-import { MockAE, MockCompItem, MockAVLayer, MockProperty, MockPropertyGroup, runInMockAE } from './mock-ae.js';
+import { MockAE, MockCompItem, MockAVLayer, MockProperty, MockPropertyGroup, runInMockAE, PropertyValueType } from './mock-ae.js';
 
 async function payloadContext(): Promise<{ ctx: vm.Context; ae: MockAE }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-e14-'));
@@ -33,6 +33,7 @@ function layerWithScale(ae: MockAE): MockProperty {
   const comp = ae.project.item(1) as MockCompItem;
   const layer = new MockAVLayer('Layer', 'Layer');
   const scale = new MockProperty('Scale', 'ADBE Scale', [100, 100, 100]);
+  scale.propertyValueType = PropertyValueType.ThreeD;
   layer.add(scale);
   comp.addLayer(layer);
   return scale;

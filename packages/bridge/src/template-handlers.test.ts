@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import vm from 'node:vm';
 import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
-import { MockAE, MockCompItem, MockPropertyGroup, MockProperty, runInMockAE } from './mock-ae.js';
+import { MockAE, MockCompItem, MockPropertyGroup, MockProperty, PropertyValueType, runInMockAE } from './mock-ae.js';
 
 async function payloadContext(): Promise<{ ctx: vm.Context; ae: MockAE }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-template-'));
@@ -106,5 +106,43 @@ describe('template.lower_third', () => {
     const { ctx } = await payloadContext();
     expect(invoke(ctx, 'template.lower_third', { comp: 'Main', title: 'Solo' }).value!.layers).toHaveLength(2);
     expect(invoke(ctx, 'template.lower_third', { comp: 'Main' }).issue).toMatchObject({ code: 'INVALID_ARGS' });
+  });
+});
+
+describe('aemcpEaseArray', () => {
+  it('sizes the array by propertyValueType: 2 for TwoD, 3 for ThreeD, 1 otherwise', async () => {
+    const { ctx } = await payloadContext();
+    const sizes: [keyof typeof PropertyValueType, number][] = [
+      ['OneD', 1],
+      ['TwoD', 2],
+      ['TwoD_SPATIAL', 1],
+      ['ThreeD', 3],
+      ['ThreeD_SPATIAL', 1],
+    ];
+    for (const [type, size] of sizes) {
+      const p = new MockProperty('p', 'ADBE Opacity', 0);
+      p.propertyValueType = PropertyValueType[type];
+      (ctx as unknown as Record<string, unknown>).probe = p;
+      expect(vm.runInContext('aemcpEaseArray(probe, 0, 66.67).length', ctx), type).toBe(size);
+    }
+    (ctx as unknown as Record<string, unknown>).probe = new MockProperty('p', 'ADBE Opacity', 0);
+    expect(vm.runInContext('aemcpEaseArray(probe, 0.5, 33.33)[0].influence', ctx)).toBe(33.33);
+  });
+
+  it('lower_third sets one ease per direction on the spatial Position', async () => {
+    const { ctx, ae } = await payloadContext();
+    const out = invoke(ctx, 'template.lower_third', { comp: 'Main', title: 'Jane Doe', duration: 5 });
+    for (const index of out.value!.layers as number[]) {
+      const position = prop(ae, index, 'ADBE Transform Group', 'ADBE Position');
+      expect(position.temporalEases[0]!.inEase).toHaveLength(1);
+      expect(position.temporalEases[0]!.outEase).toHaveLength(1);
+    }
+  });
+
+  it('title_card sizes Opacity eases to 1 and Scale eases to 3', async () => {
+    const { ctx, ae } = await payloadContext();
+    invoke(ctx, 'template.title_card', { comp: 'Main', title: 'Opening' });
+    expect(prop(ae, 2, 'ADBE Transform Group', 'ADBE Opacity').temporalEases[0]!.inEase).toHaveLength(1);
+    expect(prop(ae, 2, 'ADBE Transform Group', 'ADBE Scale').temporalEases[0]!.inEase).toHaveLength(3);
   });
 });

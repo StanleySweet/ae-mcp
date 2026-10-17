@@ -287,7 +287,14 @@ export const MockParagraphJustification = {
 
 // Only the members the bridge reads. Numeric values are placeholders; the code compares by name.
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertypropertyvaluetype
-export const PropertyValueType = { NO_VALUE: 0, OneD: 1 } as const;
+export const PropertyValueType = {
+  NO_VALUE: 0,
+  OneD: 1,
+  TwoD: 2,
+  TwoD_SPATIAL: 3,
+  ThreeD: 4,
+  ThreeD_SPATIAL: 5,
+} as const;
 
 export class MockProperty {
   // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybaseenabled
@@ -814,8 +821,13 @@ export class MockImportOptions {
 function withTransform<T extends MockLayer>(layer: T): T {
   const transform = new MockPropertyGroup('Transform', 'ADBE Transform Group');
   transform.add(new MockProperty('Anchor Point', 'ADBE Anchor Point', [0, 0, 0]));
-  transform.add(new MockProperty('Position', 'ADBE Position', [0, 0, 0]));
-  transform.add(new MockProperty('Scale', 'ADBE Scale', [100, 100, 100]));
+  // A 2D layer's Position is TwoD_SPATIAL and Scale is ThreeD; Rotation and Opacity are OneD.
+  const position = new MockProperty('Position', 'ADBE Position', [0, 0, 0]);
+  position.propertyValueType = PropertyValueType.ThreeD_SPATIAL;
+  transform.add(position);
+  const scale = new MockProperty('Scale', 'ADBE Scale', [100, 100, 100]);
+  scale.propertyValueType = PropertyValueType.ThreeD;
+  transform.add(scale);
   transform.add(new MockProperty('Rotation', 'ADBE Rotate Z', 0));
   transform.add(new MockProperty('Opacity', 'ADBE Opacity', 100));
   layer.add(transform);
