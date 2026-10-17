@@ -226,7 +226,7 @@ Add `naming.fix {match, replace, regex?, flags?}` to make a rename a safe fix.
   `ae_plan` and `ae_apply`. Removing items, relinking footage and fixing expressions are never
   applied; they stay in the report.
 
-## Resources
+## Resources and prompts
 
 Clients that support MCP resources can read the project without a tool call:
 
@@ -237,6 +237,10 @@ Clients that support MCP resources can read the project without a tool call:
 - `ae://docs/findings/<file>`: the design findings, one resource per file. These exist when
   the server runs from a source checkout.
 
+
+Prompts appear as slash commands: `build-lower-third` (`title`, optional `subtitle`, `comp`),
+`audit-project` (`comp`), `seamless-loop` (`index`, `comp`) and `title-sequence` (`title`,
+`comp`). Each prompt carries the matching recipes of the ae skill.
 
 ## Expression-driven properties
 

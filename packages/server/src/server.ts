@@ -58,6 +58,7 @@ import {
 import { selectTransport, type Runner } from './osascript-transport.js';
 import { PlanStore } from './plans.js';
 import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
+import { registerPrompts } from './prompts.js';
 import { cleanupPartialOutput } from './render-output.js';
 import { batchJson, replayJsx, replaySteps } from './replay.js';
 import { registerResources } from './resources.js';
@@ -1546,6 +1547,9 @@ export function createServer(options: ServerOptions = {}): McpServer {
   );
 
   registerResources(server, { call: callRaw, skill: options.skill, docsDir: options.docsDir });
+  if (options.skill !== undefined) {
+    registerPrompts(server, { skill: options.skill });
+  }
 
   return server;
 }
