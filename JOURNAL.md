@@ -5,6 +5,10 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.4.1`**: ships #259.
+  - **Fix:** the bridge never runs Edit > Undo by script (ADR-0009). Any scripted Undo, even in a separate job, raised AE's modal "Undo group mismatch" and froze the bridge. `project.undo` is removed. A failed atomic batch now tells the user to press Cmd+Z once. The installer live test is read-only.
+  - **Test drive on AE 26.5:** 166 passed, 0 failed, 4 skipped, with no modal.
+
 - **`chore(release): v1.4.0`**: ships #224-#226, #257 and #258.
   - **Test drive:** runs in its own saved scratch project, via `project.new`. AE reports an empty untitled project as dirty; that is treated as safe.
   - **Effects and templates:** effect parameters read from live AE (wipe, tuned looks, a bigger library); the probe is in `scripts/probes`.
