@@ -164,9 +164,11 @@ describe('runSetupChecks', () => {
       applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
     });
     expect(statusOf(checks, 'project_saved_version')).toBe('fail');
-    expect(checks.find((c) => c.check === 'project_saved_version')?.fix).toMatch(
-      /never been saved/,
+    const fix = checks.find((c) => c.check === 'project_saved_version')?.fix;
+    expect(fix).toBe(
+      'The project has never been saved. Save it once: ask Claude to run project.save with a path, or use File > Save.',
     );
+    expect(fix).not.toMatch(/destructive/);
   });
 
   it('fails project_saved_version when the saved version no longer exists on disk', async () => {

@@ -97,7 +97,7 @@ async function projectSavedVersionCheck(root: string): Promise<SetupCheck> {
   const file = join(root, 'bridge', 'last-saved-version');
   const neverSaved = fail(
     'project_saved_version',
-    'The project has never been saved; run a destructive operation or File > Save once.',
+    'The project has never been saved. Save it once: ask Claude to run project.save with a path, or use File > Save.',
   );
   let savedPath: string;
   try {
