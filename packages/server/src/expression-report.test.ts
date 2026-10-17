@@ -85,6 +85,30 @@ describe('ae_expression_report', () => {
     expect(report.truncated).toBe(false);
   });
 
+  it('cuts an expression longer than 2000 characters unless full is set (#256)', async () => {
+    const project = new FakeProject();
+    const comp = project.addComp('Main', 1920, 1080);
+    const layer = project.addLayer(comp, 'Layer 1');
+    const long = 'a'.repeat(2500);
+    project.addExpression(layer, 'Transform/Position', 'ADBE Position', long);
+    const { client, close } = await connectServer(project);
+    closes.push(close);
+
+    const rawCall = async (args: Record<string, unknown>): Promise<{ expressions: Record<string, unknown>[] }[]> => {
+      const result = await client.callTool({ name: 'ae_expression_report', arguments: args });
+      const [first] = result.content as Array<{ type: string; text: string }>;
+      return (JSON.parse(first!.text) as { layers: { expressions: Record<string, unknown>[] }[] }).layers;
+    };
+
+    const cut = (await rawCall({ comp: 'Main' }))[0]!.expressions[0]!;
+    expect(cut).toMatchObject({ expressionTruncated: true, expressionLength: 2500 });
+    expect(cut.expression).toBe('a'.repeat(2000));
+
+    const whole = (await rawCall({ comp: 'Main', full: true }))[0]!.expressions[0]!;
+    expect(whole.expression).toBe(long);
+    expect(whole.expressionTruncated).toBeUndefined();
+  });
+
   it('reports a subset by index with missing entries and a null comp when unknown', async () => {
     const project = new FakeProject();
     const comp = project.addComp('Main', 1920, 1080);

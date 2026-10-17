@@ -12,7 +12,7 @@ Recipes for the ae-mcp tools. `ae_catalog` lists every operation with its argume
 1. `check_setup`: every gating check must be green before you change anything.
 2. `ae_context` (active comp, selection, busy state) and `ae_project_info` (project and items).
 3. If `project_saved_version` fails, the project was never saved. Save once with `ae_do {op: "project.save", args: {path: "<absolute path>.aep"}}`. Destructive ops refuse an unsaved project with `UNSAVED_PROJECT`.
-4. Inspect what is there with `ae_layer_info {comp}` and `ae_expression_report {comp}`, then change it. Do not rebuild existing structures. `ae_layer_info` is compact by default: transform values at their After Effects defaults and empty arrays (`effects`, `masks`, `markers`) are left out. Pass `fields: ["name", "transform"]` to pick top-level keys (`index` is always kept), `summary: true` for only `index`, `name` and `type`, or `full: true` for every value.
+4. Inspect what is there with `ae_layer_info {comp}` and `ae_expression_report {comp}`, then change it. Do not rebuild existing structures. `ae_layer_info` is compact by default: transform values at their After Effects defaults and empty arrays (`effects`, `masks`, `markers`) are left out. Pass `fields: ["name", "transform"]` to pick top-level keys (`index` is always kept), `summary: true` for only `index`, `name` and `type`, or `full: true` for every value. Strings over 2000 characters (expressions, text documents) are cut and flagged as `<key>Truncated` with the full `<key>Length`; pass `full: true` to `ae_layer_info`, `ae_expression_report` or `ae_do` (`property.get`, `text.read`) to get them whole.
 
 ## Keyframes or expressions
 

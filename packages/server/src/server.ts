@@ -44,6 +44,7 @@ import { batchJson, replayJsx, replaySteps } from './replay.js';
 import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks, type SetupDeps } from './setup-checks.js';
 import { loadUserSnippets, registerUserSnippets, resolveUserCall, TEMPLATE_OP } from './snippets.js';
+import { truncateLongStrings } from './truncate-values.js';
 
 export const SERVER_NAME = 'ae-mcp';
 export const SERVER_VERSION = '1.4.1';
@@ -506,7 +507,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_layer_info',
     {
       description:
-        'Report layers of a composition (default: the active comp). Pass layer indices to select a subset, or omit to report every layer. The default is compact: transform values at their After Effects defaults and empty arrays are omitted. fields (top-level keys to return; index is always kept), summary (only index, name and type) and full (every value, as before the compact default) shape the report.',
+        'Report layers of a comp (default: active). Compact: defaults and empty arrays omitted. Options: fields, summary, full. Long strings cut unless full.',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         layers: z.array(z.number()).optional(),
@@ -531,7 +532,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
         layers?: unknown[];
         missing?: unknown[];
       };
-      const capped = capArray(value.layers ?? [], maxResultBytes);
+      const shaped = args.full ? value.layers ?? [] : truncateLongStrings(value.layers ?? []);
+      const capped = capArray(shaped, maxResultBytes);
       return text({
         comp: value.comp ?? null,
         layers: capped.items,
@@ -545,10 +547,11 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_expression_report',
     {
       description:
-        'List expression-driven properties on the layers of a comp (default: active comp). Pass layer indices to narrow.',
+        'List expression-driven properties on the layers of a comp (default: active comp). Pass layer indices to narrow. Strings over 2000 chars are cut (<key>Truncated); full: true keeps them.',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         layers: z.array(z.number()).optional(),
+        full: z.boolean().optional(),
       },
     },
     async (args) => {
@@ -556,6 +559,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         comp: args.comp,
         layers: args.layers,
       });
+      // Long strings are cut in the result below (truncateLongStrings), not by the bridge.
       if (!result.ok) {
         return toResult(result);
       }
@@ -564,7 +568,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
         layers?: unknown[];
         missing?: unknown[];
       };
-      const capped = capArray(value.layers ?? [], maxResultBytes);
+      const shaped = args.full ? value.layers ?? [] : truncateLongStrings(value.layers ?? []);
+      const capped = capArray(shaped, maxResultBytes);
       return text({
         comp: value.comp ?? null,
         layers: capped.items,
@@ -1111,10 +1116,11 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_do',
     {
       description:
-        'Run a named operation from ae_catalog. Args are validated against its schema first. Call get_selection for the active comp and selection.',
+        'Run a named operation from ae_catalog. Args are validated against its schema first. Call get_selection for the active comp and selection. Long strings are cut unless full: true.',
       inputSchema: {
         op: z.string(),
         args: z.record(z.string(), z.unknown()).optional(),
+        full: z.boolean().optional(),
       },
     },
     async (incoming) => {
@@ -1122,7 +1128,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (!resolved.ok) {
         return text(makeError('INVALID_ARGS', resolved.message), true);
       }
-      const toolArgs = { op: resolved.op, args: resolved.args };
+      const toolArgs = { op: resolved.op, args: resolved.args, full: incoming.full };
       const definition = operations.get(toolArgs.op);
       if (definition === undefined) {
         const suggestions = closestNames(operations.names(), toolArgs.op);
@@ -1198,7 +1204,10 @@ export function createServer(options: ServerOptions = {}): McpServer {
         }
         return toResult(result);
       }
-      const payload: Record<string, unknown> = { result: result.result };
+      const readsValues = definition.name === 'property.get' || definition.name === 'text.read';
+      const payload: Record<string, unknown> = {
+        result: readsValues && toolArgs.full !== true ? truncateLongStrings(result.result) : result.result,
+      };
       if (incrementInfo) {
         payload.increment = incrementInfo;
       }
