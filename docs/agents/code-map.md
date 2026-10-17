@@ -68,6 +68,10 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 - `listDialogs(runner?)` / `dismissFrontDialog(runner?)` run AppleScript through System Events (process "After Effects", windows with subrole `AXDialog`/`AXSystemDialog`); `Runner` is injectable (default `defaultRunner` from `osascript-transport.ts`). Dismiss clicks `Cancel`/`Annuler`, else Escape (key code 53), never a save button. A missing Accessibility permission (-1719/-25211) yields a message with the fix (`ACCESSIBILITY_FIX`). Results are `{ok, value}` | `{ok:false, message}`.
 - `AEClientOptions.checkDialogs` (default `listDialogs`) is asked in `attempt` on a `TIMEOUT` or stall; a found dialog becomes `DIALOG_OPEN` (protocol `errors.ts`) with `describeDialog` text, a failed check keeps the old result.
 
+## History of Claude's steps (`packages/server/src/history.ts`, #236)
+
+- `HistoryLog(root)` appends one JSON line per `ae_do` call and per `ae_apply` (op, args, time, `undoGroup` = `Claude: <op>`, `mutating`, `ok`) to `<root>/history.jsonl` (root = `~/.ae-mcp`). `server.ts` `recordHistory` writes it right after the bridge call. Tools `history_list` (newest first) and `history_undo` (names the undo groups; never undoes, ADR-0009) are MCP tools in `server.ts` before `ae_catalog`. Tests: `history.test.ts`.
+
 ## Plan store (`packages/server/src/plans.ts`, E9-1)
 
 - `PlanStore<T>` — in-memory store of previewed (dry-run) bulk edits. `create(steps, fingerprint)` → `planId`, `get(planId, fingerprint)` (non-consuming), `peek(planId)` (returns the plan without the fingerprint, so the caller can read its target op), `take(planId, fingerprint)` (consumes on success), `size()`. A plan is valid only while unexpired (`ttlMs`, default 10 min) and the project `fingerprint` still matches; failures are `unknown` | `expired` | `changed`. Expired plans are pruned on `create`/`size` and the oldest are evicted past `maxPlans` (default 20). `now`/`ttlMs`/`maxPlans` are injectable. For E9-2 a `T` is a `BulkStep {op, args}`, and the fingerprint is chosen by each bulk op.

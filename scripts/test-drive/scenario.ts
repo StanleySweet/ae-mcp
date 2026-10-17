@@ -1006,6 +1006,10 @@ export const scenario: Step[] = [
   tool('checkpoint_list', 'checkpoint_list', () => ({})),
   skipTool('checkpoint_revert', 'reopens the project; covered by unit tests'),
 
+  // --- history of Claude's steps (#236) --------------------------------------
+  tool('history_list', 'history_list', () => ({ n: 5 })),
+  skipTool('history_undo', 'never undoes by script (ADR-0009); its answer is covered by unit tests'),
+
   // --- explicit skips --------------------------------------------------------
   skipOp('project.new', 'run.ts starts the drive with it (fresh scratch project); a mid-drive call would wipe the scratch comp'),
   skipOp('command.execute', 'runs arbitrary menu commands; unsafe in an unattended drive'),

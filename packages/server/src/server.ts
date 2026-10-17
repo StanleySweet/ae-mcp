@@ -27,6 +27,7 @@ import { isValidCheckpointName, readCheckpoints, saveCheckpoint } from './checkp
 import { buildAeContext } from './context.js';
 import { dismissFrontDialog, listDialogs } from './dialogs.js';
 import { compareFrames, type FrameComparison } from './frame-compare.js';
+import { DEFAULT_HISTORY_LIST, HistoryLog, MAX_HISTORY_LIST } from './history.js';
 import { ANIMATION_GUIDE_URI } from './instructions.js';
 import { JobStore } from './jobs.js';
 import {
@@ -252,6 +253,22 @@ export function createServer(options: ServerOptions = {}): McpServer {
   const root = options.root ?? queueRoot();
   const maxResultBytes = options.maxResultBytes ?? MAX_RESULT_BYTES;
   const operations = options.operations ?? defaultOperationRegistry();
+  const history = new HistoryLog(root);
+
+  /** Logs one bridge call so history_list and history_undo can name its undo group (#236). */
+  const recordHistory = async (
+    op: string,
+    args: Record<string, unknown>,
+    result: ResultMessage,
+  ): Promise<void> => {
+    await history.append({
+      op,
+      args,
+      mutating: operations.get(op)?.readOnly === false,
+      ok: result.ok,
+      ...(result.ok ? {} : { error: result.error.message }),
+    });
+  };
 
   let clientPromise: Promise<AEClient> | undefined;
   const getClient = (): Promise<AEClient> => {
@@ -901,6 +918,48 @@ export function createServer(options: ServerOptions = {}): McpServer {
   );
 
   server.registerTool(
+    'history_list',
+    {
+      description:
+        "List the last n operations Claude ran in After Effects (newest first): op, args, time, undo group name ('Claude: <op>') and whether it succeeded. Read-only; it does not touch the project.",
+      inputSchema: {
+        n: z.number().int().positive().max(MAX_HISTORY_LIST).optional(),
+      },
+    },
+    async (args) => text({ entries: await history.list(args.n ?? DEFAULT_HISTORY_LIST) }),
+  );
+
+  server.registerTool(
+    'history_undo',
+    {
+      description:
+        "Name the undo steps that would revert Claude's last n mutating operations and tell the user to press Cmd+Z that many times in After Effects. This tool never undoes anything itself: scripted undo freezes After Effects (ADR-0009), and AE's undo stack cannot be read by script, so any edit the user made since those steps is undone first.",
+      inputSchema: {
+        n: z.number().int().positive().max(MAX_HISTORY_LIST).default(1),
+      },
+    },
+    async (args) => {
+      const groups = await history.undoGroups(args.n);
+      if (groups === null) {
+        return text(
+          makeError(
+            'INVALID_ARGS',
+            `the history holds fewer than ${args.n} mutating operations by Claude`,
+          ),
+          true,
+        );
+      }
+      return text({
+        undoGroups: groups,
+        pressCmdZ: groups.length,
+        instruction: `Press Cmd+Z ${groups.length} time(s) in After Effects (Edit > Undo). Claude cannot undo by script.`,
+        warning:
+          "AE's undo stack cannot be inspected by script. Any edit the user made after these steps is undone first, so check the Edit menu's undo label before pressing.",
+      });
+    },
+  );
+
+  server.registerTool(
     'ae_catalog',
     {
       description:
@@ -1028,6 +1087,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
             }
           : validation.args;
       const result = await callRaw(definition.name, bridgeArgs);
+      await recordHistory(definition.name, validation.args, result);
       if (!result.ok) {
         // Never undo by script: any scripted Edit > Undo raises AE's modal "Undo
         // group mismatch" and blocks the bridge (ADR-0009). The batch is one undo
@@ -1171,6 +1231,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       }
 
       const result = await callRaw(step.op, { ...step.args, dryRun: false });
+      await recordHistory(step.op, step.args, result);
       if (!result.ok) {
         return toResult(result);
       }
