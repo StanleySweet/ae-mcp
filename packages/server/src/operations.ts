@@ -326,7 +326,7 @@ export function defaultOperationRegistry(): OperationRegistry {
     schema: { comp, index: layerIndex, property: propertyName },
   }));
   register(
-    operation('expression.snippet', 'expression', 'Apply a named expression snippet to a property: wiggle, loop, delay, overshoot, loop_pingpong, inertia, bounce (amplitude 0.1, frequency 2, decay 5), time_counter (Source Text, rate 1/s), countdown (Source Text, from seconds, default 10), wiggle_smooth (frequency 2, amplitude 10, octaves 1), loop_cycle, loop_offset, spring (damped oscillation after the last key: frequency 2, decay 5), clock (Source Text, elapsed time as MM:SS).', {
+    operation('expression.snippet', 'expression', 'Apply a named expression snippet to a property (20 snippets): wiggle, loop, delay, overshoot, loop_pingpong, inertia, inertia_strong (longer carry), bounce (amplitude 0.1, frequency 2, decay 5), bounce_soft (0.05, 1.5, 4), bounce_hard (0.25, 3, 6), time_counter (Source Text, rate 1/s), countdown (Source Text, from seconds, default 10), count_up (Source Text, counts 0 to `to` (default 100) over `seconds` (default 2)), wiggle_smooth (frequency 2, amplitude 10, octaves 1), loop_cycle, loop_offset, spring (damped oscillation after the last key: frequency 2, decay 5), clock (Source Text, elapsed time as MM:SS), random_flicker (Opacity-style flicker, amount 0-1 default 0.5, rate 12/s), follow (Position follows the layer named `target` after `delay` seconds, default 0.2).', {
       required: ['snippet', 'property'],
       schema: {
         comp,
@@ -334,7 +334,7 @@ export function defaultOperationRegistry(): OperationRegistry {
         property: propertyName,
         snippet: {
           type: 'string',
-          enum: ['wiggle', 'loop', 'delay', 'overshoot', 'loop_pingpong', 'inertia', 'bounce', 'time_counter', 'countdown', 'wiggle_smooth', 'loop_cycle', 'loop_offset', 'spring', 'clock'],
+          enum: ['wiggle', 'loop', 'delay', 'overshoot', 'loop_pingpong', 'inertia', 'inertia_strong', 'bounce', 'bounce_soft', 'bounce_hard', 'time_counter', 'countdown', 'count_up', 'wiggle_smooth', 'loop_cycle', 'loop_offset', 'spring', 'clock', 'random_flicker', 'follow'],
         },
         amplitude: { type: 'number' },
         frequency: { type: 'number' },
@@ -342,6 +342,11 @@ export function defaultOperationRegistry(): OperationRegistry {
         decay: { type: 'number' },
         rate: { type: 'number' },
         from: { type: 'number' },
+        to: { type: 'number' },
+        seconds: { type: 'number' },
+        amount: { type: 'number' },
+        delay: { type: 'number' },
+        target: { type: 'string' },
       },
     }),
   );
@@ -512,18 +517,24 @@ export function defaultOperationRegistry(): OperationRegistry {
   }));
 
   // Text.
-  register(operation('text.animate', 'text', 'Animate a layer with an expression preset: typewriter (text layer, Source Text), fade_in (Opacity) or slide_up (Position), over duration seconds (default 1) from the layer in point.', {
+  register(operation('text.animate', 'text', 'Animate a layer over duration seconds (default 1) from its in point. Expression presets: typewriter (text layer, Source Text), fade_in (Opacity), slide_up (Position), scale_in (Scale 80 to 100), wave (Position bobs and settles). blur_in is keyframed instead: Gaussian Blur blurriness 30 to 0 on the effect it adds.', {
       required: ['preset'],
     schema: {
       comp,
       index: layerIndex,
-      preset: { type: 'string', enum: ['typewriter', 'fade_in', 'slide_up'] },
+      preset: { type: 'string', enum: ['typewriter', 'fade_in', 'slide_up', 'scale_in', 'blur_in', 'wave'] },
       duration: { type: 'number' },
     },
   }));
-  register(operation('template.lower_third', 'template', 'Build a lower third (bar, title, optional subtitle) sliding in with eased Position keyframes; returns the created layer indices. duration is the on-screen time in seconds (default 4).', {
+  register(operation('template.lower_third', 'template', 'Build a lower third (bar, title, optional subtitle) sliding in with eased Position keyframes; returns the created layer indices. style: classic (default), modern (wide blue bar), minimal (thin rule, no bar fill), news (full-width red bar). duration is the on-screen time in seconds (default 4).', {
       required: ['title'],
-    schema: { comp, title: { type: 'string' }, subtitle: { type: 'string' }, duration: { type: 'number' } },
+    schema: {
+      comp,
+      title: { type: 'string' },
+      subtitle: { type: 'string' },
+      duration: { type: 'number' },
+      style: { type: 'string', enum: ['classic', 'modern', 'minimal', 'news'] },
+    },
   }));
   register(operation('text.add', 'text', 'Add a text layer with optional styling.', {
       required: ['text'],

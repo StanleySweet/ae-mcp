@@ -25,7 +25,7 @@ Keyframed move with easing:
 4. Or select the keys in AE and run `keyframe.ease_preset {comp, index, property, preset}`; preset is `ease_in`, `ease_out` or `overshoot`.
 
 Procedural motion:
-1. Built-in: `expression.snippet {comp, index, property, snippet: "wiggle", amplitude, frequency}`. Snippets are wiggle, loop, delay, overshoot, loop_pingpong, inertia, bounce, time_counter, countdown.
+1. Built-in: `expression.snippet {comp, index, property, snippet: "wiggle", amplitude, frequency}`. Snippets are wiggle, loop, delay, overshoot, loop_pingpong, inertia, inertia_strong, bounce, bounce_soft, bounce_hard, time_counter, countdown, count_up, wiggle_smooth, loop_cycle, loop_offset, spring, clock, random_flicker and follow (`target` = layer name, `delay` seconds).
 2. Custom: `expression.set {comp, index, property, value: "<code>"}`, then `expression.check_errors` with the same target.
 3. Remove with `expression.clear`. Read an existing expression or keyframe set before you replace it.
 
@@ -53,15 +53,15 @@ Apply with `expression.set {comp, index, property: "ADBE Transform Group/ADBE Po
 
 ## Lower third, title card and transitions
 
-1. `template.lower_third {comp, title, subtitle, duration}` (duration in seconds, default 4). It returns the created layer indices.
-2. `template.title_card {comp, title, subtitle, duration}` builds a dark full-comp solid with a centred title that fades and scales in. It returns the created layer indices.
+1. `template.lower_third {comp, title, subtitle, duration, style}` (duration in seconds, default 4; `style` `classic` (default), `modern`, `minimal` or `news`). It returns the created layer indices.
+2. `template.title_card {comp, title, subtitle, duration, style}` builds a full-comp solid with a centred title. `style` `default` (dark, scales in), `cinematic` (black, slow fade) or `minimal` (light, quick fade). It returns the created layer indices.
 3. Restyle either with `text.set` or `property.set` on those indices.
 
 ## Polish
 
-1. Transition between two layers: `template.transition {comp, from, to, style, duration}`, with `style` `fade`, `push` or `zoom`. `to` starts at `from`'s out point minus `duration`.
-2. Reveal one layer: `template.logo_reveal {comp, index, style}`, with `style` `fade_scale`, `slide` or `spin`. It animates over 0.8 s from the layer's in point.
-3. Add a look: `look.apply {comp, index, look}`, with `look` `glow`, `soft_blur`, `film_grain`, `drop_shadow` or `vignette`. Parameters stay at their defaults, so tune them in the Effect Controls afterwards.
+1. Transition between two layers: `template.transition {comp, from, to, style, duration}`, with `style` `fade`, `push`, `zoom` or `wipe` (Linear Wipe on `from`). `to` starts at `from`'s out point minus `duration`.
+2. Reveal one layer: `template.logo_reveal {comp, index, style}`, with `style` `fade_scale`, `slide`, `spin` or `glitch` (Turbulent Displace plus a flicker). It animates over 0.8 s from the layer's in point.
+3. Add a look: `look.apply {comp, index, look}`, with `look` `glow`, `soft_blur`, `film_grain`, `drop_shadow`, `vignette`, `neon`, `vhs`, `chromatic`, `duotone` or `cinematic`. The effects get tuned starting values, not checked on live AE, so adjust them in the Effect Controls afterwards.
 4. Import footage in bulk with `project.import_folder {path, recursive, folder}`. Files AE refuses are listed in `skipped`.
 
 ## Check your work

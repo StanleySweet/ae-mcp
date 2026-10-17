@@ -562,9 +562,46 @@ export class MockPropertyGroup {
     if (matchName === 'ADBE Slider Control') {
       effect.add(new MockProperty('Slider', 'ADBE Slider Control-0001', 0));
     }
+    // The parameters the bridge sets on these effects, as the live probe named them.
+    const params = MOCK_EFFECT_PARAMS[matchName];
+    if (params) {
+      for (const [param, value] of params) {
+        effect.add(new MockProperty(param, param, value));
+      }
+    }
     return effect;
   }
 }
+
+// Parameter match names of the first-party effects the bridge sets (#225), read
+// from a live probe of AE 26.5 fr_FR: docs/findings/2026-10-17-effect-param-matchnames.md.
+// Each entry is [match name, default value]. Only the parameters the bridge uses.
+const MOCK_EFFECT_PARAMS: Record<string, [string, unknown][]> = {
+  'ADBE Linear Wipe': [['ADBE Linear Wipe-0001', 0]],
+  'ADBE Glo2': [
+    ['ADBE Glo2-0002', 0],
+    ['ADBE Glo2-0003', 0],
+    ['ADBE Glo2-0004', 0],
+  ],
+  'ADBE Gaussian Blur 2': [['ADBE Gaussian Blur 2-0001', 0]],
+  'ADBE Noise': [['ADBE Noise-0001', 0]],
+  'ADBE Drop Shadow': [
+    ['ADBE Drop Shadow-0002', 0],
+    ['ADBE Drop Shadow-0004', 0],
+    ['ADBE Drop Shadow-0005', 0],
+  ],
+  'CS Vignette': [['CS Vignette-0001', 0]],
+  'ADBE Tint': [
+    ['ADBE Tint-0001', [0, 0, 0]],
+    ['ADBE Tint-0002', [1, 1, 1]],
+    ['ADBE Tint-0003', 0],
+  ],
+  'ADBE Turbulent Displace': [['ADBE Turbulent Displace-0002', 0]],
+  'ADBE Brightness & Contrast 2': [
+    ['ADBE Brightness & Contrast 2-0001', 0],
+    ['ADBE Brightness & Contrast 2-0002', 0],
+  ],
+};
 
 export class MockEffect extends MockPropertyGroup {
   enabled = new MockProperty('enabled', 'ADBE Effect Enabled', true);

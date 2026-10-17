@@ -55,12 +55,38 @@ const DOCUMENTED = new Set([
   'ADBE Noise',
   'ADBE Drop Shadow',
   'CS Vignette',
+  // #225 effects on the guide's first-party page (Transition, Color Correction, Distort).
+  'ADBE Linear Wipe',
+  'ADBE Tint',
+  'ADBE Turbulent Displace',
+  'ADBE Brightness & Contrast 2',
 ]);
 
 // Match names the scripting guide does not list, read from live AE instead
 // (ae_layer_info on fr_FR AE 26.5, docs/findings/2026-10-16-shape-path-matchname-crash.md).
 // Only add to this list after reading the name back from a running AE.
-const READ_FROM_LIVE_AE = new Set(['ADBE Mask Atom', 'ADBE Mask Shape']);
+// #225: effect parameter match names from the probe in
+// docs/findings/2026-10-17-effect-param-matchnames.md.
+const READ_FROM_LIVE_AE = new Set([
+  'ADBE Mask Atom',
+  'ADBE Mask Shape',
+  'ADBE Linear Wipe-0001',
+  'ADBE Glo2-0002',
+  'ADBE Glo2-0003',
+  'ADBE Glo2-0004',
+  'ADBE Gaussian Blur 2-0001',
+  'ADBE Noise-0001',
+  'ADBE Drop Shadow-0002',
+  'ADBE Drop Shadow-0004',
+  'ADBE Drop Shadow-0005',
+  'CS Vignette-0001',
+  'ADBE Tint-0001',
+  'ADBE Tint-0002',
+  'ADBE Tint-0003',
+  'ADBE Turbulent Displace-0002',
+  'ADBE Brightness & Contrast 2-0001',
+  'ADBE Brightness & Contrast 2-0002',
+]);
 
 const BRIDGE_SOURCES = ['job-runner.js', 'serializers.js', 'handlers.js', 'handlers-project.js', 'handlers-eval.js', 'handlers-layers.js', 'handlers-housekeeping.js', 'handlers-verify.js', 'handlers-templates.js'];
 

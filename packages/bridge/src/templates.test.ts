@@ -80,9 +80,9 @@ describe('template.transition', () => {
     expect(prop(ae, 1, TRANSFORM, 'ADBE Scale').numKeys).toBe(2);
   });
 
-  it('refuses wipe, unknown layers and a duration longer than from', async () => {
+  it('refuses an unknown style, unknown layers and a duration longer than from', async () => {
     const { ctx } = await twoLayers();
-    expect(invoke(ctx, 'template.transition', { comp: 'Main', from: 1, to: 2, style: 'wipe' }).issue).toMatchObject({ code: 'INVALID_ARGS' });
+    expect(invoke(ctx, 'template.transition', { comp: 'Main', from: 1, to: 2, style: 'iris' }).issue).toMatchObject({ code: 'INVALID_ARGS' });
     expect(invoke(ctx, 'template.transition', { comp: 'Main', from: 1, to: 9, style: 'fade' }).issue).toMatchObject({ code: 'INVALID_ARGS' });
     expect(invoke(ctx, 'template.transition', { comp: 'Main', from: 1, to: 2, style: 'fade', duration: 5 }).issue).toMatchObject({ code: 'INVALID_ARGS' });
   });
@@ -131,7 +131,7 @@ describe('look.apply', () => {
   ])('adds the %s effect', async (look, matchName) => {
     const { ctx, ae } = await payloadContext();
     invoke(ctx, 'text.add', { comp: 'Main', text: 'Hi' });
-    expect(invoke(ctx, 'look.apply', { comp: 'Main', index: 1, look }).value).toEqual({ index: 1, look, effect: matchName });
+    expect(invoke(ctx, 'look.apply', { comp: 'Main', index: 1, look }).value).toEqual({ index: 1, look, effect: matchName, effects: [matchName] });
     const parade = prop(ae, 1, 'ADBE Effect Parade') as unknown as MockPropertyGroup;
     expect(parade.property(1)).toMatchObject({ matchName });
   });

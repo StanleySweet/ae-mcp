@@ -51,7 +51,29 @@ var AEMCP_MATCH = {
     SOFT_BLUR: 'ADBE Gaussian Blur 2',
     FILM_GRAIN: 'ADBE Noise',
     DROP_SHADOW: 'ADBE Drop Shadow',
-    VIGNETTE: 'CS Vignette'
+    VIGNETTE: 'CS Vignette',
+    // #225 effects for wipe and the looks. Effect names are on the guide's
+    // first-party page; parameter names are read from live AE 26.5 (fr_FR).
+    LINEAR_WIPE: 'ADBE Linear Wipe',
+    LINEAR_WIPE_COMPLETION: 'ADBE Linear Wipe-0001',
+    TINT: 'ADBE Tint',
+    TINT_DARK: 'ADBE Tint-0001',
+    TINT_LIGHT: 'ADBE Tint-0002',
+    TINT_AMOUNT: 'ADBE Tint-0003',
+    TURBULENT_DISPLACE: 'ADBE Turbulent Displace',
+    TURBULENT_AMOUNT: 'ADBE Turbulent Displace-0002',
+    BRIGHTNESS_CONTRAST: 'ADBE Brightness & Contrast 2',
+    BC_BRIGHTNESS: 'ADBE Brightness & Contrast 2-0001',
+    BC_CONTRAST: 'ADBE Brightness & Contrast 2-0002',
+    GLOW_THRESHOLD: 'ADBE Glo2-0002',
+    GLOW_RADIUS: 'ADBE Glo2-0003',
+    GLOW_INTENSITY: 'ADBE Glo2-0004',
+    BLUR_BLURRINESS: 'ADBE Gaussian Blur 2-0001',
+    NOISE_AMOUNT: 'ADBE Noise-0001',
+    SHADOW_OPACITY: 'ADBE Drop Shadow-0002',
+    SHADOW_DISTANCE: 'ADBE Drop Shadow-0004',
+    SHADOW_SOFTNESS: 'ADBE Drop Shadow-0005',
+    VIGNETTE_AMOUNT: 'CS Vignette-0001'
 };
 
 // The only way the bridge adds a property: ask AE (canAddProperty) whether the
@@ -1644,6 +1666,12 @@ function aemcpSnippetNumber(args, key, def, min) {
     return v;
 }
 
+// Bounce after the last key the value passed through: the velocity at that key
+// drives a decaying sine. Shared by bounce, bounce_soft and bounce_hard.
+function aemcpBounceCode(amp, freq, decay) {
+    return 'n = 0; if (numKeys > 0) { n = nearestKey(time).index; if (key(n).time > time) n--; } if (n == 0) { value; } else { t = time - key(n).time; value + velocityAtTime(key(n).time - thisComp.frameDuration / 10) * ' + amp + ' * Math.sin(' + freq + ' * t * 2 * Math.PI) / Math.exp(' + decay + ' * t); }';
+}
+
 // Expression source for a snippet name, or null when unknown. bounce/inertia
 // are original velocityAtTime + Math formulas; time_counter/countdown render
 // the comp time as text (Source Text expressions).
@@ -1656,10 +1684,34 @@ function aemcpSnippetCode(name, args) {
     }
     if (name === 'loop_pingpong') return 'loopOut("pingpong")';
     if (name === 'bounce') {
-        var amp = aemcpSnippetNumber(args, 'amplitude', 0.1, 0);
-        var freq = aemcpSnippetNumber(args, 'frequency', 2, 0.001);
-        var decay = aemcpSnippetNumber(args, 'decay', 5, 0);
-        return 'n = 0; if (numKeys > 0) { n = nearestKey(time).index; if (key(n).time > time) n--; } if (n == 0) { value; } else { t = time - key(n).time; value + velocityAtTime(key(n).time - thisComp.frameDuration / 10) * ' + amp + ' * Math.sin(' + freq + ' * t * 2 * Math.PI) / Math.exp(' + decay + ' * t); }';
+        return aemcpBounceCode(aemcpSnippetNumber(args, 'amplitude', 0.1, 0), aemcpSnippetNumber(args, 'frequency', 2, 0.001), aemcpSnippetNumber(args, 'decay', 5, 0));
+    }
+    if (name === 'bounce_soft') {
+        return aemcpBounceCode(aemcpSnippetNumber(args, 'amplitude', 0.05, 0), aemcpSnippetNumber(args, 'frequency', 1.5, 0.001), aemcpSnippetNumber(args, 'decay', 4, 0));
+    }
+    if (name === 'bounce_hard') {
+        return aemcpBounceCode(aemcpSnippetNumber(args, 'amplitude', 0.25, 0), aemcpSnippetNumber(args, 'frequency', 3, 0.001), aemcpSnippetNumber(args, 'decay', 6, 0));
+    }
+    if (name === 'inertia_strong') {
+        return 'if (numKeys > 1 && time > key(numKeys).time) { t = time - key(numKeys).time; value + velocityAtTime(key(numKeys).time - thisComp.frameDuration / 10) * (1 - Math.exp(-2 * t)) / 2; } else { value; }';
+    }
+    if (name === 'random_flicker') {
+        // Deterministic per-step hash (Math only), so the flicker is repeatable.
+        var fAmount = aemcpSnippetNumber(args, 'amount', 0.5, 0);
+        if (fAmount > 1) aemcpAbortArgs('amount must be <= 1');
+        return 'r = Math.abs(Math.sin(Math.floor(time * ' + aemcpSnippetNumber(args, 'rate', 12, 0.001) + ') * 12.9898) * 43758.5453) % 1; value * (1 - ' + fAmount + ' * r);';
+    }
+    if (name === 'follow') {
+        // Follows another layer's Position, delayed. The target name is written
+        // into a string literal, so quotes and backslashes are refused.
+        var target = args && typeof args.target === 'string' ? args.target : '';
+        if (target === '') aemcpAbortArgs('target is required (layer name to follow)');
+        if (target.indexOf('"') >= 0 || target.indexOf('\\') >= 0) aemcpAbortArgs('target must not contain quotes or backslashes');
+        return 'thisComp.layer("' + target + '").transform.position.valueAtTime(time - ' + aemcpSnippetNumber(args, 'delay', 0.2, 0) + ')';
+    }
+    if (name === 'count_up') {
+        // Source Text: counts from 0 to `to` over `seconds`, then holds.
+        return 'Math.floor(linear(time, 0, ' + aemcpSnippetNumber(args, 'seconds', 2, 0.001) + ', 0, ' + aemcpSnippetNumber(args, 'to', 100, 0) + ')).toString()';
     }
     if (name === 'inertia') {
         return 'if (numKeys > 1 && time > key(numKeys).time) { t = time - key(numKeys).time; value + velocityAtTime(key(numKeys).time - thisComp.frameDuration / 10) * (1 - Math.exp(-4 * t)) / 4; } else { value; }';
@@ -1735,6 +1787,16 @@ AEMCP.register('text.animate', function (args) {
     } else if (preset === 'slide_up') {
         prop = layer.property(AEMCP_MATCH.TRANSFORM).property(AEMCP_MATCH.POSITION);
         code = 'd = ease(time, ' + span + ', 50, 0); value + ' + (layer.threeDLayer ? '[0, d, 0]' : '[0, d]');
+    } else if (preset === 'scale_in') {
+        prop = layer.property(AEMCP_MATCH.TRANSFORM).property(AEMCP_MATCH.SCALE);
+        code = 'ease(time, ' + span + ', ' + (layer.threeDLayer ? '[80, 80, 100], [100, 100, 100]' : '[80, 80], [100, 100]') + ')';
+    } else if (preset === 'wave') {
+        // Bobs up and down (two cycles a second, 12 px) and settles to rest by the end of the span.
+        prop = layer.property(AEMCP_MATCH.TRANSFORM).property(AEMCP_MATCH.POSITION);
+        code = 'd = Math.sin((time - inPoint) * 2 * Math.PI * 2) * 12 * linear(time, ' + span + ', 1, 0); value + ' + (layer.threeDLayer ? '[0, d, 0]' : '[0, d]');
+    } else if (preset === 'blur_in') {
+        // Keyframes on the Gaussian Blur effect, not an expression.
+        return aemcpTplBlurIn(layer, duration);
     } else {
         return { success: false, error: 'Unknown preset: ' + preset };
     }
@@ -1752,17 +1814,20 @@ AEMCP.register('template.lower_third', function (args) {
     var duration = aemcpSnippetNumber(args, 'duration', 4, 1);
     var compKey = args && args.comp ? args.comp : null;
     var comp = aemcpRequireComp(compKey);
-    var x = comp.width * 0.08;
-    var y = comp.height * 0.8;
-    var barWidth = comp.width * 0.4;
+    var style = args && args.style ? args.style : 'classic';
+    if (style !== 'classic' && style !== 'modern' && style !== 'minimal' && style !== 'news') {
+        aemcpAbortArgs('style must be classic, modern, minimal or news');
+    }
+    var spec = aemcpLowerThirdStyle(style, comp);
+    var barWidth = spec.barW;
     var made = [];
-    var r = AEMCP.HANDLERS['shape.add']({ comp: compKey, type: 'rect', size: [barWidth, 110], fillColor: [0.1, 0.1, 0.1], layerName: 'Lower Third Bar' });
-    made.push({ layer: comp.layer(r.layerIndex), pos: [x + barWidth / 2 - 20, y - 25] });
-    r = AEMCP.HANDLERS['text.add']({ comp: compKey, text: title, fontSize: 48, fillColor: [1, 1, 1], justification: 'left' });
-    made.push({ layer: comp.layer(r.layerIndex), pos: [x, y - 10] });
+    var r = AEMCP.HANDLERS['shape.add']({ comp: compKey, type: 'rect', size: [spec.barW, spec.barH], fillColor: spec.color, layerName: 'Lower Third Bar' });
+    made.push({ layer: comp.layer(r.layerIndex), pos: [spec.barX + spec.barW / 2, spec.barY + spec.barH / 2] });
+    r = AEMCP.HANDLERS['text.add']({ comp: compKey, text: title, fontSize: spec.titleSize, fillColor: spec.titleColor, justification: 'left' });
+    made.push({ layer: comp.layer(r.layerIndex), pos: [spec.titleX, spec.titleY] });
     if (args.subtitle) {
-        r = AEMCP.HANDLERS['text.add']({ comp: compKey, text: args.subtitle, fontSize: 28, fillColor: [0.8, 0.8, 0.8], justification: 'left' });
-        made.push({ layer: comp.layer(r.layerIndex), pos: [x, y + 25] });
+        r = AEMCP.HANDLERS['text.add']({ comp: compKey, text: args.subtitle, fontSize: spec.subSize, fillColor: spec.subColor, justification: 'left' });
+        made.push({ layer: comp.layer(r.layerIndex), pos: [spec.titleX, spec.subY] });
     }
     var i, m, position, easeIn, easeOut, indices = [];
     for (i = 0; i < made.length; i++) {

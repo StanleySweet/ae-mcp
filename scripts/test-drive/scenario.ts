@@ -365,6 +365,47 @@ export const scenario: Step[] = [
     index: layerIndex(s, 'Solid'),
     look: 'glow',
   })),
+  op('look.apply.vhs', 'look.apply', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Solid'),
+    look: 'vhs',
+  })),
+  op('template.lower_third.news', 'template.lower_third', (s) => ({
+    comp: s.comp,
+    title: 'News Style',
+    style: 'news',
+    duration: 4,
+  })),
+  op('template.title_card.cinematic', 'template.title_card', (s) => ({
+    comp: s.comp,
+    title: 'Cinematic',
+    style: 'cinematic',
+    duration: 4,
+  })),
+  op('template.transition.wipe', 'template.transition', (s) => ({
+    comp: s.comp,
+    from: layerIndex(s, 'Shapes'),
+    to: layerIndex(s, 'Solid'),
+    style: 'wipe',
+    duration: 0.5,
+  })),
+  op('template.logo_reveal.glitch', 'template.logo_reveal', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Text'),
+    style: 'glitch',
+  })),
+  op('text.animate.blur_in', 'text.animate', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Text'),
+    preset: 'blur_in',
+    duration: 1,
+  })),
+  op('expression.snippet.bounce_soft', 'expression.snippet', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Null'),
+    property: POS,
+    snippet: 'bounce_soft',
+  })),
   refreshLayers('ae_layer_info.after-templates'),
   op('layer.set_3d.shape', 'layer.set_3d', (s) => ({
     comp: s.comp,
