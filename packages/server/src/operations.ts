@@ -3,6 +3,7 @@ import { registerAudioOperations } from './operations-audio.js';
 import { registerEvalOperations } from './operations-eval.js';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
 import { registerLayerOperations } from './operations-layers.js';
+import { registerLocalizeOperations } from './operations-localize.js';
 import { registerMogrtOperations } from './operations-mogrt.js';
 import { registerProjectOperations } from './operations-project.js';
 import { registerRelinkOperations } from './operations-relink.js';
@@ -793,6 +794,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerVersionOperations(register);
   registerMogrtOperations(register);
   registerAudioOperations(register);
+  registerLocalizeOperations(register);
 
   return registry;
 }

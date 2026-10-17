@@ -788,6 +788,17 @@ export class MockAVLayer extends MockLayer {
 }
 
 export class MockTextLayer extends MockAVLayer {
+  // Rough box model for fit-to-box tests (not real glyph metrics): a character is half the
+  // font size wide and a line is 1.2 times the font size tall.
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/avlayer/#avlayersourcerectattime
+  sourceRectAtTime(): { top: number; left: number; width: number; height: number } {
+    const prop = this.property('Source Text') as MockProperty | null;
+    const doc = prop ? (prop.value as { text: string; fontSize: number }) : { text: '', fontSize: 0 };
+    const width = doc.text.length * doc.fontSize * 0.5;
+    const height = doc.fontSize * 1.2;
+    return { top: -height / 2, left: -width / 2, width, height };
+  }
+
   // Real AE resolves `layer.property('Source Text')` into the text properties
   // group; mirror that shortcut so handlers can address it directly.
   property(indexOrName: number | string): MockProperty | MockPropertyGroup | null {
