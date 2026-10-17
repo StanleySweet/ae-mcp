@@ -62,6 +62,31 @@ take a checkpoint before a destructive operation.
 - **not a file** / **no longer exists on disk** — the recorded checkpoint path
   is gone; saving the project again fixes it.
 
+## Accessibility permission
+
+`ae_dialogs` and the automatic dialog recovery use macOS Accessibility. The
+permission belongs to the app that runs the MCP server, not to After Effects:
+
+- **Claude Desktop** (the extension): grant it to Claude.
+- **Claude Code**: grant it to the terminal app you run it in (Terminal, iTerm,
+  VS Code, ...).
+
+Steps:
+
+1. Open System Settings > Privacy & Security > Accessibility.
+2. Click **+**, choose the app, and turn it on.
+3. Restart that app.
+
+What it enables: pressing Escape in After Effects to close a dialog that blocks
+the bridge. Without it, `ae_dialogs` returns this instruction and timeouts keep
+their usual message.
+
+What it cannot do: After Effects 26.5 hides its windows from Accessibility, so
+`ae_dialogs list` cannot read dialog text. Recovery presses Escape without
+seeing the dialog. Escape closes a modal and is harmless when none is open.
+Answer dialogs that need a choice yourself in After Effects (Cancel, never Save).
+See `docs/findings/2026-10-17-ae-windows-hidden-from-accessibility.md`.
+
 ## Tool errors
 
 When a tool call fails, the result carries an `error.code`, a message and a

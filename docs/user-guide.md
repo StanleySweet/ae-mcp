@@ -339,6 +339,11 @@ none. It never presses Save or Don't Save, so it cannot save or lose work.
 This needs the Accessibility permission for the app that runs the MCP server (for
 example Claude Desktop): System Settings > Privacy & Security > Accessibility. Without
 it `ae_dialogs` returns that instruction, and timeouts keep their usual message.
+The permission belongs to the app that runs the MCP server: Claude Desktop for the
+extension, or your terminal for Claude Code. After granting it, restart that app.
+Accessibility lets the bridge press Escape to close a blocking dialog. After Effects
+26.5 hides its windows from Accessibility, so dialog text cannot be read. See
+`docs/troubleshooting.md`, Accessibility permission.
 
 ## Running ExtendScript (eval.run)
 

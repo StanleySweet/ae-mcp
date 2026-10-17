@@ -8,7 +8,7 @@ export interface AeDialog {
 export type DialogResult<T> = { ok: true; value: T } | { ok: false; message: string };
 
 export const ACCESSIBILITY_FIX =
-  'Grant Accessibility to your MCP client in System Settings > Privacy & Security > Accessibility, then retry.';
+  'Grant Accessibility to the app running the MCP server (Claude for the extension, your terminal for Claude Code) in System Settings > Privacy & Security > Accessibility, restart that app, then retry.';
 
 // Fields are tab-separated, one dialog per line: title, then each static text.
 const FIND_DIALOGS = `

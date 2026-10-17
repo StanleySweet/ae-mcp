@@ -71,6 +71,7 @@ Architecture map for agents: where the pieces live and the patterns to follow. R
 
 ## Dialogs (`packages/server/src/dialogs.ts`, #188, ADR 0008)
 
+- (E16-7) `ACCESSIBILITY_FIX` names the app that needs Accessibility (Claude or the terminal) and the restart step; the setup text lives in `docs/troubleshooting.md` (Accessibility permission).
 - `listDialogs(runner?)` / `dismissFrontDialog(runner?)` run AppleScript through System Events (process "After Effects", windows with subrole `AXDialog`/`AXSystemDialog`); `Runner` is injectable (default `defaultRunner` from `osascript-transport.ts`). Dismiss clicks `Cancel`/`Annuler`, else Escape (key code 53), never a save button. A missing Accessibility permission (-1719/-25211) yields a message with the fix (`ACCESSIBILITY_FIX`). Results are `{ok, value}` | `{ok:false, message}`.
 - `AEClientOptions.checkDialogs` (default `listDialogs`) is asked in `attempt` on a `TIMEOUT` or stall; a found dialog becomes `DIALOG_OPEN` (protocol `errors.ts`) with `describeDialog` text, a failed check keeps the old result.
 
