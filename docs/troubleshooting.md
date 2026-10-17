@@ -114,6 +114,32 @@ a few of them in full:
 click **Install**; **Claude extension** additionally needs Claude Desktop open
 so it can show the install prompt.
 
+### Headless check: `--check`
+
+When Setup stays red, run the same checklist without the window. It only reads:
+it writes no files, shows no admin prompt and does not launch After Effects.
+
+```sh
+"/Applications/AE-MCP Setup.app/Contents/MacOS/AE-MCP Setup" --check
+```
+
+Add `--json` for a JSON array of `{id, label, status, fix}` rows. Exit code `0`
+means every checked row is `ok`; `1` means at least one row failed. The
+**Claude extension** and **Test** rows show `skip`: they need Claude Desktop's
+state or a live After Effects, so Setup checks them, not `--check`, and they do
+not affect the exit code. Paste the output into your bug report.
+
+Example output (this machine, bridge not installed yet):
+
+```text
+ok    after_effects     After Effects found
+ok    claude            Claude Desktop found
+fail  bridge_payload    Bridge installed | fix: The bridge payload was not written; run Install again.
+ok    scripting_pref    Scripting permission
+skip  claude_extension  Claude extension | fix: Not checked by --check; open Setup to run it.
+skip  live_test         Test | fix: Not checked by --check; open Setup to run it.
+```
+
 ## Claude does not list the ae-mcp tools
 
 1. Confirm the extension is installed in Claude Desktop (**Settings >

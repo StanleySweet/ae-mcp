@@ -103,6 +103,19 @@ public sealed class SetupService
         return await RepairUninstall.UninstallAsync(_root, resolved);
     }
 
+    /// <summary>Runs the read-only checklist for <c>--check</c>: no writes, no admin prompt, no AE launch.</summary>
+    public async Task<int> RunCheckAsync(bool json, TextWriter output)
+    {
+        var environment = await DetectAsync();
+        return await HeadlessCheck.RunAsync(
+            environment,
+            _root,
+            await ReadResourceAsync(PayloadPath),
+            await ReadResourceAsync(LoaderPath),
+            json,
+            output);
+    }
+
     /// <summary>Writes a diagnostics report to the Desktop and returns its path.</summary>
     public async Task<string> DiagnosticsAsync()
     {
