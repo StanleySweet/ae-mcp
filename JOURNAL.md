@@ -5,6 +5,13 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.3.0`**: ships #212–#223, from Claude Desktop feedback on `bunny.aep` and the competitor gaps.
+  - **Fixes:** the Gradient Ramp NO_VALUE crash, `check_setup`'s circular advice, and keyframed properties failing on set (#223, found by the test drive).
+  - **Features:** richer shapes; `layer.rename` and a full `set_transform`; snapshot/diff/sample; templates and looks; folder import, reduce and consolidate; required fields in the catalog; `eval.run`, which had never been built; correct ease counts.
+  - **Docs:** a Claude skill (`skills/ae`), plus Cursor and Claude Code install notes.
+  - **Process:** seven Haiku agents in worktrees, following a shared rules file (`.tmp/agent-rules.md`). One agent pushed to `main` by mistake; it was a clean fast-forward and CI passed, so it was kept.
+  - **Test drive on AE 26.5:** 135 passed, 0 failed, 16 skipped.
+
 - **`chore(release): v1.2.0`**: ships #187–#211.
   - **Features:** dialogs, batch rollback, file import, camera/light/3D, snippets and templates, keyframe tools, project open/save/import-JSON, AE_NOT_RUNNING, and a smaller `property.list`.
   - **Installer:** checks what it installed and tells a fresh install from an update; the dmg ships an unquarantine helper.

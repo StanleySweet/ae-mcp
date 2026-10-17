@@ -31,7 +31,7 @@ import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks } from './setup-checks.js';
 
 export const SERVER_NAME = 'ae-mcp';
-export const SERVER_VERSION = '1.2.0';
+export const SERVER_VERSION = '1.3.0';
 export const MAX_RESULT_BYTES = 200_000;
 export const MAX_RENDER_BYTES = 20_000_000;
 
