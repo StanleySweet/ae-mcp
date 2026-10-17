@@ -395,6 +395,55 @@ Delay and stagger reuse E9-6.
 
 - **E15-5** feat(server): contact sheet at key times to review motion
 
+### E16 Renders you can trust, and a tidy machine (Sprint 8)
+
+**What we learned.** A Claude Desktop session built a 12-second 3D comp ("LATENT") on v1.6.x and could not get a video out of it. `ae_render` reported success on a truncated file, hung twice at the same byte count, and failed once with "exit code unknown". Output-module templates are localised (French AE rejects the English names) and cannot be listed. `ae_render_frame` returned a stale image. `font.list` returned empty objects. Layers cannot be reordered. The session left renders, broken movies and a queued item behind that it could not remove. Setup can only install the payload it shipped with. This epic makes rendering trustworthy and keeps the user's machine clean.
+
+**Story 16.1.** As a user, a render job that says "succeeded" produced a playable file, and a stuck render fails instead of running forever. AC:
+- a job succeeds only when aerender exits 0 and the output exists and stopped growing;
+- a job whose progress and output size stop changing for a set time is killed and fails with that reason;
+- "exit code unknown" is replaced by the real cause (signal, last aerender line);
+- tests cover each case with a stubbed aerender.
+
+- **E16-1** fix(server): ae_render fails stalled and truncated renders
+
+**Story 16.2.** As Claude, I can list the output-module and render-settings templates in the user's AE language, and an unknown template name is caught before aerender runs. AC:
+- `render.templates` returns both lists, read from the documented `OutputModule.templates` and `RenderQueueItem.templates`;
+- `ae_render` rejects an unknown `omTemplate`/`rsTemplate` and lists the close names.
+
+- **E16-2** feat(bridge): list render templates and check them before rendering
+
+**Story 16.3.** As Claude, `ae_render_frame` always shows the frame as it is now. AC: each call writes a fresh file (never re-reads an earlier render of the same frame) and waits until the write is complete.
+
+- **E16-3** fix(bridge): ae_render_frame never returns a stale frame
+
+**Story 16.4.** As Claude, `font.list` returns real font data. AC: each entry has name, family, style and PostScript name (documented Font object fields); a test covers it.
+
+- **E16-4** fix(bridge): font.list returns font names
+
+**Story 16.5.** As Claude, I can reorder layers. AC: `layer.move {to: top|bottom|before|after, target?}` uses the documented `Layer.moveToBeginning`, `moveToEnd`, `moveBefore`, `moveAfter`; the layer is addressed by index, name or id.
+
+- **E16-5** feat(bridge): layer.move reorders layers
+
+**Story 16.6.** As Claude, I can start a new project when nothing would be lost, and clean up after myself. AC:
+- `project.new` with `force: true` goes through without the destructive guard when the open project is saved and has no unsaved changes;
+- `render.queue_remove` removes render-queue items;
+- `render.clean` deletes files Claude rendered under `~/.ae-mcp/render/` (dry run by default, never outside that folder).
+
+- **E16-6** feat: project.new when nothing is lost, render queue and render folder cleanup
+
+**Story 16.7.** As a user, I know how to grant Accessibility, and what it is for. AC: `check_setup` and `docs/troubleshooting.md` explain which app gets the permission (Claude Desktop, or the terminal for Claude Code) and that it lets the bridge close a blocking dialog with Escape (AE 26.5 hides its windows, so dialogs cannot be read).
+
+- **E16-7** docs: Accessibility setup and what it enables
+
+**Story 16.8.** As a user, Setup installs the newest release, not only the payload it shipped with. AC:
+- Setup checks the latest GitHub release;
+- it downloads `ae-mcp.mcpb` and the payload, verifies them against `SHA256SUMS.txt`, and installs them;
+- offline or a checksum mismatch falls back to the bundled payload with a clear message;
+- tests use a stubbed release source.
+
+- **E16-8** feat(installer): install the newest release payload
+
 ## 7. GitHub pipeline
 
 Before implementing, check the current major versions of each action and the exact mcpb CLI commands in their docs, and pin actions to a commit SHA if desired.
