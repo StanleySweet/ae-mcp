@@ -5,6 +5,8 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.5.1`**: the v1.5.0 content, actually published. The `v1.5.0` tag was pushed with a red check: two `ae_do` tests hard-coded server version 1.4.1, so the release workflow failed and published nothing. The tests now follow `SERVER_VERSION`. The `v1.5.0` tag stays, as pushed tags are never moved.
+
 - **`chore(release): v1.5.0`**: ships 26 of the 30 improvement issues (#227-#256).
   - **Addressing and batches:** layers by name or id on every layer operation (#227); creating ops return `{index, id, name}` (#228); `$n.field` references between `batch.run` steps (#229).
   - **Fewer tokens:** shorter tool descriptions and instructions (full text as MCP resources), short error hints, lean `ae_catalog` plus `ae_describe` and a catalog version, compact `ae_layer_info`, truncated long strings, 768 px default frames (#230, #250-#256).
