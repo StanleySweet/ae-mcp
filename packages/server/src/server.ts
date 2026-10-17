@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
 import { buildAeContext } from './context.js';
 import { dismissFrontDialog, listDialogs } from './dialogs.js';
+import { compareFrames, type FrameComparison } from './frame-compare.js';
 import { JobStore } from './jobs.js';
 import {
   closestNames,
@@ -56,6 +57,8 @@ export interface ServerOptions {
   instructions?: string;
   /** How long `ae_render_frame` waits for AE to finish writing the PNG (test seam). */
   frameWait?: FrameWait;
+  /** Compares two rendered frames for `ae_render_frame` `compareWith` (test seam). */
+  frameCompare?: (beforePng: string, afterPng: string) => Promise<FrameComparison>;
 }
 
 /** One operation invocation stored in a previewed bulk plan. */
@@ -139,6 +142,13 @@ async function waitForCompletePng(file: string, wait: FrameWait): Promise<Buffer
   }
 }
 
+/** True when `file` resolves to `<root>/render` or a path inside it. */
+export function isInsideRenderDir(root: string, file: string): boolean {
+  const renderDir = resolve(root, 'render');
+  const target = resolve(file);
+  return target === renderDir || target.startsWith(renderDir + sep);
+}
+
 export async function readRenderedFrame(
   root: string,
   file: string,
@@ -146,9 +156,8 @@ export async function readRenderedFrame(
   downscale?: FrameDownscale,
   wait: FrameWait = DEFAULT_FRAME_WAIT,
 ): Promise<{ ok: true; data: string } | { ok: false; message: string }> {
-  const renderDir = resolve(root, 'render');
   const target = resolve(file);
-  if (target !== renderDir && !target.startsWith(renderDir + sep)) {
+  if (!isInsideRenderDir(root, file)) {
     return { ok: false, message: `refusing to read outside the render directory: ${file}` };
   }
   let buffer = await waitForCompletePng(target, wait);
@@ -507,11 +516,12 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_render_frame',
     {
       description:
-        'Render a single frame of a composition (default: the active comp, frame 0) to PNG and return it as image content plus metadata. Frames too large to return are downscaled so their longest edge is maxEdge (default 1568).',
+        'Render a single frame of a composition (default: the active comp, frame 0) to PNG and return it as image content plus metadata. Frames too large to return are downscaled so their longest edge is maxEdge (default 1568). compareWith (a previous frame path inside the render folder) adds compare: {changedPercent, meanDelta, bbox} against the new frame.',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         time: z.number().optional(),
         maxEdge: z.number().int().positive().optional(),
+        compareWith: z.string().optional(),
       },
     },
     async (args) => {
@@ -545,6 +555,28 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (!read.ok) {
         return text(makeError('SCRIPT_ERROR', read.message), true);
       }
+      let compare: FrameComparison | undefined;
+      if (args.compareWith !== undefined) {
+        if (!isInsideRenderDir(root, args.compareWith)) {
+          return text(
+            makeError('INVALID_ARGS', `compareWith must be a frame inside the render directory: ${args.compareWith}`),
+            true,
+          );
+        }
+        const before = resolve(args.compareWith);
+        const exists = await stat(before).then((info) => info.isFile(), () => false);
+        if (!exists) {
+          return text(makeError('INVALID_ARGS', `compareWith frame does not exist: ${args.compareWith}`), true);
+        }
+        try {
+          compare = await (options.frameCompare ?? compareFrames)(before, resolve(value.file));
+        } catch (error) {
+          return text(
+            makeError('SCRIPT_ERROR', `frame comparison failed: ${error instanceof Error ? error.message : String(error)}`),
+            true,
+          );
+        }
+      }
       return {
         content: [
           { type: 'image', data: read.data, mimeType: 'image/png' },
@@ -558,6 +590,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
               frame: value.frame ?? null,
               width: value.width ?? null,
               height: value.height ?? null,
+              ...(compare !== undefined ? { compare } : {}),
             }),
           },
         ],

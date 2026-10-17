@@ -14,6 +14,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, describe, it, expect } from 'vitest';
 import { createAEClient } from './ae-client.js';
 import { FileQueueTransport } from './file-queue-transport.js';
+import type { FrameComparison } from './frame-compare.js';
 import { createServer, readRenderedFrame } from './server.js';
 
 // A 1x1 transparent PNG, good enough to prove the bytes round-trip.
@@ -29,6 +30,7 @@ type RenderHandler = (root: string) => HandlerMap;
 
 async function connect(
   render: RenderHandler,
+  serverOptions: { frameCompare?: (before: string, after: string) => Promise<FrameComparison> } = {},
 ): Promise<{ client: Client; close: () => Promise<void> }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-render-frame-'));
   const root = join(home, '.ae-mcp');
@@ -40,7 +42,12 @@ async function connect(
   await consumer.start();
   const aeClient = createAEClient({ transport: new FileQueueTransport(root, 10), root });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const server = createServer({ root, client: aeClient, frameWait: { timeoutMs: 200, intervalMs: 10 } });
+  const server = createServer({
+    root,
+    client: aeClient,
+    frameWait: { timeoutMs: 200, intervalMs: 10 },
+    ...serverOptions,
+  });
   await server.connect(serverTransport);
   const client = new Client({ name: 'test-client', version: '0.0.0' });
   await client.connect(clientTransport);
@@ -98,8 +105,11 @@ describe('ae_render_frame tool', () => {
     }
   });
 
-  async function start(render: RenderHandler = defaultRender): Promise<Client> {
-    const { client, close } = await connect(render);
+  async function start(
+    render: RenderHandler = defaultRender,
+    serverOptions?: Parameters<typeof connect>[1],
+  ): Promise<Client> {
+    const { client, close } = await connect(render, serverOptions);
     closes.push(close);
     return client;
   }
@@ -202,6 +212,80 @@ describe('ae_render_frame tool', () => {
 
     expect(result.isError).toBeFalsy();
     expect(imageContent(result).mimeType).toBe('image/png');
+  });
+
+  describe('compareWith', () => {
+    const comparison: FrameComparison = { changedPercent: 12.5, meanDelta: 3.2, bbox: [4, 5, 6, 7] };
+
+    /** Renders once (so a frame exists in the render folder) and returns the client and root. */
+    async function startWithFrame(
+      serverOptions: Parameters<typeof connect>[1],
+    ): Promise<{ client: Client; root: string; first: string }> {
+      let root = '';
+      const client = await start((r) => {
+        root = r;
+        return defaultRender(r);
+      }, serverOptions);
+      const rendered = (await client.callTool({ name: 'ae_render_frame', arguments: {} })) as {
+        content: unknown[];
+      };
+      return { client, root, first: textContent(rendered).file as string };
+    }
+
+    async function callWith(client: Client, compareWith: string): Promise<{ content: unknown[]; isError?: boolean }> {
+      return (await client.callTool({
+        name: 'ae_render_frame',
+        arguments: { compareWith },
+      })) as { content: unknown[]; isError?: boolean };
+    }
+
+    const mustNotCompare = async (): Promise<FrameComparison> => {
+      throw new Error('must not compare');
+    };
+
+    it('adds the comparison of the new frame against the previous one to the metadata', async () => {
+      const calls: Array<[string, string]> = [];
+      const { client, first } = await startWithFrame({
+        frameCompare: async (before, after) => {
+          calls.push([before, after]);
+          return comparison;
+        },
+      });
+      const result = await callWith(client, first);
+
+      expect(result.isError).toBeFalsy();
+      expect(textContent(result).compare).toEqual(comparison);
+      expect(calls).toEqual([[first, first]]);
+      expect(imageContent(result).mimeType).toBe('image/png');
+    });
+
+    it('omits compare when compareWith is not given', async () => {
+      const client = await start(defaultRender, { frameCompare: mustNotCompare });
+      const result = (await client.callTool({ name: 'ae_render_frame', arguments: {} })) as {
+        content: unknown[];
+      };
+      expect(textContent(result)).not.toHaveProperty('compare');
+    });
+
+    it('refuses a compareWith path outside the render directory', async () => {
+      const { client, root } = await startWithFrame({ frameCompare: mustNotCompare });
+      const result = await callWith(client, join(root, 'secret.png'));
+      expect(result.isError).toBe(true);
+      const [first] = result.content as Array<{ type: string; text: string }>;
+      const error = errorSchema.parse(JSON.parse(first!.text));
+      expect(error.code).toBe('INVALID_ARGS');
+      expect(error.message).toContain('render directory');
+    });
+
+    it('refuses a compareWith frame that does not exist', async () => {
+      const { client, root } = await startWithFrame({ frameCompare: mustNotCompare });
+      const result = await callWith(client, join(root, 'render', 'missing.png'));
+      expect(result.isError).toBe(true);
+      const [first] = result.content as Array<{ type: string; text: string }>;
+      const error = errorSchema.parse(JSON.parse(first!.text));
+      expect(error.code).toBe('INVALID_ARGS');
+      expect(error.message).toContain('does not exist');
+    });
   });
 });
 
