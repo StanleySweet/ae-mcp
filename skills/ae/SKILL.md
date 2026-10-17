@@ -47,7 +47,7 @@ Keyframed move with easing:
 
 Procedural motion:
 1. Built-in: `expression.snippet {comp, index, property, snippet: "wiggle", amplitude, frequency}`. Snippets are wiggle, loop, delay, overshoot, loop_pingpong, inertia, inertia_strong, bounce, bounce_soft, bounce_hard, time_counter, countdown, count_up, wiggle_smooth, loop_cycle, loop_offset, spring, clock, random_flicker and follow (`target` = layer name, `delay` seconds).
-2. Custom: `expression.set {comp, index, property, value: "<code>"}`, then `expression.check_errors` with the same target.
+2. Custom: `expression.set {comp, index, property, value: "<code>"}`, then `expression.check_errors` with the same target. A broken expression aborts with AE's error text and the previous expression is restored; fix the code and set again.
 3. Remove with `expression.clear`. Read an existing expression or keyframe set before you replace it.
 
 ## Build a layered scene

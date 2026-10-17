@@ -825,3 +825,104 @@ describe('keyframe handlers', () => {
     expect(out.issue).toMatchObject({ code: 'INVALID_ARGS', message: 'No keyframe at time 5' });
   });
 });
+
+// E15-3: expression.set reads expressionError right after setting it. A broken
+// expression is rolled back to the previous one and the call aborts with AE's text.
+describe('expression error reporting (E15-3)', () => {
+  it('returns success with the enabled state when the expression is valid', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const position = new MockProperty('Position', 'ADBE Position', [0, 0]);
+    layer.add(position);
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'expression.set', {
+      comp: 'Main',
+      index: 1,
+      property: 'Position',
+      value: 'wiggle(2, 30)',
+    });
+
+    expect(out.issue).toBeUndefined();
+    expect(out.value).toEqual({ success: true, expression: 'wiggle(2, 30)', enabled: true });
+    expect(position.expressionError).toBe('');
+  });
+
+  it('aborts with AE error text and restores the previous expression', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const position = new MockProperty('Position', 'ADBE Position', [0, 0]);
+    position.expression = 'wiggle(2, 30)';
+    position.expressionEnabled = true;
+    layer.add(position);
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'expression.set', {
+      comp: 'Main',
+      index: 1,
+      property: 'Position',
+      value: 'value + @broken',
+    });
+
+    expect(out.value).toBeUndefined();
+    expect(out.issue).toMatchObject({
+      code: 'INVALID_ARGS',
+      message: expect.stringContaining('Expression error: unexpected token'),
+    });
+    expect(out.issue).toMatchObject({ message: expect.stringContaining('value + @broken') });
+    expect(out.issue).toMatchObject({ message: expect.stringContaining('previous expression restored') });
+    expect(position.expression).toBe('wiggle(2, 30)');
+    expect(position.expressionEnabled).toBe(true);
+    expect(position.expressionError).toBe('');
+  });
+
+  it('restores an empty expression and leaves it disabled when none existed', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const position = new MockProperty('Position', 'ADBE Position', [0, 0]);
+    layer.add(position);
+    comp.addLayer(layer);
+
+    const out = invoke(ctx, 'expression.set', {
+      comp: 'Main',
+      index: 1,
+      property: 'Position',
+      value: '@broken',
+    });
+
+    expect(out.issue).toMatchObject({ code: 'INVALID_ARGS' });
+    expect(position.expression).toBe('');
+    expect(position.expressionEnabled).toBe(false);
+  });
+
+  it('applies the same check to bulk.set_expression on each layer', async () => {
+    const { ctx, ae } = await payloadContext();
+    createComp(ctx);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Layer', 'Layer');
+    const position = new MockProperty('Position', 'ADBE Position', [0, 0]);
+    layer.add(position);
+    comp.addLayer(layer);
+    ae.project.activeItem = comp;
+
+    const out = invoke(ctx, 'bulk.set_expression', {
+      comp: 'Main',
+      property: 'Position',
+      expression: '@broken',
+      dryRun: false,
+    });
+
+    expect(out.issue).toMatchObject({
+      code: 'INVALID_ARGS',
+      message: expect.stringContaining('layer 1'),
+    });
+    expect(position.expression).toBe('');
+    expect(position.expressionEnabled).toBe(false);
+  });
+});

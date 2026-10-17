@@ -339,13 +339,30 @@ function mockCopyValue(value: unknown): unknown {
   return value;
 }
 
+export const MOCK_BROKEN_EXPRESSION = '@broken';
+
 export class MockProperty {
   // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybaseenabled
   enabled = true;
   expressionEnabled = false;
-  expression = '';
+  private storedExpression = '';
   // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpressionerror
   expressionError = '';
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpression
+  // Mirrors the guide: a broken string sets expressionError and disables the
+  // expression. The marker MOCK_BROKEN_EXPRESSION stands in for a syntax error.
+  get expression(): string {
+    return this.storedExpression;
+  }
+  set expression(value: string) {
+    this.storedExpression = value;
+    if (value.indexOf(MOCK_BROKEN_EXPRESSION) !== -1) {
+      this.expressionError = 'Expression error: unexpected token (line 1)';
+      this.expressionEnabled = false;
+    } else {
+      this.expressionError = '';
+    }
+  }
   readonly keys: {
     time: number;
     value: unknown;

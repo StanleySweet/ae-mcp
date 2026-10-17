@@ -1659,6 +1659,38 @@ AEMCP.register('anchor.move_preserving', function (args) {
 });
 
 // Expression operation handlers (mutating, run via ae_do).
+// E15-3: set an expression, then read Property.expressionError at once. The guide
+// says expressionError holds the error from the string most recently set, but it
+// does not say whether AE updates it synchronously, so it is read right after the
+// assignment (a thrown error is caught too). A broken expression is rolled back to
+// the previous one and the call aborts with AE's text. `where` names the target
+// in bulk calls.
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpressionerror
+function aemcpSetExpressionChecked(prop, value, where) {
+    var prevExpr = prop.expression;
+    var prevEnabled = prop.expressionEnabled;
+    var setError = '';
+    try {
+        prop.expression = value;
+    } catch (err) {
+        setError = String(err);
+    }
+    var error = setError !== '' ? setError : (prop.expressionError || '');
+    if (error !== '') {
+        try {
+            prop.expression = prevExpr;
+            prop.expressionEnabled = prevEnabled;
+        } catch (restoreErr) {
+            prevExpr = prevExpr + ' (restore failed: ' + String(restoreErr) + ')';
+        }
+        aemcpAbortArgs('expression error' + (where ? ' on ' + where : '') + ': ' + error +
+            ' | expression: ' + value + ' | previous expression restored: ' +
+            (prevExpr === '' ? '(empty)' : prevExpr));
+    }
+    prop.expressionEnabled = value !== '';
+    return prop.expressionEnabled;
+}
+
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyexpression
 AEMCP.register('expression.set', function (args) {
     var compName = args && args.comp ? args.comp : null;
@@ -1673,9 +1705,8 @@ AEMCP.register('expression.set', function (args) {
     if (!prop) return { success: false, error: 'Property not found' };
     // Setting a valid expression auto-enables it; enable explicitly so the mock
     // and real AE agree.
-    prop.expression = value;
-    prop.expressionEnabled = value !== '';
-    return { success: true, expression: prop.expression, enabled: prop.expressionEnabled };
+    var enabled = aemcpSetExpressionChecked(prop, value, null);
+    return { success: true, expression: prop.expression, enabled: enabled };
 });
 
 AEMCP.register('expression.clear', function (args) {
@@ -1809,9 +1840,8 @@ AEMCP.register('expression.snippet', function (args) {
     if (!prop) return { success: false, error: 'Property not found' };
     // Setting expression auto-enables it when the string is valid (guide), but
     // enable explicitly so the mock and real AE agree.
-    prop.expression = code;
-    prop.expressionEnabled = true;
-    return { success: true, snippet: snippetName, expression: code, enabled: prop.expressionEnabled };
+    var enabled = aemcpSetExpressionChecked(prop, code, null);
+    return { success: true, snippet: snippetName, expression: code, enabled: enabled };
 });
 
 // #192: expression-based text animation presets (no text-animator addProperty).
@@ -3087,8 +3117,7 @@ AEMCP.register('bulk.set_expression', function (args) {
         if (from !== expression) {
             changes.push({ index: indices[i], from: from, to: expression });
             if (!dryRun) {
-                prop.expression = expression;
-                prop.expressionEnabled = expression !== '';
+                aemcpSetExpressionChecked(prop, expression, 'layer ' + indices[i]);
             }
         }
     }
