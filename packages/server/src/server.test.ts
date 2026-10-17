@@ -1,6 +1,7 @@
 import { chmod, mkdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { errorCodes, errorHintDetails, ERROR_HINTS_URI } from '@ae-mcp/protocol';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, it, expect } from 'vitest';
@@ -69,6 +70,16 @@ describe('mcp server skeleton', () => {
     }
     const total = tools.tools.reduce((sum, tool) => sum + (tool.description?.length ?? 0), 0);
     expect(total).toBe(2213);
+    await client.close();
+    await server.close();
+  });
+
+  it('serves the full error hint table once as a resource', async () => {
+    const { client, server } = await connect({ root: await tempRoot() });
+    const resource = await client.readResource({ uri: ERROR_HINTS_URI });
+    const table = JSON.parse((resource.contents[0] as { text: string }).text) as Record<string, string>;
+    expect(table.TIMEOUT).toBe(errorHintDetails.TIMEOUT);
+    expect(Object.keys(table)).toEqual([...errorCodes]);
     await client.close();
     await server.close();
   });

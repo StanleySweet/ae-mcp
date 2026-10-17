@@ -6,7 +6,15 @@ export {
   errorSchema,
 } from './messages.js';
 export type { JobMessage, HeartbeatMessage, ResultMessage } from './messages.js';
-export { errorCodes, errorCodeSchema, errorHints, makeError } from './errors.js';
+export {
+  ERROR_HINTS_URI,
+  ERROR_HINT_MAX_LENGTH,
+  errorCodes,
+  errorCodeSchema,
+  errorHintDetails,
+  errorHints,
+  makeError,
+} from './errors.js';
 export type { ErrorCode } from './errors.js';
 export {
   queueRoot,

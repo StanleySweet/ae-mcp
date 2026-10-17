@@ -65,24 +65,29 @@ take a checkpoint before a destructive operation.
 ## Tool errors
 
 When a tool call fails, the result carries an `error.code`, a message and a
-`hint`. The codes and their hints:
+short `hint`. The codes and their hints:
 
 | Code | Hint |
 |------|------|
 | `AE_NOT_RUNNING` | Launch After Effects, then retry. |
-| `BRIDGE_NOT_LOADED` | Restart After Effects so the startup loader runs, then retry. |
-| `UNKNOWN_TOOL` | Call `ae_catalog` to list the available tools. |
-| `INVALID_MESSAGE` | Client and server protocol versions differ; restart the client after upgrading. |
-| `INVALID_ARGS` | Call `ae_catalog` for the operation's schema and required arguments. |
+| `AE_BUSY` | After Effects runs another script. Close the panel running it, then retry. |
+| `BRIDGE_NOT_LOADED` | Restart After Effects so the bridge loads, then retry. |
+| `UNKNOWN_TOOL` | Call `ae_catalog` to list the operations. |
+| `INVALID_MESSAGE` | Client and server protocol differ; restart the client. |
+| `INVALID_ARGS` | Call `ae_catalog` for the operation's schema. |
 | `FORBIDDEN` | Adjust `~/.ae-mcp/settings.json` or the environment override. |
-| `UNSAVED_PROJECT` | Save the project once (File > Save) so Increment and Save can version it. |
-| `SCRIPT_ERROR` | Open Window > Console in After Effects for the script error. |
-| `TIMEOUT` | The job exceeded its deadline and was cancelled. |
-| `UNKNOWN_JOB` | Poll `job_status` with the id returned when the job started. |
-| `AERENDER_NOT_FOUND` | Install After Effects so its aerender executable is available. |
-| `UNKNOWN_PLAN` | Call `ae_plan` again to preview the change and get a fresh `planId`. |
-| `PLAN_EXPIRED` | Plans expire after 10 minutes; call `ae_plan` again and apply right away. |
-| `PLAN_CHANGED` | The project changed since the plan was made; call `ae_plan` again to re-preview. |
+| `UNSAVED_PROJECT` | Save the project once (File > Save), then retry. |
+| `SCRIPT_ERROR` | See Window > Console in After Effects. |
+| `TIMEOUT` | The job passed its deadline and was cancelled. |
+| `UNKNOWN_JOB` | Poll `job_status` with the id from the start call. |
+| `AERENDER_NOT_FOUND` | Install After Effects so aerender is available. |
+| `UNKNOWN_PLAN` | Call `ae_plan` again for a fresh `planId`. |
+| `PLAN_EXPIRED` | Plans expire after 10 minutes; call `ae_plan` again. |
+| `PLAN_CHANGED` | The project changed since the plan; call `ae_plan` again. |
+| `DIALOG_OPEN` | Dismiss the dialog with `ae_dialogs`, then retry. |
+
+The longer explanation of each code is served once as the MCP resource
+`ae-mcp://error-hints` (JSON, code to text).
 
 The two most common: `AE_NOT_RUNNING` (After Effects is closed) and
 `BRIDGE_NOT_LOADED` (AE is open but the startup loader has not run — restart

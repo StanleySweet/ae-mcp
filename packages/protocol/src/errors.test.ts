@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  ERROR_HINT_MAX_LENGTH,
   errorCodes,
+  errorHintDetails,
   errorHints,
   makeError,
   type ErrorCode,
@@ -11,6 +13,13 @@ describe('error codes', () => {
   it('has a non-empty hint for every code', () => {
     for (const code of errorCodes) {
       expect(errorHints[code as ErrorCode].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps each short hint under the fixed length and has full detail for it', () => {
+    for (const code of errorCodes) {
+      expect(errorHints[code as ErrorCode].length).toBeLessThanOrEqual(ERROR_HINT_MAX_LENGTH);
+      expect(errorHintDetails[code as ErrorCode].length).toBeGreaterThan(0);
     }
   });
 

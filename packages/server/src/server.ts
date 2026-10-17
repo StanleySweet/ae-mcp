@@ -10,7 +10,13 @@ import {
   type AerenderRunHandle,
   type SpawnAerender,
 } from '@ae-mcp/core';
-import { makeError, queueRoot, type ResultMessage } from '@ae-mcp/protocol';
+import {
+  ERROR_HINTS_URI,
+  errorHintDetails,
+  makeError,
+  queueRoot,
+  type ResultMessage,
+} from '@ae-mcp/protocol';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
@@ -226,6 +232,21 @@ export function createServer(options: ServerOptions = {}): McpServer {
       }),
     );
   }
+  // The full hint for each error code, once; errors carry only the short `hint`.
+  server.registerResource(
+    'error-hints',
+    ERROR_HINTS_URI,
+    {
+      title: 'Error hints',
+      description: 'Full hint text for every error code returned by ae-mcp.',
+      mimeType: 'application/json',
+    },
+    async () => ({
+      contents: [
+        { uri: ERROR_HINTS_URI, mimeType: 'application/json', text: JSON.stringify(errorHintDetails) },
+      ],
+    }),
+  );
   const root = options.root ?? queueRoot();
   const maxResultBytes = options.maxResultBytes ?? MAX_RESULT_BYTES;
   const operations = options.operations ?? defaultOperationRegistry();

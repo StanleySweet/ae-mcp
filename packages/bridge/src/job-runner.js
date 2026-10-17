@@ -1,12 +1,12 @@
 var AEMCP_HINTS = {
     AE_NOT_RUNNING: 'Launch After Effects, then retry.',
-    BRIDGE_NOT_LOADED: 'Restart After Effects so the startup loader runs, then retry.',
-    UNKNOWN_TOOL: 'Call ae_catalog to list the available tools.',
-    INVALID_MESSAGE: 'Client and server protocol versions differ; restart the client after upgrading.',
-    INVALID_ARGS: "Call ae_catalog for the operation's schema and required arguments.",
-    UNSAVED_PROJECT: 'Save the project once (File > Save) so Increment and Save can version it.',
-    SCRIPT_ERROR: 'Open Window > Console in After Effects for the script error.',
-    TIMEOUT: 'The job exceeded its deadline and was cancelled.'
+    BRIDGE_NOT_LOADED: 'Restart After Effects so the bridge loads, then retry.',
+    UNKNOWN_TOOL: 'Call ae_catalog to list the operations.',
+    INVALID_MESSAGE: 'Client and server protocol differ; restart the client.',
+    INVALID_ARGS: "Call ae_catalog for the operation's schema.",
+    UNSAVED_PROJECT: 'Save the project once (File > Save), then retry.',
+    SCRIPT_ERROR: 'See Window > Console in After Effects.',
+    TIMEOUT: 'The job passed its deadline and was cancelled.'
 };
 
 function aemcpErrorIssue(code, message) {
