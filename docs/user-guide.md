@@ -234,6 +234,12 @@ A property whose value comes from an expression (for example one added by a pres
 `keyframe.ease_preset`, `anchor.move_preserving`, `effect.set_property` or `effect.set_keyframe` against such a property, the result carries a
 `warning` naming the property and the expression, so Claude can edit the driving control
 instead. `ae_expression_report` lists every expression-driven property on a comp's layers.
+
+Pass `verify: true` to `ae_do` on a mutating operation to get a `verify` field: a compact
+diff of the comp before and after the change (added and removed layers, and changed
+fields only). It is off by default, and a read-only operation ignores it. If the comp
+cannot be snapshotted, `verify` says `available: false` with the reason and the operation
+still succeeds.
 `expression.snippet` applies a named expression snippet (`wiggle`, `loop`, `delay`,
 `overshoot`) to a property by setting `Property.expression` directly.
 `rig.null_controller` builds a controller rig in one step: it creates a null, adds a

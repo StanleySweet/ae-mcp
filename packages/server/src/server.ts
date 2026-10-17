@@ -22,6 +22,7 @@ import {
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
+import { beginVerify, finishVerify } from './ae-do-verify.js';
 import { bridgeVersionWarning } from './bridge-version.js';
 import { isValidCheckpointName, readCheckpoints, saveCheckpoint } from './checkpoints.js';
 import { buildAeContext } from './context.js';
@@ -1276,11 +1277,12 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_do',
     {
       description:
-        'Run a named operation from ae_catalog. Args are validated against its schema first. Call get_selection for the active comp and selection. Long strings are cut unless full: true.',
+        'Run an ae_catalog operation; args are schema-checked first. get_selection gives the active comp. full: true keeps long strings. verify: true returns a diff of the changed comp.',
       inputSchema: {
         op: z.string(),
         args: z.record(z.string(), z.unknown()).optional(),
         full: z.boolean().optional(),
+        verify: z.boolean().optional(),
       },
     },
     async (incoming) => {
@@ -1288,7 +1290,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (!resolved.ok) {
         return text(makeError('INVALID_ARGS', resolved.message), true);
       }
-      const toolArgs = { op: resolved.op, args: resolved.args, full: incoming.full };
+      const toolArgs = { op: resolved.op, args: resolved.args, full: incoming.full, verify: incoming.verify };
       const definition = operations.get(toolArgs.op);
       if (definition === undefined) {
         const suggestions = closestNames(operations.names(), toolArgs.op);
@@ -1347,6 +1349,11 @@ export function createServer(options: ServerOptions = {}): McpServer {
               ),
             }
           : validation.args;
+      // verify (#233): snapshot the comp before the change, diff it after.
+      const verifyBefore =
+        toolArgs.verify === true && definition.readOnly === false
+          ? await beginVerify(callRaw, validation.args.comp as string | undefined)
+          : null;
       const result = await callRaw(definition.name, bridgeArgs);
       await recordHistory(definition.name, validation.args, result);
       if (definition.name === 'project.lint' && validation.args.fix === true && result.ok) {
@@ -1374,6 +1381,9 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const versionWarning = await bridgeVersionWarning(root, SERVER_VERSION);
       if (versionWarning !== undefined) {
         payload.warning = versionWarning;
+      }
+      if (verifyBefore) {
+        payload.verify = await finishVerify(callRaw, validation.args.comp as string | undefined, verifyBefore);
       }
       const size = Buffer.byteLength(JSON.stringify(payload));
       if (size > maxResultBytes) {
