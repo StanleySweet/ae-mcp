@@ -46,6 +46,10 @@ AEMCP.register('mogrt.export', function (args) {
             aemcpAbort(aemcpErrorIssue('SCRIPT_ERROR', 'could not add control ' + control.name));
         }
     }
+    // With no control, AE shows a modal instead of failing, which blocks the bridge.
+    if (comp.motionGraphicsTemplateControllerCount === 0) {
+        aemcpAbortArgs('the comp needs at least one Essential Graphics control: pass controls [{layer, property, name}]');
+    }
     comp.motionGraphicsTemplateName = name;
     if (!comp.exportAsMotionGraphicsTemplate(overwrite, folder)) {
         aemcpAbort(aemcpErrorIssue('SCRIPT_ERROR', 'exportAsMotionGraphicsTemplate returned false'));

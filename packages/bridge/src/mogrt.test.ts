@@ -58,6 +58,7 @@ describe('mogrt.export', () => {
       comp: 'Hero',
       path: '/out/Hero.mogrt',
       overwrite: true,
+      controls: [{ layer: 1, property: 'Opacity', name: 'Fade' }],
     });
 
     expect(outcome.ok).toBe(true);
@@ -94,6 +95,20 @@ describe('mogrt.export', () => {
 
     expect(outcome.ok).toBe(false);
     expect(outcome.issue?.code).toBe('INVALID_ARGS');
+  });
+
+  // AE answers an export with no controls with a modal ("au moins un contrôleur de
+  // propriété") that blocks the bridge, so the op refuses before calling it.
+  it('refuses a comp with no essential graphics control, without exporting', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedHero(ae);
+
+    const outcome = invoke(ctx, 'mogrt.export', { comp: 'Hero', path: '/out/Hero.mogrt' });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.issue?.code).toBe('INVALID_ARGS');
+    expect(outcome.issue?.message).toMatch(/at least one Essential Graphics control/);
+    expect(comp.mogrtExports).toEqual([]);
   });
 
   it('requires a .mogrt path', async () => {
