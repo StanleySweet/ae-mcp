@@ -776,6 +776,7 @@ export const scenario: Step[] = [
   op('mogrt.export.controls', 'mogrt.export', (s) => ({
     comp: s.comp,
     path: outFile(s, 'drive.mogrt'),
+    overwrite: true,
     controls: [{ layer: layerIndex(s, 'Text'), property: 'Opacity', name: 'Drive Fade' }],
   }), {
     after: (result) => {
@@ -1062,7 +1063,8 @@ export const scenario: Step[] = [
     targetLayer: layerIndex(s, 'Drive Audio Null'),
     property: 'Opacity',
   })),
-  // #245 with apply: import a copy of the tone, delete the copy on disk, relink from the tone's folder.
+  // #245 with apply: import a copy of the tone and delete it on disk; the relink runs after
+  // project.open, since AE only marks footage missing when the project loads.
   op('project.import_file.missing', 'project.import_file', (s) => {
     const dir = outFile(s, 'missing');
     mkdirSync(dir, { recursive: true });
@@ -1070,12 +1072,6 @@ export const scenario: Step[] = [
     return { path: join(dir, 'tone.wav'), folder: s.folder };
   }, {
     after: (_result, state) => rmSync(outFile(state, 'missing'), { recursive: true, force: true }),
-  }),
-  op('footage.relink.apply', 'footage.relink', (s) => ({ folder: dirname(s.vars.toneFile as string), apply: true }), {
-    after: (result) => {
-      const relinked = (payload(result).relinked as unknown[] | undefined) ?? [];
-      if (relinked.length < 1) throw new Error(`footage.relink relinked nothing: ${result.text.slice(0, 300)}`);
-    },
   }),
 
   // #243 on its own comp, so no later step reads the rewritten text.
@@ -1096,6 +1092,12 @@ export const scenario: Step[] = [
   op('project.increment_save', 'project.increment_save', () => ({})),
   op('project.save.final', 'project.save', (s) => ({ path: outFile(s, 'drive.aep'), overwrite: true })),
   op('project.open', 'project.open', (s) => ({ path: outFile(s, 'drive.aep'), force: true })),
+  op('footage.relink.apply', 'footage.relink', (s) => ({ folder: dirname(s.vars.toneFile as string), apply: true }), {
+    after: (result) => {
+      const relinked = (payload(result).relinked as unknown[] | undefined) ?? [];
+      if (relinked.length < 1) throw new Error(`footage.relink relinked nothing: ${result.text.slice(0, 300)}`);
+    },
+  }),
   op('comp.create.reduce', 'comp.create', (s) => ({
     name: `${s.prefix} reduce`,
     width: 320,
