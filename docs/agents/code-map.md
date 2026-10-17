@@ -89,6 +89,10 @@ deleted from `packages/core`.
 - `createBridgeCall({root, appName?})` `packages/server/src/bridge.ts` (E11-10) — a `LiveCall` that runs one job over the osascript transport (transport B, ADR 0001); `LiveCall` is defined in that module. The native app has its own `BridgeCall` counterpart.
 - Packaging (E11-4/9/11): `scripts/build-installer.ts` stages `packages/bridge/dist/{payload,loader}.jsx` + `dist/ae-mcp.mcpb` into `AeMcpSetup/Resources/`, runs `dotnet publish -c Release -r osx-<arch> --self-contained -p:PublishTrimmed=true`, then `build/app-bundle.sh` assembles `AE-MCP Setup.app` (`Info.plist` + `build/icon.icns`) and a `.dmg` with an Applications drop-link. `npm run installer:build` = `bridge:build` → `bundle:pack` → that script; arm64 first (`AE_MCP_ARCH` overrides). CI runs `dotnet test` on both runners (`dotnet:test`), and `release.yml`'s installer job is an `arm64,x64` matrix that runs `installer:build` with `AE_MCP_ARCH`, so a `v*` tag publishes both dmg arches alongside the mcpb and `SHA256SUMS.txt`.
 
+## Claude skill (`skills/ae/SKILL.md`, #219)
+
+- Recipes for driving AE through the ae-mcp tools (keyframes vs expressions, scene build, parallax, lower third, verify, bulk plans, batches, dialogs). Check every op name in it against `packages/server/src/operations.ts` when ops change.
+
 ## Settings (`packages/server/src/settings.ts`)
 
 - `loadSettings({root, env})` :42 — reads `~/.ae-mcp/settings.json` (zod-validated, unknown keys rejected), env vars (`AE_MCP_READ_ONLY`, `AE_MCP_ALLOWED_CATEGORIES`, `AE_MCP_EVAL_ENABLED`, `AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE`) override the file. Defaults in `DEFAULT_SETTINGS` :18. Consumed by the E7 policy engine.

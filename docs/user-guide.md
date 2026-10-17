@@ -72,6 +72,40 @@ On connect the server also sends Claude its animation principles (keyframes vs
 expressions, naming, easing, safety), so motion edits follow one consistent
 ruleset without you pasting any context.
 
+## Using ae-mcp from Cursor
+
+Cursor reads MCP servers from `.cursor/mcp.json` in a project, or `~/.cursor/mcp.json`
+for every project. Point it at the installed server:
+
+```json
+{
+  "mcpServers": {
+    "ae-mcp": {
+      "command": "node",
+      "args": ["<path to installed server>/server/index.js"]
+    }
+  }
+}
+```
+
+The installed server is one of:
+
+- The Claude Desktop extension that Setup installed:
+  `~/Library/Application Support/Claude/Claude Extensions/<id>/server/index.js`. Find
+  `<id>` as the folder whose `manifest.json` has `"name": "ae-mcp"`.
+- This repo, after `npm run bundle:pack`: `dist/staging/server/index.js`.
+
+Cursor is a GUI app and may not see the `node` on your shell `PATH`. If it cannot start
+the server, put the full path from `which node` in `command`.
+
+## Using ae-mcp from Claude Code
+
+```sh
+claude mcp add ae-mcp -- node "<path to installed server>/server/index.js"
+```
+
+The path is the same as for Cursor above.
+
 ## Uninstall
 
 Open AE-MCP Setup and click **Uninstall**. It removes the bridge payload, the
@@ -136,6 +170,30 @@ none. It never presses Save or Don't Save, so it cannot save or lose work.
 This needs the Accessibility permission for the app that runs the MCP server (for
 example Claude Desktop): System Settings > Privacy & Security > Accessibility. Without
 it `ae_dialogs` returns that instruction, and timeouts keep their usual message.
+
+## Running ExtendScript (eval.run)
+
+`eval.run` runs arbitrary ExtendScript inside After Effects, so it is off by default. A
+client that can call it can do anything AE can do. Leave it off unless you need it.
+
+To enable it, set `evalEnabled` in `~/.ae-mcp/settings.json`:
+
+```json
+{ "evalEnabled": true }
+```
+
+or set `AE_MCP_EVAL_ENABLED=1` in the environment that starts the server. Then restart
+the MCP client (Claude Desktop, Cursor or Claude Code).
+
+Rules that always apply:
+
+- It is always destructive: ae-mcp makes an incremental save (File > Increment and Save)
+  before each call, so the project must have been saved once. See
+  [Destructive operations](#destructive-operations).
+- It is refused in read-only mode (`AE_MCP_READ_ONLY=1` or `readOnly: true`).
+- While it is off, `ae_catalog` does not list it and `ae_do` returns `FORBIDDEN`.
+- Status: the gate is in place, but this build does not yet register the `eval.run`
+  operation, so enabling it adds nothing to `ae_catalog` until the operation ships.
 
 ## Test drive
 
