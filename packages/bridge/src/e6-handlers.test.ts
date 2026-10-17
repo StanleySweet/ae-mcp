@@ -71,15 +71,6 @@ describe('comp handlers', () => {
     expect(out.value).toMatchObject({ name: 'Pre' });
     expect(ae.project.numItems).toBe(2);
   });
-
-  it('project.undo runs the Edit > Undo command', async () => {
-    const { ctx, ae } = await payloadContext();
-
-    const out = invoke(ctx, 'project.undo', null);
-
-    expect(out.value).toEqual({ success: true });
-    expect(ae.executedCommands).toEqual([16]);
-  });
 });
 
 describe('layer handlers', () => {

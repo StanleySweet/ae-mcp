@@ -66,14 +66,9 @@ function aemcpRunHandler(tool, args) {
     return aemcpCallHandler(handler, args);
 }
 
-// Ops that must run outside an undo group: Edit > Undo inside an open group makes
-// AE warn "Undo group mismatch, will attempt to fix" (#195).
-var AEMCP_NO_UNDO_GROUP = { 'project.undo': true };
-
-// Ops batch.run refuses. project.undo would undo the batch's own steps; the save and
-// open ops leave nothing in AE's undo history, so a rollback Undo would revert the
-// user's own last edit instead (#202).
-var AEMCP_NOT_IN_BATCH = { 'project.undo': true, 'project.save': true, 'project.open': true, 'project.new': true, 'project.increment_save': true };
+// Ops batch.run refuses: the save and open ops leave nothing in AE's undo history,
+// so undoing the batch would revert the user's own last edit instead (#202).
+var AEMCP_NOT_IN_BATCH = { 'project.save': true, 'project.open': true, 'project.new': true, 'project.increment_save': true };
 
 function aemcpInvoke(tool, args, deadline) {
     if (typeof deadline === 'number' && new Date().getTime() >= deadline) {
@@ -83,23 +78,18 @@ function aemcpInvoke(tool, args, deadline) {
     if (!handler) {
         return { ok: false, issue: aemcpErrorIssue('UNKNOWN_TOOL', 'no handler for tool ' + tool) };
     }
-    var grouped = !AEMCP_NO_UNDO_GROUP[tool];
-    if (grouped) {
-        app.beginUndoGroup('Claude: ' + tool);
-    }
+    app.beginUndoGroup('Claude: ' + tool);
     AEMCP_BUSY = true;
     var outcome;
     try {
         outcome = aemcpCallHandler(handler, args);
     } finally {
-        if (grouped) {
-            app.endUndoGroup();
-        }
+        app.endUndoGroup();
         AEMCP_BUSY = false;
     }
-    // A batch rollback is NOT undone here: Edit > Undo inside the running script
-    // makes AE raise a modal "Undo group mismatch" that blocks every later job.
-    // The issue keeps `rollback: true`; the server runs project.undo as its own job.
+    // A failed batch is never undone by script: any scripted Edit > Undo makes AE
+    // raise a modal "Undo group mismatch" that blocks every later job (ADR-0009).
+    // The issue keeps `rollback: true`; the server tells the user to press Cmd+Z.
     return outcome;
 }
 

@@ -17,7 +17,6 @@ const CORE_TOOLS = [
   'find',
   'get_selection',
   'project.info',
-  'project.undo',
 ];
 
 async function payloadContext(): Promise<{ ctx: vm.Context; ae: MockAE }> {

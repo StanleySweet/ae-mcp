@@ -6,11 +6,9 @@ public delegate Task<bool> LaunchAE(string appName);
 /// <summary>Runs one bridge operation and reports whether it succeeded.</summary>
 public delegate Task<bool> LiveCall(string tool, IReadOnlyDictionary<string, object?>? args);
 
-/// <summary>Install-time smoke test: create and remove a test comp through the bridge.</summary>
+/// <summary>Install-time smoke test: one read-only round trip through the bridge.</summary>
 public static class LiveTest
 {
-    public const string TestCompName = "AE-MCP Test";
-
     private const long DefaultTimeoutMs = 60_000;
     private const int DefaultPollMs = 500;
     private const long DefaultHeartbeatMaxAgeMs = 90_000;
@@ -77,24 +75,13 @@ public static class LiveTest
             }
         }
 
-        var createArgs = new Dictionary<string, object?>
-        {
-            ["name"] = TestCompName,
-            ["width"] = 1920,
-            ["height"] = 1080,
-        };
-        if (!await call("comp.create", createArgs))
+        // Read-only round trip: it never changes the project. The former comp.create
+        // + project.undo raised AE's modal "Undo group mismatch" (ADR-0009).
+        if (!await call("project.info", new Dictionary<string, object?>()))
         {
             return new InstallerCheck(
                 "live_test", "fail",
-                "After Effects could not create a test comp; check the scripting preference and reinstall.");
-        }
-
-        if (!await call("project.undo", new Dictionary<string, object?>()))
-        {
-            return new InstallerCheck(
-                "live_test", "fail",
-                "After Effects could not remove the test comp; undo the change by hand.");
+                "After Effects did not answer the bridge; check the scripting preference and reinstall.");
         }
 
         return new InstallerCheck("live_test", "ok");

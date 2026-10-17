@@ -17,7 +17,6 @@ const CORE_TOOLS = [
   'find',
   'get_selection',
   'project.info',
-  'project.undo',
 ];
 
 async function makeAE(): Promise<{ ae: MockAE; home: string; source: string }> {

@@ -82,7 +82,8 @@ Apply with `expression.set {comp, index, property: "ADBE Transform Group/ADBE Po
 
 1. `ae_do {op: "batch.run", args: {ops: [{op: "layer.add_solid", args: {...}}, {op: "shape.add", args: {...}}], atomic: true}}`.
 2. The batch is one undo group. If a step fails after a change, the whole batch rolls back (Edit > Undo).
-3. Never put `project.save`, `project.open` or `project.undo` in a batch. Run them alone.
+3. Never put `project.save`, `project.open`, `project.new` or `project.increment_save` in a batch. Run them alone.
+4. A failed batch is not undone automatically: it is one undo step, so ask the user to press Cmd+Z once in After Effects to revert it.
 4. Destructive steps trigger one incremental save for the whole batch.
 
 ## When a dialog blocks AE

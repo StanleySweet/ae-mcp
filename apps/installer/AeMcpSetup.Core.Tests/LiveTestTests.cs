@@ -54,7 +54,7 @@ public class LiveTestTests
         Assert.Equal("live_test", result.Check);
         Assert.Equal("ok", result.Status);
         Assert.False(launched);
-        Assert.Equal(["comp.create", "project.undo"], tools);
+        Assert.Equal(["project.info"], tools);
     }
 
     [Fact]

@@ -927,14 +927,13 @@ export function createServer(options: ServerOptions = {}): McpServer {
           : validation.args;
       const result = await callRaw(definition.name, bridgeArgs);
       if (!result.ok) {
-        // Batch rollback: Undo runs as its own job, outside the batch script, or
-        // AE raises a modal "Undo group mismatch" (live test drive, #258).
+        // Never undo by script: any scripted Edit > Undo raises AE's modal "Undo
+        // group mismatch" and blocks the bridge (ADR-0009). The batch is one undo
+        // step, so the user reverts it with a single Cmd+Z.
         if ((result.error as { rollback?: boolean }).rollback === true) {
           delete (result.error as { rollback?: boolean }).rollback;
-          const undone = await callRaw('project.undo');
-          if (!undone.ok) {
-            result.error.message += ` (rollback failed: ${undone.error.message})`;
-          }
+          result.error.message +=
+            '. The earlier steps are still applied; press Cmd+Z (Edit > Undo) once in After Effects to revert the whole batch.';
         }
         return toResult(result);
       }

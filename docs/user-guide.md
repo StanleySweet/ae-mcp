@@ -244,7 +244,7 @@ The drive works in its own scratch project, never in yours. It refuses to start 
 the open project has unsaved changes (exit code 2, nothing changed). Otherwise it runs
 `project.new`, saves the scratch project to `.tmp/test-drive/drive.aep`, and at the end
 reopens the project that was open before, if there was one. Renders and copies go to
-`.tmp/test-drive`. It never uses `eval.run`, `command.execute` or `project.undo`, and
+`.tmp/test-drive`. It never uses `eval.run` or `command.execute`, and
 runs `bulk.remove_unused` as a dry-run plan only. `batch.run` includes one deliberate
 failing step to exercise rollback (Edit > Undo). The scratch items are removed at the end.
 

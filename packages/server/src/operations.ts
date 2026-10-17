@@ -105,7 +105,6 @@ export function defaultOperationRegistry(): OperationRegistry {
       required: ['snapshot'],
     schema: { snapshot: { type: 'object' } },
   }));
-  register(operation('project.undo', 'project', 'Undo the last change.'));
   register(operation('project.increment_save', 'project', 'File > Increment and Save the project.'));
 
   // Comp (comp.info is the server tool ae_comp_info).

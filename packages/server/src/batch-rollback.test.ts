@@ -31,15 +31,19 @@ async function connect(batchError: Record<string, unknown>): Promise<{ client: C
 const ops = { ops: [{ op: 'layer.rename', args: { index: 1, name: 'A' } }] };
 
 describe('batch.run rollback', () => {
-  it('runs project.undo as a separate job when the bridge flags a rollback', async () => {
+  // Any scripted Undo raised AE's modal "Undo group mismatch" (ADR-0009): the
+  // server never undoes, it tells the user to press Cmd+Z once.
+  it('tells the user to press Cmd+Z instead of undoing by script', async () => {
     const { client, calls } = await connect({ code: 'SCRIPT_ERROR', message: 'batch rolled back', rollback: true });
 
     const result = await client.callTool({ name: 'ae_do', arguments: { op: 'batch.run', args: ops } });
 
     expect(result.isError).toBe(true);
-    expect(calls).toEqual(['batch.run', 'project.undo']);
+    expect(calls).toEqual(['batch.run']);
     const [first] = result.content as Array<{ text: string }>;
-    expect(JSON.parse(first!.text)).not.toHaveProperty('rollback');
+    const error = JSON.parse(first!.text) as { message: string };
+    expect(error).not.toHaveProperty('rollback');
+    expect(error.message).toContain('Cmd+Z');
   });
 
   it('does not undo when the bridge did not flag a rollback', async () => {

@@ -253,13 +253,6 @@ AEMCP.register('project.import_json', function (args) {
     return { comps: comps, skipped: skipped };
 });
 
-// There is no undo method in the scripting API; the Edit > Undo menu command
-// is ID 16. Ref: https://ae-scripting.docsforadobe.dev/general/application/#appexecutecommand
-AEMCP.register('project.undo', function () {
-    app.executeCommand(16);
-    return { success: true };
-});
-
 // File > Increment and Save, done natively so it does not depend on the
 // localized menu name (app.findMenuCommandId only takes a localized string).
 // app.project.save(file) saves to a new file without prompting.
