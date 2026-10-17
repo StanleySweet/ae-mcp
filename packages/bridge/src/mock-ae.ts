@@ -454,6 +454,23 @@ export class MockProperty {
     Object.assign(this.keys[keyIndex - 1], { inEase, outEase });
   }
 
+  // Step-wise: the last key at or before t, the first key before them all, or the static value without keys.
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyvalueattime
+  valueAtTime(time: number, preExpression: boolean): unknown {
+    void preExpression;
+    if (this.keys.length === 0) {
+      return this.value;
+    }
+    let atOrBefore: (typeof this.keys)[number] | null = null;
+    let earliest = this.keys[0];
+    for (const key of this.keys) {
+      if (key.time < earliest.time) earliest = key;
+      if (key.time <= time && (atOrBefore === null || key.time > atOrBefore.time)) atOrBefore = key;
+    }
+    const best = atOrBefore ?? earliest;
+    return best.value;
+  }
+
   setValue(value: unknown): void {
     this.value = value;
   }

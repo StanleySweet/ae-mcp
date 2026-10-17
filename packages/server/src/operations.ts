@@ -2,6 +2,7 @@ import type { OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
 
 import { registerLayerOperations } from './operations-layers.js';
+import { registerVerifyOperations } from './operations-verify.js';
 
 export class OperationRegistry {
   private readonly byName = new Map<string, OperationDefinition>();
@@ -714,6 +715,7 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   registerLayerOperations(register);
   registerHousekeepingOperations(register);
+  registerVerifyOperations(register);
 
   return registry;
 }

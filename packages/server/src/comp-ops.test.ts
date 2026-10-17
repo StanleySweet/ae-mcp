@@ -18,11 +18,13 @@ import { createServer } from './server.js';
 
 const COMP_OPERATIONS = [
   'comp.create',
+  'comp.diff',
   'comp.duplicate',
   'comp.info',
   'comp.layer_clip_frames',
   'comp.precompose',
   'comp.set_settings',
+  'comp.snapshot',
 ];
 
 async function connect(

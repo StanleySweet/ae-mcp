@@ -368,6 +368,19 @@ export const scenario: Step[] = [
     value: [100, 100, 100],
   })),
   op('property.list', 'property.list', (s) => ({ comp: s.comp })),
+  // --- verify: snapshot, change, diff, then sample a keyed property -----------
+  op('comp.snapshot', 'comp.snapshot', (s) => ({ comp: s.comp }), {
+    after: (result, state) => {
+      state.vars.compSnapshot = payload(result);
+    },
+  }),
+  op('property.set.opacity_for_diff', 'property.set', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    name: OPACITY,
+    value: 60,
+  })),
+  op('comp.diff', 'comp.diff', (s) => ({ comp: s.comp, snapshot: s.vars.compSnapshot })),
   op('comp.layer_clip_frames', 'comp.layer_clip_frames', (s) => ({
     comp: s.comp,
     from: 0,
@@ -464,6 +477,13 @@ export const scenario: Step[] = [
     index: layerIndex(s, 'Shapes'),
     property: POS,
     time: 4,
+  })),
+
+  op('property.sample', 'property.sample', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Shapes'),
+    property: OPACITY,
+    times: [0, 1.5],
   })),
 
   // --- expressions -----------------------------------------------------------

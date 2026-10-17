@@ -4,6 +4,9 @@ import { defaultOperationRegistry, validateOperationArgs } from './operations.js
 // Every operation the bridge registers (`packages/bridge/src/handlers.js` plus
 // `batch.run` in `job-runner.js`), minus the top-level MCP tools.
 const BRIDGE_OPS = [
+  'comp.snapshot',
+  'comp.diff',
+  'property.sample',
   'project.info',
   'project.export_json',
   'project.report_usage',
