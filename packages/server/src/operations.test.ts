@@ -119,6 +119,7 @@ const BRIDGE_OPS = [
   'project.consolidate_footage',
   'batch.run',
   'eval.run',
+  'layer.move',
 ];
 
 describe('server operation registry', () => {

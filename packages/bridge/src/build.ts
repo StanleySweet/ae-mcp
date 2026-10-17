@@ -7,7 +7,7 @@ const SRC_DIR = join(dirname(fileURLToPath(import.meta.url)));
 
 const SHARED_SOURCES = ['es3-polyfills.js', 'es3-json2.js', 'bridge-fs.js'];
 
-const PAYLOAD_SOURCES = [...SHARED_SOURCES, 'job-runner.js', 'serializers.js', 'handlers.js', 'handlers-relink.js', 'handlers-project.js', 'handlers-eval.js', 'handlers-layers.js', 'handlers-housekeeping.js', 'handlers-verify.js', 'handlers-templates.js', 'handlers-lint.js', 'handlers-errors.js', 'handlers-versions.js', 'handlers-mogrt.js', 'handlers-audio.js', 'handlers-localize.js', 'handlers-animate.js', 'handlers-keytimes.js', 'handlers-render-templates.js'];
+const PAYLOAD_SOURCES = [...SHARED_SOURCES, 'job-runner.js', 'serializers.js', 'handlers.js', 'handlers-relink.js', 'handlers-project.js', 'handlers-eval.js', 'handlers-layers.js', 'handlers-housekeeping.js', 'handlers-verify.js', 'handlers-templates.js', 'handlers-lint.js', 'handlers-errors.js', 'handlers-versions.js', 'handlers-mogrt.js', 'handlers-audio.js', 'handlers-localize.js', 'handlers-animate.js', 'handlers-keytimes.js', 'handlers-render-templates.js', 'handlers-layer-move.js'];
 const LOADER_SOURCES = [...SHARED_SOURCES, 'loader.js'];
 const PANEL_SOURCES = [...SHARED_SOURCES, 'panel.js'];
 

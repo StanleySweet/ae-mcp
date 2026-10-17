@@ -178,3 +178,4 @@ deleted from `packages/core`.
 - (E16-3, #272) `render.frame` writes `<root>/render/<comp>-<frame>-<unique>.png` (a fresh suffix per call, `aemcpRenderFileName` in `handlers.js`) so no render reuses an earlier file. `waitForCompletePng` (`server.ts`) returns a frame only when it ends in IEND and its size is unchanged between two polls. Tests: `handlers-render.test.ts`, `render-frame.test.ts`.
 
 - (E16-4) `font.list` (`handlers.js`): flattens `app.fonts.allFonts` family groups; each entry `{name: fullName, family: familyName, style: styleName, postScriptName}`. Mock: `MockAE.fontFamilies`, `MockFontObject` (`mock-ae.ts`).
+- (E16-5) `layer.move` (`handlers-layer-move.js`, op in `packages/server/src/operations-layer-move.ts`): top/bottom/before/after via Layer.moveToBeginning/moveToEnd/moveBefore/moveAfter. Mock: `MockLayer.move*` + `MockCompItem.relocateLayer`.

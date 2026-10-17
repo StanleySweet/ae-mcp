@@ -223,6 +223,21 @@ export class MockCompItem extends MockItem {
     this.reindexLayers();
   }
 
+  /** Takes `layer` out of the stack and puts it directly before `before` (null: at the end). */
+  relocateLayer(layer: MockLayer, before: MockLayer | null): void {
+    if (before === layer) return;
+    const from = this.layerList.indexOf(layer);
+    if (from < 0) return;
+    this.layerList.splice(from, 1);
+    const at = before ? this.layerList.indexOf(before) : this.layerList.length;
+    if (at < 0) {
+      this.layerList.splice(from, 0, layer);
+      return;
+    }
+    this.layerList.splice(at, 0, layer);
+    this.reindexLayers();
+  }
+
   private reindexLayers(): void {
     this.layerList.forEach((layer, i) => {
       layer.index = i + 1;
@@ -765,6 +780,27 @@ export class MockLayer extends MockPropertyGroup {
   // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerremove
   remove(): void {
     if (this.containingComp) this.containingComp.removeLayerAt(this.index);
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layermovetobeginning
+  moveToBeginning(): void {
+    if (this.containingComp) this.containingComp.relocateLayer(this, this.containingComp.layer(1));
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layermovetoend
+  moveToEnd(): void {
+    if (this.containingComp) this.containingComp.relocateLayer(this, null);
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layermovebefore
+  moveBefore(layer: MockLayer): void {
+    if (this.containingComp) this.containingComp.relocateLayer(this, layer);
+  }
+
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layermoveafter
+  moveAfter(layer: MockLayer): void {
+    if (!this.containingComp) return;
+    this.containingComp.relocateLayer(this, this.containingComp.layer(layer.index + 1));
   }
 }
 
