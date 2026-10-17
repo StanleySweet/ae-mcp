@@ -682,6 +682,15 @@ export const scenario: Step[] = [
       },
     }),
   ),
+  tool('ae_render_frame.compare', 'ae_render_frame', (s) => ({ comp: s.comp, time: 3, compareWith: s.frames[0]?.file }), {
+    skipIf: (s) => (s.frames.length === 0 ? 'no earlier frame to compare with' : undefined),
+    after: (result) => {
+      const meta = result.json as { compare?: unknown } | null;
+      if (!meta?.compare) {
+        throw new Error('ae_render_frame compareWith returned no compare block');
+      }
+    },
+  }),
   op('render.frame', 'render.frame', (s) => ({ comp: s.comp, time: 4 })),
   op('render.queue_add', 'render.queue_add', (s) => ({
     comp: s.comp,
@@ -865,6 +874,13 @@ export const scenario: Step[] = [
 
   // --- final look ------------------------------------------------------------
   tool('ae_project_info.final', 'ae_project_info', () => ({})),
+
+  // --- checkpoints -----------------------------------------------------------
+  // checkpoint_create and checkpoint_revert both run File > Increment and Save,
+  // which the drive never does (see project.increment_save below).
+  skipTool('checkpoint_create', 'runs File > Increment and Save; the drive never saves the open project'),
+  tool('checkpoint_list', 'checkpoint_list', () => ({})),
+  skipTool('checkpoint_revert', 'reopens the project; covered by unit tests'),
 
   // --- explicit skips --------------------------------------------------------
   skipOp('project.open', 'replaces the open project (destructive); the drive never touches the user project file'),

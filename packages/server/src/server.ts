@@ -14,6 +14,7 @@ import { makeError, queueRoot, type ResultMessage } from '@ae-mcp/protocol';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
+import { isValidCheckpointName, readCheckpoints, saveCheckpoint } from './checkpoints.js';
 import { buildAeContext } from './context.js';
 import { dismissFrontDialog, listDialogs } from './dialogs.js';
 import { compareFrames, type FrameComparison } from './frame-compare.js';
@@ -457,6 +458,97 @@ export function createServer(options: ServerOptions = {}): McpServer {
         layers: capped.items,
         missing: value.missing ?? [],
         truncated: capped.truncated,
+      });
+    },
+  );
+
+  // Named checkpoints (checkpoints.ts): an incremental save recorded under a name.
+  server.registerTool(
+    'checkpoint_create',
+    {
+      description:
+        'Name a restore point: runs File > Increment and Save and records the new versioned project file under name (1-64 characters: letters, digits, space, _ or -). Reusing a name replaces it. Needs a saved project.',
+      inputSchema: { name: z.string() },
+    },
+    async (args) => {
+      const settings = await getSettings();
+      if (settings.readOnly) {
+        return text(
+          makeError('FORBIDDEN', 'checkpoint_create saves the project and is not permitted in read-only mode'),
+          true,
+        );
+      }
+      if (!isValidCheckpointName(args.name)) {
+        return text(
+          makeError('INVALID_ARGS', 'checkpoint name must be 1-64 characters: letters, digits, space, _ or -'),
+          true,
+        );
+      }
+      const saved = await callRaw('project.increment_save');
+      if (!saved.ok) {
+        return toResult(saved);
+      }
+      const file = (saved.result as { file?: unknown } | null)?.file;
+      if (typeof file !== 'string') {
+        return text(
+          makeError('UNSAVED_PROJECT', 'checkpoint_create needs a saved project; save it once first'),
+          true,
+        );
+      }
+      await persistSavedVersionPath(root, file);
+      const checkpoint = { name: args.name, file, createdAt: new Date().toISOString() };
+      await saveCheckpoint(root, checkpoint);
+      return text(checkpoint);
+    },
+  );
+
+  server.registerTool(
+    'checkpoint_list',
+    {
+      description: 'List the named checkpoints, newest first.',
+      inputSchema: {},
+    },
+    async () => text({ checkpoints: (await readCheckpoints(root)).reverse() }),
+  );
+
+  server.registerTool(
+    'checkpoint_revert',
+    {
+      description:
+        'Reopen the project file of a named checkpoint (destructive). Runs File > Increment and Save first so the current state is kept as a version. Refused in read-only mode.',
+      inputSchema: { name: z.string() },
+    },
+    async (args) => {
+      const settings = await getSettings();
+      if (settings.readOnly) {
+        return text(
+          makeError('FORBIDDEN', 'checkpoint_revert reopens the project and is not permitted in read-only mode'),
+          true,
+        );
+      }
+      if (!isValidCheckpointName(args.name)) {
+        return text(
+          makeError('INVALID_ARGS', 'checkpoint name must be 1-64 characters: letters, digits, space, _ or -'),
+          true,
+        );
+      }
+      const checkpoint = (await readCheckpoints(root)).find((entry) => entry.name === args.name);
+      if (!checkpoint) {
+        return text(makeError('INVALID_ARGS', `unknown checkpoint: ${args.name}`), true);
+      }
+      const guard = await incrementBeforeDestructive('checkpoint_revert');
+      if (!guard.ok) {
+        return guard.result;
+      }
+      const opened = await callRaw('project.open', { path: checkpoint.file, force: true });
+      if (!opened.ok) {
+        return toResult(opened);
+      }
+      return text({
+        name: checkpoint.name,
+        file: checkpoint.file,
+        incrementedFile: guard.info?.incrementedFile ?? null,
+        opened: opened.result,
       });
     },
   );

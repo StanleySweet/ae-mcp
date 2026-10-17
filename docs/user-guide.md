@@ -144,6 +144,35 @@ once per operation inside a batch. When an increment happens, the result carries
 never been saved, the operation is refused with the error code `UNSAVED_PROJECT` and a hint
 to save once first.
 
+## Comparing frames
+
+`ae_render_frame` takes an optional `compareWith`: the path of an earlier frame that
+ae-mcp rendered into its render folder (`~/.ae-mcp/render`, the `file` field of the
+earlier result). The new frame is compared with it and the metadata gains a `compare`
+block:
+
+- `changedPercent` — share of pixels where some colour channel moved by more than 8 (0-100)
+- `meanDelta` — mean absolute channel difference over all pixels (0-255)
+- `bbox` — `[x, y, width, height]` around the changed pixels, or `null` when none changed
+
+Frames of different sizes report `changedPercent: 100` with `note: "size differs"`. The
+comparison uses macOS `sips` to decode the PNGs, so it only runs on macOS. A `compareWith`
+path outside the render folder, or one that does not exist, is refused with `INVALID_ARGS`.
+
+## Checkpoints
+
+A checkpoint is a named restore point: the versioned project file that File > Increment and
+Save writes. Checkpoints are stored in `~/.ae-mcp/checkpoints.json`.
+
+- `checkpoint_create {name}` saves the open project with Increment and Save and records the
+  new file under `name`. The name is 1-64 characters: letters, digits, spaces, `_` and `-`.
+  Reusing a name replaces the old entry; the old file stays on disk. The project must have
+  been saved once already (`UNSAVED_PROJECT` otherwise).
+- `checkpoint_list` returns the checkpoints, newest first.
+- `checkpoint_revert {name}` is destructive. It first runs Increment and Save so the current
+  state is kept as a version, then reopens the checkpoint's file (with `force`). It is
+  refused in read-only mode, and so is `checkpoint_create`, because both save the project.
+
 ## Expression-driven properties
 
 A property whose value comes from an expression (for example one added by a preset, or a
