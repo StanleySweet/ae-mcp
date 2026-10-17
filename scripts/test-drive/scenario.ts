@@ -235,6 +235,7 @@ export const scenario: Step[] = [
   tool('get_selection', 'get_selection', () => ({})),
   op('project.info', 'project.info', () => ({})),
   op('project.report_usage', 'project.report_usage', () => ({})),
+  op('project.lint', 'project.lint', () => ({ naming: { pattern: '^[A-Za-z]' } })),
 
   // --- scratch comp inside a scratch folder ----------------------------------
   op('comp.create', 'comp.create', (s) => ({

@@ -102,6 +102,26 @@ function toResult(value: ResultMessage): ToolResult {
   return value.ok ? text(value.result) : text(value.error, true);
 }
 
+/** Outcome of a plan step: the value, or the ToolResult to return as the error. */
+type PlanOutcome = { ok: true; value: Record<string, unknown> } | { ok: false; result: ToolResult };
+
+function failed(error: unknown): PlanOutcome {
+  return { ok: false, result: text(error, true) };
+}
+
+/** The JSON error body of a failed ToolResult, for nesting inside another result. */
+function errorBody(result: ToolResult): unknown {
+  const [first] = result.content;
+  return first && first.type === 'text' ? JSON.parse(first.text) : null;
+}
+
+/** One finding of project.lint (#244); `fix.safe` findings may be applied with fix: true. */
+interface LintFinding {
+  item: string;
+  rule: string;
+  fix?: { safe?: boolean; op?: string; args?: Record<string, unknown> } | null;
+}
+
 /** Records the path of the project file produced by the last successful incremental save, so
 `check_setup` can name it later. */
 async function persistSavedVersionPath(root: string, savedFile: string): Promise<void> {
@@ -1157,6 +1177,10 @@ export function createServer(options: ServerOptions = {}): McpServer {
           : validation.args;
       const result = await callRaw(definition.name, bridgeArgs);
       await recordHistory(definition.name, validation.args, result);
+      if (definition.name === 'project.lint' && validation.args.fix === true && result.ok) {
+        // fix: true applies only the findings marked safe, through the plan store (#244).
+        return text({ result: result.result, fixes: await applyLintFixes(result.result) });
+      }
       if (!result.ok) {
         // Never undo by script: any scripted Edit > Undo raises AE's modal "Undo
         // group mismatch" and blocks the bridge (ADR-0009). The batch is one undo
@@ -1190,6 +1214,116 @@ export function createServer(options: ServerOptions = {}): McpServer {
     },
   );
 
+  /** Previews a bulk operation and registers it as a plan (the body of ae_plan; reused by project.lint fixes, #244). */
+  const planOperation = async (op: string, argsIn: Record<string, unknown> | undefined): Promise<PlanOutcome> => {
+    const definition = operations.get(op);
+    if (definition === undefined) {
+      const suggestions = closestNames(operations.names(), op);
+      const suffix = suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : '';
+      return failed(makeError('UNKNOWN_TOOL', `unknown operation '${op}'.${suffix}`));
+    }
+    if (definition.category !== 'bulk') {
+      return failed(makeError('INVALID_ARGS', `operation '${op}' is not a bulk operation`));
+    }
+    const validation = validateOperationArgs(definition.schema, argsIn, definition.required);
+    if (!validation.ok) {
+      return failed(makeError('INVALID_ARGS', validation.message));
+    }
+    const settings = await getSettings();
+    if (!isPermitted(definition, settings)) {
+      return failed(makeError('FORBIDDEN', `operation '${op}' is not permitted by the current policy`));
+    }
+    const dry = await callRaw(definition.name, { ...validation.args, dryRun: true });
+    if (!dry.ok) {
+      return { ok: false, result: toResult(dry) };
+    }
+    const value = dry.result as { changes?: unknown[]; fingerprint?: unknown } | null;
+    if (typeof value?.fingerprint !== 'string') {
+      return failed(makeError('SCRIPT_ERROR', `operation '${op}' did not return a plan fingerprint`));
+    }
+    const planId = planStore.create([{ op: definition.name, args: validation.args }], value.fingerprint);
+    return { ok: true, value: { planId, changes: value.changes ?? [] } };
+  };
+
+  /** Applies a registered plan (the body of ae_apply; reused by project.lint fixes, #244). */
+  const applyPlan = async (planId: string): Promise<PlanOutcome> => {
+    const peeked = planStore.peek(planId);
+    if (peeked === undefined) {
+      return failed(makeError('UNKNOWN_PLAN', `no plan with id '${planId}'`));
+    }
+    const step = peeked.steps[0];
+    if (step === undefined) {
+      return failed(makeError('SCRIPT_ERROR', `plan '${planId}' has no steps`));
+    }
+    if (operations.get(step.op) === undefined) {
+      return failed(makeError('UNKNOWN_TOOL', `plan references unknown operation '${step.op}'`));
+    }
+    const dry = await callRaw(step.op, { ...step.args, dryRun: true });
+    if (!dry.ok) {
+      return { ok: false, result: toResult(dry) };
+    }
+    const current = (dry.result as { fingerprint?: unknown } | null)?.fingerprint;
+    const taken = planStore.take(planId, typeof current === 'string' ? current : '');
+    if (!taken.ok) {
+      if (taken.reason === 'expired') {
+        return failed(makeError('PLAN_EXPIRED', `plan '${planId}' has expired`));
+      }
+      if (taken.reason === 'changed') {
+        return failed(makeError('PLAN_CHANGED', 'the project changed since the plan was made'));
+      }
+      return failed(makeError('UNKNOWN_PLAN', `no plan with id '${planId}'`));
+    }
+
+    const stepDefinition = operations.get(step.op);
+    const settings = await getSettings();
+    const needsIncrement = stepDefinition?.destructive === true && settings.incrementBeforeDestructive;
+    let incrementInfo: Record<string, unknown> | null = null;
+    if (needsIncrement) {
+      const increment = await incrementBeforeDestructive(step.op);
+      if (!increment.ok) {
+        return { ok: false, result: increment.result };
+      }
+      incrementInfo = increment.info;
+    }
+
+    const result = await callRaw(step.op, { ...step.args, dryRun: false });
+    await recordHistory(step.op, step.args, result);
+    if (!result.ok) {
+      return { ok: false, result: toResult(result) };
+    }
+    const payload: Record<string, unknown> = { planId, op: step.op, result: result.result };
+    if (incrementInfo) {
+      payload.increment = incrementInfo;
+    }
+    return { ok: true, value: payload };
+  };
+
+  /**
+   * Applies the findings of project.lint whose fix is marked safe: each one is planned with
+   * ae_plan's logic and applied with ae_apply's, so the fingerprint check still guards it (#244).
+   */
+  const applyLintFixes = async (report: unknown): Promise<Array<Record<string, unknown>>> => {
+    const findings = (report as { findings?: LintFinding[] } | null)?.findings ?? [];
+    const outcomes: Array<Record<string, unknown>> = [];
+    for (const finding of findings) {
+      if (finding.fix?.safe !== true || finding.fix.op === undefined) {
+        continue;
+      }
+      const planned = await planOperation(finding.fix.op, finding.fix.args);
+      if (!planned.ok) {
+        outcomes.push({ item: finding.item, rule: finding.rule, applied: false, error: errorBody(planned.result) });
+        continue;
+      }
+      const applied = await applyPlan(planned.value.planId as string);
+      outcomes.push(
+        applied.ok
+          ? { item: finding.item, rule: finding.rule, applied: true, result: applied.value }
+          : { item: finding.item, rule: finding.rule, applied: false, error: errorBody(applied.result) },
+      );
+    }
+    return outcomes;
+  };
+
   server.registerTool(
     'ae_plan',
     {
@@ -1201,45 +1335,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
       },
     },
     async (toolArgs) => {
-      const definition = operations.get(toolArgs.op);
-      if (definition === undefined) {
-        const suggestions = closestNames(operations.names(), toolArgs.op);
-        const suffix = suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : '';
-        return text(makeError('UNKNOWN_TOOL', `unknown operation '${toolArgs.op}'.${suffix}`), true);
-      }
-      if (definition.category !== 'bulk') {
-        return text(
-          makeError('INVALID_ARGS', `operation '${toolArgs.op}' is not a bulk operation`),
-          true,
-        );
-      }
-      const validation = validateOperationArgs(definition.schema, toolArgs.args, definition.required);
-      if (!validation.ok) {
-        return text(makeError('INVALID_ARGS', validation.message), true);
-      }
-      const settings = await getSettings();
-      if (!isPermitted(definition, settings)) {
-        return text(
-          makeError('FORBIDDEN', `operation '${toolArgs.op}' is not permitted by the current policy`),
-          true,
-        );
-      }
-      const dry =await callRaw(definition.name, { ...validation.args, dryRun: true });
-      if (!dry.ok) {
-        return toResult(dry);
-      }
-      const value = dry.result as { changes?: unknown[]; fingerprint?: unknown } | null;
-      if (typeof value?.fingerprint !== 'string') {
-        return text(
-          makeError('SCRIPT_ERROR', `operation '${toolArgs.op}' did not return a plan fingerprint`),
-          true,
-        );
-      }
-      const planId = planStore.create(
-        [{ op: definition.name, args: validation.args }],
-        value.fingerprint,
-      );
-      return text({ planId, changes: value.changes ?? [] });
+      const planned = await planOperation(toolArgs.op, toolArgs.args);
+      return planned.ok ? text(planned.value) : planned.result;
     },
   );
 
@@ -1253,62 +1350,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
       },
     },
     async (toolArgs) => {
-      const peeked = planStore.peek(toolArgs.planId);
-      if (peeked === undefined) {
-        return text(makeError('UNKNOWN_PLAN', `no plan with id '${toolArgs.planId}'`), true);
-      }
-      const step = peeked.steps[0];
-      if (step === undefined) {
-        return text(makeError('SCRIPT_ERROR', `plan '${toolArgs.planId}' has no steps`), true);
-      }
-      if (operations.get(step.op) === undefined) {
-        return text(
-          makeError('UNKNOWN_TOOL', `plan references unknown operation '${step.op}'`),
-          true,
-        );
-      }
-      const dry = await callRaw(step.op, { ...step.args, dryRun: true });
-      if (!dry.ok) {
-        return toResult(dry);
-      }
-      const current = (dry.result as { fingerprint?: unknown } | null)?.fingerprint;
-      const taken = planStore.take(toolArgs.planId, typeof current === 'string' ? current : '');
-      if (!taken.ok) {
-        if (taken.reason === 'expired') {
-          return text(makeError('PLAN_EXPIRED', `plan '${toolArgs.planId}' has expired`), true);
-        }
-        if (taken.reason === 'changed') {
-          return text(
-            makeError('PLAN_CHANGED', 'the project changed since the plan was made'),
-            true,
-          );
-        }
-        return text(makeError('UNKNOWN_PLAN', `no plan with id '${toolArgs.planId}'`), true);
-      }
-
-      const stepDefinition = operations.get(step.op);
-      const settings = await getSettings();
-      const needsIncrement =
-        stepDefinition?.destructive === true && settings.incrementBeforeDestructive;
-      let incrementInfo: Record<string, unknown> | null = null;
-      if (needsIncrement) {
-        const increment = await incrementBeforeDestructive(step.op);
-        if (!increment.ok) {
-          return increment.result;
-        }
-        incrementInfo = increment.info;
-      }
-
-      const result = await callRaw(step.op, { ...step.args, dryRun: false });
-      await recordHistory(step.op, step.args, result);
-      if (!result.ok) {
-        return toResult(result);
-      }
-      const payload: Record<string, unknown> = { planId: toolArgs.planId, op: step.op, result: result.result };
-      if (incrementInfo) {
-        payload.increment = incrementInfo;
-      }
-      return text(payload);
+      const applied = await applyPlan(toolArgs.planId);
+      return applied.ok ? text(applied.value) : applied.result;
     },
   );
 

@@ -200,6 +200,19 @@ Save writes. Checkpoints are stored in `~/.ae-mcp/checkpoints.json`.
   (`kind`, `name`, `description`, `ops`) adds the `template.user` op; `{{key}}` in its args is
   filled from `args`. Invalid files are skipped, and `check_setup` lists each with its reason.
 
+## Project lint
+
+`ae_do` op `project.lint {comp?, naming?, fix?}` returns one report of findings, each with
+`item`, `rule` (`unused-item`, `missing-footage`, `expression-error`, `naming`), `severity` and
+`fix`. Unused items and missing footage are project-wide; expression errors and naming are per
+comp (all comps when `comp` is omitted). `naming.pattern` is a regex every layer name must match.
+Add `naming.fix {match, replace, regex?, flags?}` to make a rename a safe fix.
+
+- Without `fix: true` the lint only reads.
+- With `fix: true` only the findings whose `fix.safe` is true are applied, one at a time through
+  `ae_plan` and `ae_apply`. Removing items, relinking footage and fixing expressions are never
+  applied; they stay in the report.
+
 ## Expression-driven properties
 
 A property whose value comes from an expression (for example one added by a preset, or a

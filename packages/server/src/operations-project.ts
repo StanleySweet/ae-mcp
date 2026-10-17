@@ -33,4 +33,14 @@ export function registerProjectOperations(register: Register): void {
       schema: { force: { type: 'boolean' } },
     }),
   );
+  // Report only; fix: true applies the safe findings through ae_plan and ae_apply (#244).
+  register(
+    operation('project.lint', 'project', 'Lint the project: unused items, missing footage, expression errors and naming-rule violations (naming.pattern regex; naming.fix {match, replace, regex, flags} makes a rename a safe fix). Returns findings with severity and fix.safe. fix: true applies only the safe fixes; the rest are listed, not applied.', {
+      schema: {
+        comp: { type: 'string' },
+        naming: { type: 'object' },
+        fix: { type: 'boolean' },
+      },
+    }),
+  );
 }
