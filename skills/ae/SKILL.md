@@ -32,11 +32,12 @@ Procedural motion:
 ## Build a layered scene
 
 1. Background: `layer.add_solid {comp, color: [0.08, 0.1, 0.14]}`.
-2. Shape layer with a named shape: `shape.add {comp, layerName: "Accent bar", type: "rect", size: [400, 120], fillColor: [1, 0.4, 0.1]}`. Omit `layerIndex` to create the layer.
-3. Text: `text.add {comp, text: "Title", fontSize: 96, fillColor: [1, 1, 1], font, justification}`.
-4. Place a layer: `layer.set_transform {comp, index, position: [960, 540]}`. Scale with `property.set {comp, index, name: "ADBE Transform Group/ADBE Scale", value: [80, 80]}`.
-5. Parent only after checking the child's own keyframes: `layer.set_parent {comp, index, parent}`.
-6. Rename an existing layer through a bulk plan (see Bulk edits). `layer.rename` does not exist.
+2. Shape layer with a named shape: `shape.add {comp, layerName: "Accent bar", type: "rect", size: [400, 120], position: [200, 60], fillColor: [1, 0.4, 0.1], fillOpacity: 100}`. Omit `layerIndex` to create the layer. Each new group is drawn behind existing groups unless `front: true`.
+3. Adjust a shape later with `shape.set {comp, layerIndex, group: 1, position, fillOpacity, groupPosition, groupScale, groupRotation, groupOpacity, front}`. `shape.read {comp, layerIndex}` lists each group's items and transform first.
+4. Text: `text.add {comp, text: "Title", fontSize: 96, fillColor: [1, 1, 1], font, justification}`.
+5. Place a layer: `layer.set_transform {comp, index, anchorPoint, position, scale, rotation, opacity}`; pass only the fields you change. Scale is `[100, 100]` style percentages.
+6. Parent only after checking the child's own keyframes: `layer.set_parent {comp, index, parent}`.
+7. Name a layer with `layer.rename {comp, index, name}`. Use `bulk.rename` only for many layers at once (see Bulk edits).
 
 ## Parallax loop
 
@@ -50,18 +51,26 @@ var w = thisComp.width;
 
 Apply with `expression.set {comp, index, property: "ADBE Transform Group/ADBE Position", value: "<code>"}`. Start `value[0]` at the layer's start x. A wrap shows a seam unless the art is at least comp-wide. For narrower art, add a second copy offset by `w`.
 
-## Lower third and title card
+## Lower third, title card and transitions
 
 1. `template.lower_third {comp, title, subtitle, duration}` (duration in seconds, default 4). It returns the created layer indices.
-2. Restyle with `text.set` or `property.set` on those indices.
-3. `template.title_card` is not in `operations.ts`. Do not call it.
+2. `template.title_card {comp, title, subtitle, duration}` builds a dark full-comp solid with a centred title that fades and scales in. It returns the created layer indices.
+3. Restyle either with `text.set` or `property.set` on those indices.
+
+## Polish
+
+1. Transition between two layers: `template.transition {comp, from, to, style, duration}`, with `style` `fade`, `push` or `zoom`. `to` starts at `from`'s out point minus `duration`.
+2. Reveal one layer: `template.logo_reveal {comp, index, style}`, with `style` `fade_scale`, `slide` or `spin`. It animates over 0.8 s from the layer's in point.
+3. Add a look: `look.apply {comp, index, look}`, with `look` `glow`, `soft_blur`, `film_grain`, `drop_shadow` or `vignette`. Parameters stay at their defaults, so tune them in the Effect Controls afterwards.
+4. Import footage in bulk with `project.import_folder {path, recursive, folder}`. Files AE refuses are listed in `skipped`.
 
 ## Check your work
 
-1. Before a change: `ae_layer_info {comp}`, and `ae_comp_info {comps: ["Main"]}` for comp settings. No `comp.snapshot` or `comp.diff` op exists, so compare the two reports yourself.
-2. After the change: repeat `ae_layer_info {comp}` and compare.
+1. Before a change: `ae_do {op: "comp.snapshot", args: {comp}}` and keep the result. It lists each layer with its index, name, in/out, transform values, effects and expression flags.
+2. After the change: `ae_do {op: "comp.diff", args: {comp, snapshot: <the result from step 1>}}`. It reports added and removed layers and changed fields.
 3. `ae_render_frame {comp, time}` at two or three times (start, middle, end). Use `maxEdge` to shrink large frames.
-4. Read every `warning` in a result. It names an expression-driven property, so edit its driver instead.
+4. For a motion check, `property.sample {comp, index, property, times}` returns values at the given times.
+5. Read every `warning` in a result. It names an expression-driven property, so edit its driver instead.
 
 ## Bulk edits: plan, then apply
 
