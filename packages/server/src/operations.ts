@@ -1,4 +1,5 @@
 import type { ErrorDetails, OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
+import { registerAudioOperations } from './operations-audio.js';
 import { registerEvalOperations } from './operations-eval.js';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
 import { registerLayerOperations } from './operations-layers.js';
@@ -791,6 +792,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerProjectOperations(register);
   registerVersionOperations(register);
   registerMogrtOperations(register);
+  registerAudioOperations(register);
 
   return registry;
 }

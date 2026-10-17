@@ -61,6 +61,7 @@ const BRIDGE_OPS = [
   'look.apply',
   'versions.generate',
   'mogrt.export',
+  'audio.to_keyframes',
   'rig.null_controller',
   'effect.apply',
   'effect.list_on_layer',

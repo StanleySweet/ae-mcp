@@ -241,6 +241,11 @@ export class MockCompItem extends MockItem {
     return null;
   }
 
+  // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemframeduration
+  get frameDuration(): number {
+    return 1 / this.frameRate;
+  }
+
   // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemmotiongraphicstemplatename
   motionGraphicsTemplateName = '';
   // Essential graphics controls, by name, in panel order (added through Property.addToMotionGraphicsTemplateAs).
