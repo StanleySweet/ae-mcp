@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { discoverAEVersions, discoverAeExtensions } from '@ae-mcp/core';
 import { bridgeVersionDiffers } from './bridge-version.js';
 import { readHeartbeat } from './heartbeat.js';
+import { checkForUpdate, type UpdateCheckOptions } from './update-check.js';
 
 export type CheckStatus = 'ok' | 'fail';
 
@@ -24,6 +25,35 @@ export interface SetupDeps {
   expectedOperations?: string[];
   /** The server's version; the bridge heartbeat must report the same release. */
   expectedBridgeVersion?: string;
+  /** The running server version; when given, check_setup also looks for a newer release. */
+  serverVersion?: string;
+  /** Test seams and opt-out for the update check (see update-check.ts). */
+  updateCheck?: Pick<UpdateCheckOptions, 'env' | 'fetchLatest' | 'now' | 'timeoutMs'>;
+}
+
+async function updateCheckRow(deps: SetupDeps): Promise<SetupCheck | null> {
+  if (!deps.serverVersion) {
+    return null;
+  }
+  const result = await checkForUpdate({
+    root: deps.root,
+    current: deps.serverVersion,
+    ...deps.updateCheck,
+  });
+  switch (result.status) {
+    case 'disabled':
+      return null;
+    case 'up_to_date':
+      return { check: 'extension_update', status: 'ok', detail: `up to date (${result.latest})` };
+    case 'update_available':
+      return {
+        check: 'extension_update',
+        status: 'ok',
+        detail: `update available: ${result.latest} at ${result.url}`,
+      };
+    case 'unavailable':
+      return { check: 'extension_update', status: 'ok', detail: `update check unavailable: ${result.reason}` };
+  }
 }
 
 function fail(check: string, fix: string): SetupCheck {
@@ -162,7 +192,7 @@ async function extensionsCheck(homeDir?: string): Promise<SetupCheck> {
 export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {
   const now = deps.now ?? Date.now;
   const heartbeatMaxAgeMs = deps.heartbeatMaxAgeMs ?? 90_000;
-  return [
+  const checks = [
     await afterEffectsCheck(deps.applicationsDir),
     await heartbeatCheck(deps.root, heartbeatMaxAgeMs, now),
     await bridgePayloadCheck(deps.root, heartbeatMaxAgeMs, now, deps.expectedOperations),
@@ -171,4 +201,9 @@ export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {
     await projectSavedVersionCheck(deps.root),
     await extensionsCheck(deps.homeDir),
   ];
+  const update = await updateCheckRow(deps);
+  if (update !== null) {
+    checks.push(update);
+  }
+  return checks;
 }

@@ -66,6 +66,11 @@ With AE open, ask Claude to run the `check_setup` tool. It reports six checks:
   [Destructive operations](#destructive-operations)).
 - `third_party_extensions` — informational: the CEP extensions found (for
   example Animation Composer or Motion), in its `detail`. Always `ok`.
+- `extension_update` — informational: compares the server with the latest GitHub
+  release. Its `detail` says `update available` with the release URL when a newer
+  one exists. Always `ok`; offline it says the check was unavailable. The lookup is
+  cached for a day under `~/.ae-mcp`. Set `AE_MCP_NO_UPDATE_CHECK=1` to turn it off
+  (the row is then omitted and nothing is fetched).
 
 Any failing check carries a `fix` hint. When the five gating checks are green,
 ask Claude to list the tools it can see.

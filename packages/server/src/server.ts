@@ -31,7 +31,7 @@ import { PlanStore } from './plans.js';
 import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
 import { cleanupPartialOutput } from './render-output.js';
 import { loadSettings, type Settings } from './settings.js';
-import { runSetupChecks } from './setup-checks.js';
+import { runSetupChecks, type SetupDeps } from './setup-checks.js';
 
 export const SERVER_NAME = 'ae-mcp';
 export const SERVER_VERSION = '1.4.1';
@@ -49,6 +49,8 @@ export interface ServerOptions {
   settings?: Settings;
   /** Explicit aerender executable; when omitted it is discovered under `applicationsDir`. */
   aerender?: string;
+  /** Update-check seams for check_setup (release source, clock, env opt-out). */
+  updateCheck?: SetupDeps['updateCheck'];
   /** Test seam for the aerender process spawner. */
   spawnAerender?: SpawnAerender;
   /** Background job registry; a fresh one is created when omitted. */
@@ -349,6 +351,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
         applicationsDir: options.applicationsDir,
         expectedOperations: operations.names(),
         expectedBridgeVersion: SERVER_VERSION,
+        serverVersion: SERVER_VERSION,
+        updateCheck: options.updateCheck,
       });
       return text(checks);
     },

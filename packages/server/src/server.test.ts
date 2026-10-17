@@ -48,6 +48,8 @@ describe('mcp server skeleton', () => {
     const { client, server } = await connect({
       root: await tempRoot(),
       applicationsDir: await mkdtemp(join(tmpdir(), 'ae-mcp-server-apps-')),
+      // Never reach GitHub from a test (update-check.ts).
+      updateCheck: { env: { AE_MCP_NO_UPDATE_CHECK: '1' } },
     });
 
     const tools = await client.listTools();
