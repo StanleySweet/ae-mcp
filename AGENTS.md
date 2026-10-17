@@ -24,6 +24,13 @@ Code map: `docs/agents/code-map.md` — file:line map of tool registration, brid
 
 Before proposing or editing motion in a user's project, load `docs/agents/animation-principles.md` — how to treat keyframes vs expressions, naming, parenting, easing and safety when driving AE. The server sends a short core of it as its `instructions` (`packages/server/src/instructions.ts`) and serves the full file as the resource `ae-mcp://animation-principles`, so callers get it without the source checked out.
 
+### Delegation and release
+
+Issue work goes to the `ae-issue-worker` agent (`.claude/agents/ae-issue-worker.md`, Haiku, one
+worktree each): give it the issue numbers, their order and the exact commit subjects. Merge its
+branch with the `merge-agent-branches` skill (`scripts/agents/merge-branch.sh`). Ship with the
+`release` skill; reset the drive's scratch project with `scripts/test-drive/reset.jsx` first.
+
 ## Documentation discipline
 
 ### Write down what you learn, before you finish
