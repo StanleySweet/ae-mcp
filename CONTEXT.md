@@ -9,7 +9,7 @@ the rest of the docs use. Rewritten in place as state changes; history lives in
 After Effects for Claude — an MCP server that lets Claude Desktop see and edit the
 After Effects project the user has open. macOS only.
 
-v1.3.0 is released (1.1.0 contract changes in ADR-0007; dialogs and batch rollback in ADR-0008). `npm run test:drive` exercises every tool against a running AE: pushing a `v*` tag runs `release.yml`, which publishes the
+v1.4.0 is released (1.1.0 contract changes in ADR-0007; dialogs and batch rollback in ADR-0008). `npm run test:drive` exercises every tool against a running AE: pushing a `v*` tag runs `release.yml`, which publishes the
 `.mcpb`, the Setup app for arm64 and x64, and `SHA256SUMS.txt`.
 
 ## Shape

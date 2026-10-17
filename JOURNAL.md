@@ -5,6 +5,14 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.4.0`**: ships #224-#226, #257 and #258.
+  - **Test drive:** runs in its own saved scratch project, via `project.new`. AE reports an empty untitled project as dirty; that is treated as safe.
+  - **Effects and templates:** effect parameters read from live AE (wipe, tuned looks, a bigger library); the probe is in `scripts/probes`.
+  - **New tools:** frame comparison and checkpoints.
+  - **Fixes:** audio and Source Text by match name (#257). Batch rollback now undoes in a separate job (#258), because an in-script Undo raised a modal "Undo group mismatch" that froze the bridge.
+  - **Data safety:** `bunny.aep` untouched; its unsaved state was saved as a copy before the scratch project opened.
+  - **Test drive on AE 26.5:** 166 passed, 0 failed, 5 skipped.
+
 - **`chore(release): v1.3.0`**: ships #212–#223, from Claude Desktop feedback on `bunny.aep` and the competitor gaps.
   - **Fixes:** the Gradient Ramp NO_VALUE crash, `check_setup`'s circular advice, and keyframed properties failing on set (#223, found by the test drive).
   - **Features:** richer shapes; `layer.rename` and a full `set_transform`; snapshot/diff/sample; templates and looks; folder import, reduce and consolidate; required fields in the catalog; `eval.run`, which had never been built; correct ease counts.
