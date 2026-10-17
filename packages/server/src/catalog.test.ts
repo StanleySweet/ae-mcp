@@ -35,7 +35,7 @@ async function connectServer(operations: OperationRegistry): Promise<Client> {
 async function catalog(
   client: Client,
   args: Record<string, unknown>,
-): Promise<{ operations: unknown[] }> {
+): Promise<{ operations: unknown[]; version?: string }> {
   const result = await client.callTool({ name: 'ae_catalog', arguments: args });
   const [first] = result.content as Array<{ type: string; text: string }>;
   return JSON.parse(first!.text);

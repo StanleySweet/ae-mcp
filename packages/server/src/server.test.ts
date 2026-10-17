@@ -52,7 +52,7 @@ describe('mcp server skeleton', () => {
       guide: '# Full guide',
     });
     const instructions = client.getInstructions() ?? '';
-    expect(instructions.length).toBeLessThan(800);
+    expect(instructions.length).toBeLessThan(1000);
     expect(instructions).toContain(ANIMATION_GUIDE_URI);
     const resource = await client.readResource({ uri: ANIMATION_GUIDE_URI });
     expect(resource.contents[0]).toMatchObject({ text: '# Full guide', mimeType: 'text/markdown' });

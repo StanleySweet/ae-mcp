@@ -13,10 +13,11 @@ export const SERVER_INSTRUCTIONS = [
   'Inspect first; modify, do not rebuild; reuse controllers.',
   'Respect layer order, parenting, masks, effects; check child keys before reparenting.',
   'Descriptive names (no Null 12); keep project naming.',
+  'Preserve timing and visual intent when editing animation.',
   'Easy Ease for landings, hold for jumps, roving keys for paths. Avoid extra keys.',
   'Expressions: named layers, no magic numbers, named loop; tunables on a Slider.',
   'Uniform Scale; check comp motion blur before per-layer blur.',
   'Read an expression or key set before replacing; state the trade-off.',
-  'Validate first; ask before broad or destructive changes.',
+  'Validate first; ask before broad or destructive changes; just do reversible in-scope per-property edits.',
   'Ties: simplest maintainable solution.',
 ].join('\n');
