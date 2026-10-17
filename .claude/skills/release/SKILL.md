@@ -15,6 +15,7 @@ Do not release while a known bug is open from the current round, or while CI is 
 3. Live test drive against the running After Effects. The drive works in its own scratch
    project and never touches the user's project.
    ```
+   npm run bridge:build && cp packages/bridge/dist/payload.jsx ~/.ae-mcp/bridge/current.jsx
    osascript -e 'tell application "Adobe After Effects 2026" to DoScriptFile "'$PWD'/scripts/test-drive/reset.jsx"'
    npm run test:drive > .tmp/drive.log 2>&1; grep -E "passed|✗" -A1 .tmp/drive.log
    ```
@@ -22,6 +23,8 @@ Do not release while a known bug is open from the current round, or while CI is 
    `/ae-mcp/.tmp/test-drive/`; otherwise it does nothing. Expect 0 failed. If a failure is
    a scenario bug, fix the scenario in its own commit. If it is a product bug, fix it
    first, with its own issue.
+   AE runs the installed payload, not the working tree (docs/findings/2026-10-14-stale-bridge-payload.md):
+   skip the copy and new ops fail with UNKNOWN_TOOL "no handler for tool".
    A modal dialog in AE blocks every later job, so a cascade of "the bridge wrote no result"
    errors means a dialog is open. Ask the user to look at AE.
 
