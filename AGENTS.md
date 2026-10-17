@@ -30,6 +30,8 @@ Issue work goes to the `ae-issue-worker` agent (`.claude/agents/ae-issue-worker.
 worktree each): give it the issue numbers, their order and the exact commit subjects. Merge its
 branch with the `merge-agent-branches` skill (`scripts/agents/merge-branch.sh`). Ship with the
 `release` skill; reset the drive's scratch project with `scripts/test-drive/reset.jsx` first.
+For a task with several mechanical, file-disjoint parts, the `literal-parallel-execution` skill
+decides whether to split it across `cheap-worker` agents (fully specified leaves only).
 
 ## Documentation discipline
 
