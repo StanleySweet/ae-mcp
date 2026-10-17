@@ -157,6 +157,14 @@ const skipOp = (name: string, reason: string): Step => ({
   skip: reason,
 });
 
+const skipTool = (name: string, reason: string): Step => ({
+  id: `skip:${name}`,
+  kind: 'tool',
+  name,
+  args: () => ({}),
+  skip: reason,
+});
+
 /** A file in the drive's output folder (`.tmp/test-drive`). */
 const outFile = (s: DriveState, name: string): string => join(s.vars.outputDir as string, name);
 
@@ -944,9 +952,9 @@ export const scenario: Step[] = [
   tool('ae_project_info.final', 'ae_project_info', () => ({})),
 
   // --- checkpoints -----------------------------------------------------------
-  // checkpoint_create and checkpoint_revert both run File > Increment and Save,
-  // which the drive never does (see project.increment_save below).
-  skipTool('checkpoint_create', 'runs File > Increment and Save; the drive never saves the open project'),
+  // The drive runs in its own saved scratch project (#224), so a checkpoint only
+  // increments that scratch file.
+  tool('checkpoint_create', 'checkpoint_create', () => ({ name: 'drive-a' })),
   tool('checkpoint_list', 'checkpoint_list', () => ({})),
   skipTool('checkpoint_revert', 'reopens the project; covered by unit tests'),
 

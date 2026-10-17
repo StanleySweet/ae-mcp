@@ -8,10 +8,13 @@
 // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectclose
 AEMCP.register('project.new', function (args) {
     var force = args && args.force === true;
-    if (!force && app.project.dirty !== false) {
+    // AE reports a fresh untitled project as dirty; with no file and no items
+    // there is nothing to lose (the same rule as increment_save, #204).
+    var emptyUntitled = !app.project.file && app.project.numItems === 0;
+    if (!force && !emptyUntitled && app.project.dirty !== false) {
         aemcpAbortArgs('the open project has unsaved changes: save it or pass force: true');
     }
-    if (force) {
+    if (force || emptyUntitled) {
         app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES);
     }
     var created = app.newProject();

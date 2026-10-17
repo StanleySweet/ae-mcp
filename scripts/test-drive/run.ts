@@ -159,9 +159,13 @@ __out.close();`,
 
   // #224: never drive the user's project. Refuse while it has unsaved changes.
   const info = await call('ae_project_info', {});
-  const originalPath = (info.json as { file?: string | null } | null)?.file ?? null;
+  const project = info.json as { file?: string | null; numItems?: number } | null;
+  const originalPath = project?.file ?? null;
+  // AE reports a fresh untitled project as dirty; with no file and no items there
+  // is nothing to protect (the same rule as increment_save, #204).
+  const emptyUntitled = originalPath === null && project?.numItems === 0;
   const dirty = await runJsx('String(app.project.dirty)');
-  if (dirty !== 'false') {
+  if (dirty !== 'false' && !emptyUntitled) {
     console.log(
       red(
         'The open After Effects project has unsaved changes (or Project.dirty is unavailable). Save or close it, then run the drive again. Nothing was changed.',

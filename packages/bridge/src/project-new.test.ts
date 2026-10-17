@@ -66,4 +66,15 @@ describe('project.new', () => {
     expect(ae.project.numItems).toBe(0);
     expect(ae.project.dirty).toBe(false);
   });
+
+  // A fresh AE's untitled project reports dirty = true; nothing to protect (#224).
+  it('replaces an empty untitled project even when it reports unsaved changes', async () => {
+    const { ctx, ae } = await payloadContext();
+    ae.project.file = null;
+    ae.project.dirty = true;
+
+    const out = invoke(ctx, 'project.new', {});
+
+    expect(out.ok).toBe(true);
+  });
 });
