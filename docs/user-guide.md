@@ -75,9 +75,11 @@ With AE open, ask Claude to run the `check_setup` tool. It reports six checks:
 Any failing check carries a `fix` hint. When the five gating checks are green,
 ask Claude to list the tools it can see.
 
-On connect the server also sends Claude its animation principles (keyframes vs
-expressions, naming, easing, safety), so motion edits follow one consistent
-ruleset without you pasting any context.
+On connect the server also sends Claude a short core of its animation principles
+(keyframes vs expressions, naming, easing, safety) as the MCP instructions, so
+motion edits follow one consistent ruleset without you pasting any context. The
+full text is the MCP resource `ae-mcp://animation-principles`; clients that read
+resources can load it for the reasoning behind each rule.
 
 ## Using ae-mcp from Cursor
 

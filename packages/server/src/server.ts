@@ -19,6 +19,7 @@ import { isValidCheckpointName, readCheckpoints, saveCheckpoint } from './checkp
 import { buildAeContext } from './context.js';
 import { dismissFrontDialog, listDialogs } from './dialogs.js';
 import { compareFrames, type FrameComparison } from './frame-compare.js';
+import { ANIMATION_GUIDE_URI } from './instructions.js';
 import { JobStore } from './jobs.js';
 import {
   closestNames,
@@ -57,8 +58,10 @@ export interface ServerOptions {
   jobStore?: JobStore;
   /** Plan registry for previewed bulk edits; a fresh one is created when omitted. */
   planStore?: PlanStore<BulkStep>;
-  /** MCP `instructions` returned to the client on initialize (docs/agents/animation-principles.md). */
+  /** MCP `instructions` returned to the client on initialize (a short core of the animation rules). */
   instructions?: string;
+  /** Full animation principles, served as the resource ANIMATION_GUIDE_URI (docs/agents/animation-principles.md). */
+  guide?: string;
   /** How long `ae_render_frame` waits for AE to finish writing the PNG (test seam). */
   frameWait?: FrameWait;
   /** Compares two rendered frames for `ae_render_frame` `compareWith` (test seam). */
@@ -208,6 +211,21 @@ export function createServer(options: ServerOptions = {}): McpServer {
     { name: SERVER_NAME, version: SERVER_VERSION },
     { instructions: options.instructions },
   );
+  if (options.guide !== undefined) {
+    const guide = options.guide;
+    server.registerResource(
+      'animation-principles',
+      ANIMATION_GUIDE_URI,
+      {
+        title: 'Animation principles',
+        description: 'How to treat keyframes vs expressions, naming, parenting, easing and safety when driving After Effects.',
+        mimeType: 'text/markdown',
+      },
+      async () => ({
+        contents: [{ uri: ANIMATION_GUIDE_URI, mimeType: 'text/markdown', text: guide }],
+      }),
+    );
+  }
   const root = options.root ?? queueRoot();
   const maxResultBytes = options.maxResultBytes ?? MAX_RESULT_BYTES;
   const operations = options.operations ?? defaultOperationRegistry();

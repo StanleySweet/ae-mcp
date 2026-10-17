@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { describe, it, expect } from 'vitest';
+import { ANIMATION_GUIDE_URI, SERVER_INSTRUCTIONS } from './instructions.js';
 import { createServer, SERVER_NAME, SERVER_VERSION } from './server.js';
 
 async function connect(options: Parameters<typeof createServer>[0] = {}): Promise<{
@@ -40,6 +41,20 @@ describe('mcp server skeleton', () => {
   it('serves the instructions option to the client on connect', async () => {
     const { client, server } = await connect({ instructions: 'Animation Principles' });
     expect(client.getInstructions()).toBe('Animation Principles');
+    await client.close();
+    await server.close();
+  });
+
+  it('sends short instructions and serves the full guide as a resource', async () => {
+    const { client, server } = await connect({
+      instructions: SERVER_INSTRUCTIONS,
+      guide: '# Full guide',
+    });
+    const instructions = client.getInstructions() ?? '';
+    expect(instructions.length).toBeLessThan(800);
+    expect(instructions).toContain(ANIMATION_GUIDE_URI);
+    const resource = await client.readResource({ uri: ANIMATION_GUIDE_URI });
+    expect(resource.contents[0]).toMatchObject({ text: '# Full guide', mimeType: 'text/markdown' });
     await client.close();
     await server.close();
   });

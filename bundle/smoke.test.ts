@@ -7,6 +7,6 @@ describe('bundle:smoke', () => {
     expect(toolNames).toContain('check_setup');
     expect(toolNames).toContain('ae_catalog');
     expect(toolNames).toContain('ae_do');
-    expect(instructions).toContain('Animation Principles');
+    expect(instructions).toContain('ae-mcp://animation-principles');
   }, 60_000);
 });
