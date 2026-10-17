@@ -5,6 +5,15 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-17
 
+- **`chore(release): v1.5.0`**: ships 26 of the 30 improvement issues (#227-#256).
+  - **Addressing and batches:** layers by name or id on every layer operation (#227); creating ops return `{index, id, name}` (#228); `$n.field` references between `batch.run` steps (#229).
+  - **Fewer tokens:** shorter tool descriptions and instructions (full text as MCP resources), short error hints, lean `ae_catalog` plus `ae_describe` and a catalog version, compact `ae_layer_info`, truncated long strings, 768 px default frames (#230, #250-#256).
+  - **MCP features:** resources, prompts, progress notifications for renders, precise error details, optional `verify` diff (#231-#233, #235, #237); contact sheets and region crops (#234).
+  - **Workflow:** step history and replay, user snippets, project lint, CSV/JSON versions, export presets, MOGRT export, audio-driven keys, localization fit-to-box, footage relink, stale-bridge warning, update check (#236-#248).
+  - **Left open (Refs):** #236 (`history_undo` only names the Cmd+Z presses; ADR-0009), #238 (replay jsx untested in AE), #241 (MOGRT control values not in the guide), #249 (UXP spike needs an AE 26.5 beta; ADR-0010 proposed).
+  - **Process:** seven Haiku agents in worktrees, merged by cherry-pick. The round produced the `ae-issue-worker` agent and the `merge-agent-branches` and `release` skills. Tests leaked temp dirs and filled the disk; vitest now cleans `TMPDIR` per run. Agents cleared the npm cache and old `ae-mcp-*` test dirs to recover space.
+  - **Test drive on AE 26.5:** 173 passed, 0 failed, 9 skipped, with the fresh payload installed.
+
 - **`chore(release): v1.4.1`**: ships #259.
   - **Fix:** the bridge never runs Edit > Undo by script (ADR-0009). Any scripted Undo, even in a separate job, raised AE's modal "Undo group mismatch" and froze the bridge. `project.undo` is removed. A failed atomic batch now tells the user to press Cmd+Z once. The installer live test is read-only.
   - **Test drive on AE 26.5:** 166 passed, 0 failed, 4 skipped, with no modal.
