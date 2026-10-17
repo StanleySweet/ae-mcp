@@ -45,7 +45,13 @@ var AEMCP_MATCH = {
     SHAPE_GROUP_POSITION: 'ADBE Vector Position',
     SHAPE_GROUP_SCALE: 'ADBE Vector Scale',
     SHAPE_GROUP_ROTATION: 'ADBE Vector Rotation',
-    SHAPE_GROUP_OPACITY: 'ADBE Vector Group Opacity'
+    SHAPE_GROUP_OPACITY: 'ADBE Vector Group Opacity',
+    // First-party effects (#217, look.apply); parameters stay at defaults.
+    GLOW: 'ADBE Glo2',
+    SOFT_BLUR: 'ADBE Gaussian Blur 2',
+    FILM_GRAIN: 'ADBE Noise',
+    DROP_SHADOW: 'ADBE Drop Shadow',
+    VIGNETTE: 'CS Vignette'
 };
 
 // The only way the bridge adds a property: ask AE (canAddProperty) whether the
@@ -1648,6 +1654,25 @@ function aemcpSnippetCode(name, args) {
     }
     if (name === 'countdown') {
         return 'Math.max(0, Math.ceil(' + aemcpSnippetNumber(args, 'from', 10, 0) + ' - time)).toString()';
+    }
+    if (name === 'wiggle_smooth') {
+        var wFreq = aemcpSnippetNumber(args, 'frequency', 2, 0.001);
+        var wAmp = aemcpSnippetNumber(args, 'amplitude', 10, 0);
+        var octaves = aemcpSnippetNumber(args, 'octaves', 1, 1);
+        return 'wiggle(' + wFreq + ', ' + wAmp + ', ' + Math.floor(octaves) + ')';
+    }
+    if (name === 'loop_cycle') return 'loopOut("cycle")';
+    if (name === 'loop_offset') return 'loopOut("offset")';
+    if (name === 'spring') {
+        // Damped sine after the last key, driven by the velocity at that key:
+        // displacement = v0 * sin(2 pi f t) / (2 pi f) / exp(decay t).
+        var sFreq = aemcpSnippetNumber(args, 'frequency', 2, 0.001);
+        var sDecay = aemcpSnippetNumber(args, 'decay', 5, 0);
+        return 'if (numKeys > 1 && time > key(numKeys).time) { t = time - key(numKeys).time; value + velocityAtTime(key(numKeys).time - thisComp.frameDuration / 10) * Math.sin(' + sFreq + ' * t * 2 * Math.PI) / (' + sFreq + ' * 2 * Math.PI) / Math.exp(' + sDecay + ' * t); } else { value; }';
+    }
+    if (name === 'clock') {
+        // Source Text: elapsed comp time as MM:SS.
+        return 'm = Math.floor(time / 60); s = Math.floor(time % 60); (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;';
     }
     return null;
 }

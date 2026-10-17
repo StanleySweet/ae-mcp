@@ -54,6 +54,10 @@ const BRIDGE_OPS = [
   'expression.snippet',
   'text.animate',
   'template.lower_third',
+  'template.title_card',
+  'template.transition',
+  'template.logo_reveal',
+  'look.apply',
   'rig.null_controller',
   'effect.apply',
   'effect.list_on_layer',
@@ -118,7 +122,8 @@ describe('server operation registry', () => {
     for (const name of registry.names()) {
       const definition = registry.get(name);
       expect(definition).toBeDefined();
-      expect(definition!.category).toBe(name.split('.')[0]);
+      // look.apply is an effect-category op (#217), not a 'look' category.
+      expect(definition!.category).toBe(name === 'look.apply' ? 'effect' : name.split('.')[0]);
       expect(definition!.description.length).toBeGreaterThan(0);
       expect(typeof definition!.readOnly).toBe('boolean');
       expect(typeof definition!.destructive).toBe('boolean');

@@ -50,6 +50,11 @@ const DOCUMENTED = new Set([
   'ADBE Vector Scale',
   'ADBE Vector Rotation',
   'ADBE Vector Group Opacity',
+  'ADBE Glo2',
+  'ADBE Gaussian Blur 2',
+  'ADBE Noise',
+  'ADBE Drop Shadow',
+  'CS Vignette',
 ]);
 
 // Match names the scripting guide does not list, read from live AE instead
@@ -57,7 +62,7 @@ const DOCUMENTED = new Set([
 // Only add to this list after reading the name back from a running AE.
 const READ_FROM_LIVE_AE = new Set(['ADBE Mask Atom', 'ADBE Mask Shape']);
 
-const BRIDGE_SOURCES = ['job-runner.js', 'serializers.js', 'handlers.js', 'handlers-layers.js', 'handlers-housekeeping.js', 'handlers-verify.js'];
+const BRIDGE_SOURCES = ['job-runner.js', 'serializers.js', 'handlers.js', 'handlers-layers.js', 'handlers-housekeeping.js', 'handlers-verify.js', 'handlers-templates.js'];
 
 function source(file: string): string {
   return readFileSync(join(import.meta.dirname, file), 'utf8');

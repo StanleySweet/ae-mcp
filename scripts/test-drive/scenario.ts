@@ -82,6 +82,7 @@ export function createState(now: Date = new Date()): DriveState {
 
 const POS = 'ADBE Transform Group/ADBE Position';
 const OPACITY = 'ADBE Transform Group/ADBE Opacity';
+const TEXT_DOCUMENT = 'ADBE Text Properties/ADBE Text Document';
 const SCALE = 'ADBE Transform Group/ADBE Scale';
 const BLUR = 'ADBE Gaussian Blur 2';
 const BLUR_AMOUNT = 'ADBE Gaussian Blur 2-0001';
@@ -326,6 +327,31 @@ export const scenario: Step[] = [
     duration: 4,
   })),
   refreshLayers('ae_layer_info.after-build'),
+  op('template.title_card', 'template.title_card', (s) => ({
+    comp: s.comp,
+    title: 'Title Card',
+    subtitle: 'test drive',
+    duration: 4,
+  })),
+  refreshLayers('ae_layer_info.after-title-card'),
+  op('template.transition', 'template.transition', (s) => ({
+    comp: s.comp,
+    from: layerIndex(s, 'Shapes'),
+    to: layerIndex(s, 'Solid'),
+    style: 'push',
+    duration: 0.5,
+  })),
+  op('template.logo_reveal', 'template.logo_reveal', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Text'),
+    style: 'fade_scale',
+  })),
+  op('look.apply', 'look.apply', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Solid'),
+    look: 'glow',
+  })),
+  refreshLayers('ae_layer_info.after-templates'),
   op('layer.set_3d.shape', 'layer.set_3d', (s) => ({
     comp: s.comp,
     index: layerIndex(s, 'Shapes'),
@@ -505,6 +531,51 @@ export const scenario: Step[] = [
     snippet: 'wiggle',
     amplitude: 20,
     frequency: 1,
+  })),
+  op('expression.snippet.wiggle_smooth', 'expression.snippet', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Null'),
+    property: POS,
+    snippet: 'wiggle_smooth',
+    frequency: 1,
+    amplitude: 15,
+    octaves: 2,
+  })),
+  op('expression.snippet.loop_cycle', 'expression.snippet', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Null'),
+    property: POS,
+    snippet: 'loop_cycle',
+  })),
+  op('expression.snippet.loop_offset', 'expression.snippet', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Null'),
+    property: POS,
+    snippet: 'loop_offset',
+  })),
+  op('expression.snippet.spring', 'expression.snippet', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Null'),
+    property: POS,
+    snippet: 'spring',
+    frequency: 2,
+    decay: 4,
+  })),
+  op('expression.clear.snippets', 'expression.clear', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Null'),
+    property: POS,
+  })),
+  op('expression.snippet.clock', 'expression.snippet', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Text'),
+    property: TEXT_DOCUMENT,
+    snippet: 'clock',
+  })),
+  op('expression.clear.clock', 'expression.clear', (s) => ({
+    comp: s.comp,
+    index: layerIndex(s, 'Text'),
+    property: TEXT_DOCUMENT,
   })),
   tool('ae_expression_report', 'ae_expression_report', (s) => ({ comps: [s.comp] })),
   op('expression.clear', 'expression.clear', (s) => ({

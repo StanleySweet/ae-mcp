@@ -2,6 +2,7 @@ import type { OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
 
 import { registerLayerOperations } from './operations-layers.js';
+import { registerTemplateOperations } from './operations-templates.js';
 import { registerVerifyOperations } from './operations-verify.js';
 
 export class OperationRegistry {
@@ -295,17 +296,18 @@ export function defaultOperationRegistry(): OperationRegistry {
     schema: { comp, index: layerIndex, property: propertyName },
   }));
   register(
-    operation('expression.snippet', 'expression', 'Apply a named expression snippet to a property: wiggle, loop, delay, overshoot, loop_pingpong, inertia, bounce (amplitude 0.1, frequency 2, decay 5), time_counter (Source Text, rate 1/s), countdown (Source Text, from seconds, default 10).', {
+    operation('expression.snippet', 'expression', 'Apply a named expression snippet to a property: wiggle, loop, delay, overshoot, loop_pingpong, inertia, bounce (amplitude 0.1, frequency 2, decay 5), time_counter (Source Text, rate 1/s), countdown (Source Text, from seconds, default 10), wiggle_smooth (frequency 2, amplitude 10, octaves 1), loop_cycle, loop_offset, spring (damped oscillation after the last key: frequency 2, decay 5), clock (Source Text, elapsed time as MM:SS).', {
       schema: {
         comp,
         index: layerIndex,
         property: propertyName,
         snippet: {
           type: 'string',
-          enum: ['wiggle', 'loop', 'delay', 'overshoot', 'loop_pingpong', 'inertia', 'bounce', 'time_counter', 'countdown'],
+          enum: ['wiggle', 'loop', 'delay', 'overshoot', 'loop_pingpong', 'inertia', 'bounce', 'time_counter', 'countdown', 'wiggle_smooth', 'loop_cycle', 'loop_offset', 'spring', 'clock'],
         },
         amplitude: { type: 'number' },
         frequency: { type: 'number' },
+        octaves: { type: 'number' },
         decay: { type: 'number' },
         rate: { type: 'number' },
         from: { type: 'number' },
@@ -716,6 +718,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerLayerOperations(register);
   registerHousekeepingOperations(register);
   registerVerifyOperations(register);
+  registerTemplateOperations(register);
 
   return registry;
 }
