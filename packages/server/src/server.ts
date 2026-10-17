@@ -78,6 +78,8 @@ export interface ServerOptions {
   frameWait?: FrameWait;
   /** Compares two rendered frames for `ae_render_frame` `compareWith` (test seam). */
   frameCompare?: (beforePng: string, afterPng: string) => Promise<FrameComparison>;
+  /** Scales a rendered PNG so its longest edge is `maxEdge`, returning the new path or null (test seam). */
+  resizeFrame?: (file: string, maxEdge: number) => Promise<string | null>;
 }
 
 /** One operation invocation stored in a previewed bulk plan. */
@@ -135,8 +137,8 @@ async function persistSavedVersionPath(root: string, savedFile: string): Promise
 of a smaller file (or null when it cannot resize). */
 export type FrameDownscale = (file: string) => Promise<string | null>;
 
-/** Longest edge a rendered frame is scaled down to when it is too large to return. */
-export const MAX_RENDER_EDGE = 1568;
+/** Longest edge a returned frame is scaled to when maxEdge is not given (#253; vision-sized). */
+export const DEFAULT_RENDER_EDGE = 768;
 
 const execFileAsync = promisify(execFile);
 
@@ -181,6 +183,14 @@ async function waitForCompletePng(file: string, wait: FrameWait): Promise<Buffer
   }
 }
 
+/** Longest edge of a PNG read from its IHDR chunk; 0 when the bytes are not a PNG. */
+function pngLongestEdge(png: Buffer): number {
+  if (png.length < 24 || png.toString('ascii', 12, 16) !== 'IHDR') {
+    return 0;
+  }
+  return Math.max(png.readUInt32BE(16), png.readUInt32BE(20));
+}
+
 /** True when `file` resolves to `<root>/render` or a path inside it. */
 export function isInsideRenderDir(root: string, file: string): boolean {
   const renderDir = resolve(root, 'render');
@@ -194,6 +204,7 @@ export async function readRenderedFrame(
   maxBytes: number,
   downscale?: FrameDownscale,
   wait: FrameWait = DEFAULT_FRAME_WAIT,
+  maxEdge?: number,
 ): Promise<{ ok: true; data: string } | { ok: false; message: string }> {
   const target = resolve(file);
   if (!isInsideRenderDir(root, file)) {
@@ -206,7 +217,9 @@ export async function readRenderedFrame(
       message: `rendered frame was not finished writing after ${wait.timeoutMs} ms: ${file}`,
     };
   }
-  if (buffer.length > maxBytes && downscale) {
+  // Downscale when the file is too large to return, or when its longest edge exceeds maxEdge.
+  const tooWide = maxEdge !== undefined && pngLongestEdge(buffer) > maxEdge;
+  if ((buffer.length > maxBytes || tooWide) && downscale) {
     const smaller = await downscale(target);
     if (smaller) {
       try {
@@ -725,7 +738,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_render_frame',
     {
       description:
-        'Render one frame (default: active comp, frame 0) to PNG, returned as image plus metadata. compareWith adds a diff. See docs/user-guide.md.',
+        'Render one frame (default: active comp, frame 0) to PNG, returned as image plus metadata. maxEdge default 768. compareWith adds a diff. See docs/user-guide.md.',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         time: z.number().optional(),
@@ -753,13 +766,14 @@ export function createServer(options: ServerOptions = {}): McpServer {
           true,
         );
       }
-      const maxEdge = args.maxEdge ?? MAX_RENDER_EDGE;
+      const maxEdge = args.maxEdge ?? DEFAULT_RENDER_EDGE;
       const read = await readRenderedFrame(
         root,
         value.file,
         MAX_RENDER_BYTES,
-        (file) => shrinkPng(file, maxEdge),
+        (file) => (options.resizeFrame ?? shrinkPng)(file, maxEdge),
         options.frameWait,
+        maxEdge,
       );
       if (!read.ok) {
         return text(makeError('SCRIPT_ERROR', read.message), true);

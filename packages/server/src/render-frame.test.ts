@@ -30,7 +30,10 @@ type RenderHandler = (root: string) => HandlerMap;
 
 async function connect(
   render: RenderHandler,
-  serverOptions: { frameCompare?: (before: string, after: string) => Promise<FrameComparison> } = {},
+  serverOptions: {
+    frameCompare?: (before: string, after: string) => Promise<FrameComparison>;
+    resizeFrame?: (file: string, maxEdge: number) => Promise<string | null>;
+  } = {},
 ): Promise<{ client: Client; close: () => Promise<void> }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-render-frame-'));
   const root = join(home, '.ae-mcp');
@@ -212,6 +215,67 @@ describe('ae_render_frame tool', () => {
 
     expect(result.isError).toBeFalsy();
     expect(imageContent(result).mimeType).toBe('image/png');
+  });
+
+  describe('image size (#253)', () => {
+    /** A PNG whose IHDR says width x height, followed by the end marker. */
+    const pngWithSize = (width: number, height: number): Buffer => {
+      const ihdr = Buffer.alloc(25);
+      ihdr.writeUInt32BE(13, 0);
+      ihdr.write('IHDR', 4, 'ascii');
+      ihdr.writeUInt32BE(width, 8);
+      ihdr.writeUInt32BE(height, 12);
+      return Buffer.concat([FAKE_PNG.subarray(0, 8), ihdr, PNG_END]);
+    };
+    const sizedRender =
+      (width: number, height: number): RenderHandler =>
+      (root) => ({
+        'render.frame': async () => {
+          await mkdir(join(root, 'render'), { recursive: true });
+          const file = join(root, 'render', 'Main-0.png');
+          await writeFile(file, pngWithSize(width, height));
+          return { method: 'direct', comp: 'Main', file, time: 0, frame: 0, width, height };
+        },
+      });
+    const imageSize = (result: { content: unknown[] }): { width: number; height: number } => {
+      const data = Buffer.from(imageContent(result).data, 'base64');
+      return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+    };
+    const shrinkTo = (requested: number[]) => async (file: string, maxEdge: number) => {
+      requested.push(maxEdge);
+      const smaller = file.replace(/\.png$/, `-${maxEdge}.png`);
+      await writeFile(smaller, pngWithSize(Math.min(maxEdge, 1920), Math.round((Math.min(maxEdge, 1920) * 1080) / 1920)));
+      return smaller;
+    };
+
+    it('scales a larger frame to a longest edge of 768 by default', async () => {
+      const requested: number[] = [];
+      const client = await start(sizedRender(1920, 1080), { resizeFrame: shrinkTo(requested) });
+      const result = (await client.callTool({ name: 'ae_render_frame', arguments: {} })) as { content: unknown[] };
+
+      expect(requested).toEqual([768]);
+      expect(imageSize(result)).toEqual({ width: 768, height: 432 });
+    });
+
+    it('scales to a larger maxEdge when the caller asks for one', async () => {
+      const requested: number[] = [];
+      const client = await start(sizedRender(1920, 1080), { resizeFrame: shrinkTo(requested) });
+      const result = (await client.callTool({ name: 'ae_render_frame', arguments: { maxEdge: 1200 } })) as {
+        content: unknown[];
+      };
+
+      expect(requested).toEqual([1200]);
+      expect(imageSize(result)).toEqual({ width: 1200, height: 675 });
+    });
+
+    it('leaves a frame within maxEdge untouched', async () => {
+      const requested: number[] = [];
+      const client = await start(sizedRender(640, 360), { resizeFrame: shrinkTo(requested) });
+      const result = (await client.callTool({ name: 'ae_render_frame', arguments: {} })) as { content: unknown[] };
+
+      expect(requested).toEqual([]);
+      expect(imageSize(result)).toEqual({ width: 640, height: 360 });
+    });
   });
 
   describe('compareWith', () => {

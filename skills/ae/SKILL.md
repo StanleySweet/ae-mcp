@@ -72,7 +72,7 @@ Apply with `expression.set {comp, index, property: "ADBE Transform Group/ADBE Po
 
 1. Before a change: `ae_do {op: "comp.snapshot", args: {comp}}` and keep the result. It lists each layer with its index, name, in/out, transform values, effects and expression flags.
 2. After the change: `ae_do {op: "comp.diff", args: {comp, snapshot: <the result from step 1>}}`. It reports added and removed layers and changed fields.
-3. `ae_render_frame {comp, time}` at two or three times (start, middle, end). Use `maxEdge` to shrink large frames.
+3. `ae_render_frame {comp, time}` at two or three times (start, middle, end). Frames come back with their longest edge at `maxEdge` 768 by default; pass a larger `maxEdge` to read small text or fine detail.
 4. For a motion check, `property.sample {comp, index, property, times}` returns values at the given times.
 5. Read every `warning` in a result. It names an expression-driven property, so edit its driver instead.
 
