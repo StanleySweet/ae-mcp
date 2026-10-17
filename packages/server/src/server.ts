@@ -66,6 +66,7 @@ import { cleanupPartialOutput } from './render-output.js';
 import { createRenderProgress } from './render-progress.js';
 import { batchJson, replayJsx, replaySteps } from './replay.js';
 import { registerResources } from './resources.js';
+import { saveReplayScript } from './script-save.js';
 import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks, type SetupDeps } from './setup-checks.js';
 import { loadUserSnippets, registerUserSnippets, resolveUserCall, TEMPLATE_OP } from './snippets.js';
@@ -80,6 +81,8 @@ export const MAX_RENDER_BYTES = 20_000_000;
 export interface ServerOptions {
   root?: string;
   applicationsDir?: string;
+  /** Folder script_save writes into; defaults to the newest install's Scripts folder (tests pass a temp dir). */
+  scriptsDir?: string;
   appName?: string;
   runner?: Runner;
   client?: AEClient;
@@ -1435,6 +1438,27 @@ export function createServer(options: ServerOptions = {}): McpServer {
         skipped: plan.skipped,
         ...(args.format === 'batch' ? { batch: { ops: plan.ops } } : {}),
       });
+    },
+  );
+
+  server.registerTool(
+    'script_save',
+    {
+      description:
+        "Save Claude's recent steps as <name>.jsx in After Effects' Scripts folder (File > Scripts). Refuses an existing name unless overwrite. Restart AE to see it.",
+      inputSchema: {
+        name: z.string().min(1).max(100),
+        n: z.number().int().positive().max(MAX_HISTORY_LIST).optional(),
+        comp: z.string().optional(),
+        overwrite: z.boolean().default(false),
+      },
+    },
+    async (args) => {
+      const saved = await saveReplayScript(
+        { root, history, operations, scriptsDir: options.scriptsDir, applicationsDir: options.applicationsDir },
+        args,
+      );
+      return text(saved.value, saved.isError);
     },
   );
 

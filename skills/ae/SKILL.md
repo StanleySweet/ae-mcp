@@ -31,6 +31,8 @@ Directions for `slide_in` are `left`, `right`, `up` and `down`. Only write keys 
 
 After animating, check the result with `ae_render_frame {comp, times: [start, middle, end]}` or `property.sample`, as in Check your work.
 
+To keep a run as a script: `script_save {name: "Fix titles"}` writes it into AE's Scripts folder (File > Scripts after a restart; may need a restart).
+
 ## Keyframes or expressions
 
 Read `docs/agents/animation-principles.md` first. Hand-authored motion gets keyframes. Procedural, random or linked motion gets an expression.

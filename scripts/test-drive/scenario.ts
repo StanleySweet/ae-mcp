@@ -1179,7 +1179,8 @@ export const scenario: Step[] = [
   // --- history of Claude's steps (#236) --------------------------------------
   tool('history_list', 'history_list', () => ({ n: 5 })),
   tool('history_export', 'history_export', (s) => ({ format: 'batch', n: 5, path: outFile(s, 'replay.json') })),
-  skipTool('history_undo', 'never undoes by script (ADR-0009); its answer is covered by unit tests'),
+  skipTool('script_save', 'writes into the installed After Effects Scripts folder (may need admin rights); unit tests cover it with a temp folder'),
+  skipTool('history_undo','never undoes by script (ADR-0009); its answer is covered by unit tests'),
 
   // --- explicit skips --------------------------------------------------------
   skipOp('project.new', 'run.ts starts the drive with it (fresh scratch project); a mid-drive call would wipe the scratch comp'),

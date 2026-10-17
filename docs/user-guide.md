@@ -216,6 +216,11 @@ Save writes. Checkpoints are stored in `~/.ae-mcp/checkpoints.json`.
   writes a standalone ExtendScript file that runs in After Effects without the server; it
   needs the installed bridge. Failed and read-only calls are left out. `comp` retargets every
   step that names a comp; set `AEMCP_REPLAY_COMP` in the jsx to retarget it at run time.
+- `script_save {name, n, comp, overwrite}` writes the same jsx replay into After Effects' Scripts folder
+  of the newest install (`/Applications/Adobe After Effects <year>/Scripts/`) as `<name>.jsx`. The name keeps
+  letters, digits, spaces, dashes and underscores. An existing file is refused unless `overwrite: true`.
+  The script shows under File > Scripts after a restart; AE may need a restart. If the folder is not
+  writable (EACCES), the error names the path; the Scripts folder may need admin rights.
 - User snippets live in `~/.ae-mcp/snippets/*.json`. An `expression` file (`kind`, `name`,
   `description`, `expression`) adds a snippet to `expression.snippet`. A `template` file
   (`kind`, `name`, `description`, `ops`) adds the `template.user` op; `{{key}}` in its args is
