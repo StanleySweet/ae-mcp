@@ -12,6 +12,7 @@ const BRIDGE_OPS = [
   'project.report_usage',
   'project.save',
   'project.open',
+  'project.new',
   'project.import_json',
   'project.undo',
   'project.increment_save',

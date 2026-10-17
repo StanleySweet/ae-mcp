@@ -73,7 +73,7 @@ var AEMCP_NO_UNDO_GROUP = { 'project.undo': true };
 // Ops batch.run refuses. project.undo would undo the batch's own steps; the save and
 // open ops leave nothing in AE's undo history, so a rollback Undo would revert the
 // user's own last edit instead (#202).
-var AEMCP_NOT_IN_BATCH = { 'project.undo': true, 'project.save': true, 'project.open': true, 'project.increment_save': true };
+var AEMCP_NOT_IN_BATCH = { 'project.undo': true, 'project.save': true, 'project.open': true, 'project.new': true, 'project.increment_save': true };
 
 function aemcpInvoke(tool, args, deadline) {
     if (typeof deadline === 'number' && new Date().getTime() >= deadline) {

@@ -1188,6 +1188,16 @@ export class MockProject {
     return true;
   }
 
+  // What app.newProject() leaves behind: an empty, unsaved, clean project.
+  // Ref: https://ae-scripting.docsforadobe.dev/general/application/#appnewproject
+  reset(): void {
+    this.file = null;
+    this.dirty = false;
+    this.all.length = 0;
+    this.activeItem = null;
+    this.selection = [];
+  }
+
   removeItem(item: MockItem): void {
     const index = this.all.indexOf(item);
     if (index >= 0) {
@@ -1253,6 +1263,11 @@ export class MockAE {
       this.project.file = file;
       this.project.dirty = false;
       this.opened.push(file.fsName);
+      return this.project;
+    },
+    // Ref: https://ae-scripting.docsforadobe.dev/general/application/#appnewproject
+    newProject: (): MockProject => {
+      this.project.reset();
       return this.project;
     },
     findMenuCommandId: (name: string): number => this.menuCommandIds[name] ?? 0,

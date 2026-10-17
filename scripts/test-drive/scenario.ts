@@ -883,6 +883,7 @@ export const scenario: Step[] = [
   skipTool('checkpoint_revert', 'reopens the project; covered by unit tests'),
 
   // --- explicit skips --------------------------------------------------------
+  skipOp('project.new', 'replaces the open project (destructive); the drive never touches the user project file'),
   skipOp('project.open', 'replaces the open project (destructive); the drive never touches the user project file'),
   skipOp('project.save', 'would save or Save As the open project; the drive never writes the user project'),
   skipOp('project.increment_save', 'saves the open project to disk; the drive never saves'),
