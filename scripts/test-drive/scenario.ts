@@ -1063,13 +1063,14 @@ export const scenario: Step[] = [
     targetLayer: layerIndex(s, 'Drive Audio Null'),
     property: 'Opacity',
   })),
-  // #245 with apply: import a copy of the tone and delete it on disk; the relink runs after
-  // project.open, since AE only marks footage missing when the project loads.
+  // #245 with apply: import a uniquely named copy of the tone and delete it on disk; the
+  // relink runs after project.open, since AE only marks footage missing when the project loads.
   op('project.import_file.missing', 'project.import_file', (s) => {
     const dir = outFile(s, 'missing');
+    rmSync(outFile(s, 'relink-source'), { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
-    copyFileSync(s.vars.toneFile as string, join(dir, 'tone.wav'));
-    return { path: join(dir, 'tone.wav'), folder: s.folder };
+    copyFileSync(s.vars.toneFile as string, join(dir, 'tone-missing.wav'));
+    return { path: join(dir, 'tone-missing.wav'), folder: s.folder };
   }, {
     after: (_result, state) => rmSync(outFile(state, 'missing'), { recursive: true, force: true }),
   }),
@@ -1092,7 +1093,13 @@ export const scenario: Step[] = [
   op('project.increment_save', 'project.increment_save', () => ({})),
   op('project.save.final', 'project.save', (s) => ({ path: outFile(s, 'drive.aep'), overwrite: true })),
   op('project.open', 'project.open', (s) => ({ path: outFile(s, 'drive.aep'), force: true })),
-  op('footage.relink.apply', 'footage.relink', (s) => ({ folder: dirname(s.vars.toneFile as string), apply: true }), {
+  // The source folder appears only now, after the reload, so AE cannot re-resolve the file itself.
+  op('footage.relink.apply', 'footage.relink', (s) => {
+    const dir = outFile(s, 'relink-source');
+    mkdirSync(dir, { recursive: true });
+    copyFileSync(s.vars.toneFile as string, join(dir, 'tone-missing.wav'));
+    return { folder: dir, apply: true };
+  }, {
     after: (result) => {
       const relinked = (payload(result).relinked as unknown[] | undefined) ?? [];
       if (relinked.length < 1) throw new Error(`footage.relink relinked nothing: ${result.text.slice(0, 300)}`);

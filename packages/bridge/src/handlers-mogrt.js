@@ -67,15 +67,18 @@ AEMCP.register('mogrt.export', function (args) {
             controls: aemcpMogrtControls(comp)
         };
     }
-    if (!comp.exportAsMotionGraphicsTemplate(overwrite, folder)) {
-        aemcpAbort(aemcpErrorIssue('SCRIPT_ERROR', 'exportAsMotionGraphicsTemplate returned false'));
-    }
-    return {
+    // On AE 26.5 the comp object is invalid after the export ("Objet non valide"),
+    // so the result is built before it.
+    var result = {
         exported: true,
         path: folder + '/' + name + '.mogrt',
         name: name,
         controls: aemcpMogrtControls(comp)
     };
+    if (!comp.exportAsMotionGraphicsTemplate(overwrite, folder)) {
+        aemcpAbort(aemcpErrorIssue('SCRIPT_ERROR', 'exportAsMotionGraphicsTemplate returned false'));
+    }
+    return result;
 });
 
 // The Essential Graphics controls of a comp, in panel order.
