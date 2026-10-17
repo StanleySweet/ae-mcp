@@ -14,6 +14,7 @@ import { makeError, queueRoot, type ResultMessage } from '@ae-mcp/protocol';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
+import { bridgeVersionWarning } from './bridge-version.js';
 import { isValidCheckpointName, readCheckpoints, saveCheckpoint } from './checkpoints.js';
 import { buildAeContext } from './context.js';
 import { dismissFrontDialog, listDialogs } from './dialogs.js';
@@ -347,6 +348,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         root,
         applicationsDir: options.applicationsDir,
         expectedOperations: operations.names(),
+        expectedBridgeVersion: SERVER_VERSION,
       });
       return text(checks);
     },
@@ -940,6 +942,10 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const payload: Record<string, unknown> = { result: result.result };
       if (incrementInfo) {
         payload.increment = incrementInfo;
+      }
+      const versionWarning = await bridgeVersionWarning(root, SERVER_VERSION);
+      if (versionWarning !== undefined) {
+        payload.warning = versionWarning;
       }
       const size = Buffer.byteLength(JSON.stringify(payload));
       if (size > maxResultBytes) {

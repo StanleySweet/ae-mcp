@@ -35,6 +35,15 @@ an unknown-operation error for it. The `fix` names the missing operation(s).
 Refresh the bridge: run Setup and click **Install**, then restart After Effects
 so the new payload loads.
 
+### `bridge_version` — fail
+
+The bridge that reported in the heartbeat is a different release than the
+server (for example 1.4.0 against 1.4.1). `ae_do` results then carry a
+`warning` line pointing here. The `fix` names both versions.
+
+Run Setup to reinstall the bridge, then restart After Effects. Matching
+release numbers pass; a `+revision` suffix on a development build is ignored.
+
 ### `queue_permissions` — fail
 
 The `~/.ae-mcp` directory is missing or is not `chmod 700`.

@@ -1,6 +1,7 @@
 import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { discoverAEVersions, discoverAeExtensions } from '@ae-mcp/core';
+import { bridgeVersionDiffers } from './bridge-version.js';
 import { readHeartbeat } from './heartbeat.js';
 
 export type CheckStatus = 'ok' | 'fail';
@@ -21,6 +22,8 @@ export interface SetupDeps {
   heartbeatMaxAgeMs?: number;
   /** Operation names the installed bridge payload must report (the server's op registry). */
   expectedOperations?: string[];
+  /** The server's version; the bridge heartbeat must report the same release. */
+  expectedBridgeVersion?: string;
 }
 
 function fail(check: string, fix: string): SetupCheck {
@@ -78,6 +81,30 @@ async function bridgePayloadCheck(
     'bridge_capabilities',
     `The bridge payload is out of date: it is missing ${missing.length} operation(s) — ` +
       `${missing.join(', ')}. Refresh the bridge (run Setup, then restart After Effects).`,
+  );
+}
+
+async function bridgeVersionCheck(
+  root: string,
+  maxAgeMs: number,
+  now: () => number,
+  expected: string | undefined,
+): Promise<SetupCheck> {
+  if (!expected) {
+    return { check: 'bridge_version', status: 'ok', detail: 'no expected version to compare' };
+  }
+  const state = await readHeartbeat(root, maxAgeMs, now);
+  if (state.status === 'missing' || state.status === 'unreadable') {
+    return { check: 'bridge_version', status: 'ok', detail: 'bridge not reporting; see bridge_heartbeat' };
+  }
+  const bridge = state.beat.bridgeVersion;
+  if (!bridgeVersionDiffers(expected, bridge)) {
+    return { check: 'bridge_version', status: 'ok' };
+  }
+  return fail(
+    'bridge_version',
+    `The After Effects bridge is version ${bridge}, but this server is ${expected}. ` +
+      'Run Setup to reinstall the bridge, then restart After Effects.',
   );
 }
 
@@ -139,6 +166,7 @@ export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {
     await afterEffectsCheck(deps.applicationsDir),
     await heartbeatCheck(deps.root, heartbeatMaxAgeMs, now),
     await bridgePayloadCheck(deps.root, heartbeatMaxAgeMs, now, deps.expectedOperations),
+    await bridgeVersionCheck(deps.root, heartbeatMaxAgeMs, now, deps.expectedBridgeVersion),
     await queueDirCheck(deps.root),
     await projectSavedVersionCheck(deps.root),
     await extensionsCheck(deps.homeDir),

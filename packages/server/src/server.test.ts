@@ -60,6 +60,7 @@ describe('mcp server skeleton', () => {
       'after_effects',
       'bridge_heartbeat',
       'bridge_capabilities',
+      'bridge_version',
       'queue_permissions',
       'project_saved_version',
       'third_party_extensions',

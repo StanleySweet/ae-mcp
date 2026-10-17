@@ -21,14 +21,18 @@ async function queueRoot(): Promise<string> {
   return root;
 }
 
-async function writeHeartbeat(root: string, capabilities: string[] = []): Promise<string> {
+async function writeHeartbeat(
+  root: string,
+  capabilities: string[] = [],
+  bridgeVersion = '0.0.0',
+): Promise<string> {
   await mkdir(outboxDir(root), { recursive: true, mode: 0o700 });
   const file = join(outboxDir(root), 'heartbeat.json');
   await writeFile(
     file,
     JSON.stringify({
       protocolVersion: 1,
-      bridgeVersion: '0.0.0',
+      bridgeVersion,
       aeVersion: '26.5',
       os: 'Macintosh',
       capabilities,
@@ -63,6 +67,7 @@ describe('runSetupChecks', () => {
       'after_effects',
       'bridge_heartbeat',
       'bridge_capabilities',
+      'bridge_version',
       'queue_permissions',
       'project_saved_version',
       'third_party_extensions',
@@ -143,6 +148,43 @@ describe('runSetupChecks', () => {
       expectedOperations: ['project.info', 'comp.create'],
     });
     expect(statusOf(checks, 'bridge_capabilities')).toBe('ok');
+  });
+
+  it('passes bridge_version when the bridge reports the server version, ignoring a +revision suffix', async () => {
+    const root = await queueRoot();
+    await writeHeartbeat(root, [], '1.4.1+abc1234-dirty');
+    const checks = await runSetupChecks({
+      root,
+      applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
+      expectedBridgeVersion: '1.4.1',
+    });
+    expect(statusOf(checks, 'bridge_version')).toBe('ok');
+  });
+
+  it('fails bridge_version with the exact fix when the bridge is a different version', async () => {
+    const root = await queueRoot();
+    await writeHeartbeat(root, [], '1.4.0');
+    const checks = await runSetupChecks({
+      root,
+      applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
+      expectedBridgeVersion: '1.4.1',
+    });
+    expect(statusOf(checks, 'bridge_version')).toBe('fail');
+    const fix = checks.find((c) => c.check === 'bridge_version')?.fix ?? '';
+    expect(fix).toContain('1.4.0');
+    expect(fix).toContain('1.4.1');
+    expect(fix).toMatch(/Run Setup/);
+    expect(fix).toMatch(/restart After Effects/);
+  });
+
+  it('does not check bridge_version when no expected version is given', async () => {
+    const root = await queueRoot();
+    await writeHeartbeat(root, [], '1.4.0');
+    const checks = await runSetupChecks({
+      root,
+      applicationsDir: await fakeApplications('Adobe After Effects 2026.app'),
+    });
+    expect(statusOf(checks, 'bridge_version')).toBe('ok');
   });
 
   it('fails queue_permissions when the queue is not 0700', async () => {

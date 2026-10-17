@@ -59,6 +59,8 @@ With AE open, ask Claude to run the `check_setup` tool. It reports six checks:
 - `bridge_capabilities` — the installed bridge payload reports every operation the
   server knows. Fails when the payload is out of date, naming the missing
   operation(s) and the fix (refresh the bridge, then restart After Effects).
+- `bridge_version` — the bridge reports the same release as the server. Fails on
+  a mismatch and names both versions; `ae_do` adds a `warning` in that case.
 - `queue_permissions` — `~/.ae-mcp` is `chmod 700`.
 - `project_saved_version` — the project has been saved at least once (see
   [Destructive operations](#destructive-operations)).

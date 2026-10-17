@@ -1,8 +1,8 @@
-import { chmod, mkdir, mkdtemp } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createQueueConsumer, FakeProject, observeHandlers } from '@ae-mcp/fake-bridge';
-import { errorSchema } from '@ae-mcp/protocol';
+import { errorSchema, outboxDir } from '@ae-mcp/protocol';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, describe, it, expect } from 'vitest';
@@ -61,11 +61,27 @@ async function connectServer(
   project: FakeProject,
   calls: string[],
   maxResultBytes?: number,
+  bridgeVersion?: string,
 ): Promise<{ client: Client; close: () => Promise<void> }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-ae-do-'));
   const root = join(home, '.ae-mcp');
   await mkdir(root, { recursive: true, mode: 0o700 });
   await chmod(root, 0o700);
+  if (bridgeVersion !== undefined) {
+    await mkdir(outboxDir(root), { recursive: true, mode: 0o700 });
+    await writeFile(
+      join(outboxDir(root), 'heartbeat.json'),
+      JSON.stringify({
+        protocolVersion: 1,
+        bridgeVersion,
+        aeVersion: '26.5',
+        os: 'Macintosh',
+        capabilities: [],
+        busy: false,
+        transport: 'osascript',
+      }),
+    );
+  }
 
   const observe = observeHandlers(project);
   const handlers = {
@@ -139,6 +155,31 @@ describe('ae_do', () => {
     expect(isError).toBe(false);
     expect(JSON.parse(text)).toEqual({ result: { index: 1, name: 'Hero' } });
     expect(calls).toEqual(['layer.rename']);
+  });
+
+  it('adds one warning line when the bridge version differs from the server', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, undefined, '1.4.0');
+    closes.push(close);
+
+    const { isError, text } = await call(client, {
+      op: 'layer.rename',
+      args: { index: 1, name: 'Hero' },
+    });
+    expect(isError).toBe(false);
+    const parsed = JSON.parse(text) as { result: unknown; warning?: string };
+    expect(parsed.result).toEqual({ index: 1, name: 'Hero' });
+    expect(parsed.warning).toMatch(/bridge is version 1\.4\.0 but the server is 1\.4\.1/);
+    expect(parsed.warning).not.toContain('\n');
+  });
+
+  it('adds no warning when the bridge version matches the server', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, undefined, '1.4.1+abc1234');
+    closes.push(close);
+
+    const { text } = await call(client, { op: 'layer.rename', args: { index: 1, name: 'Hero' } });
+    expect(JSON.parse(text)).toEqual({ result: { index: 1, name: 'Hero' } });
   });
 
   it('refuses a result over maxResultBytes with INVALID_ARGS', async () => {
