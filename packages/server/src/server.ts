@@ -29,6 +29,7 @@ import { bridgeVersionWarning } from './bridge-version.js';
 import { isValidCheckpointName, readCheckpoints, saveCheckpoint } from './checkpoints.js';
 import { buildAeContext } from './context.js';
 import { dismissFrontDialog, listDialogs } from './dialogs.js';
+import { type ExportTarget, planExportPreset } from './export-preset.js';
 import {
   compareFrames,
   sipsToBmp,
@@ -1202,6 +1203,69 @@ export function createServer(options: ServerOptions = {}): McpServer {
         jobs.push({ comp: copy.name, jobId });
       }
       return text({ applied: created.length, created, jobs });
+    },
+  );
+
+  // Batch export presets (#240): one resized copy and one ae_render job per format.
+  server.registerTool(
+    'export_preset',
+    {
+      description:
+        'Render a comp per aspect ratio (16:9, 9:16, 1:1, 4:5, 21:9): resized copies, a saved version, one ae_render job each. pattern takes {comp} {format}.',
+      inputSchema: {
+        comp: z.string(),
+        formats: z.array(z.string()).min(1),
+        outputDir: z.string(),
+        pattern: z.string().optional(),
+        project: z.string().optional(),
+      },
+    },
+    async (args) => {
+      const settings = await getSettings();
+      if (settings.readOnly) {
+        return text(
+          makeError('FORBIDDEN', 'export_preset writes files and is not permitted in read-only mode'),
+          true,
+        );
+      }
+      let targets: ExportTarget[];
+      try {
+        targets = planExportPreset({
+          comp: args.comp,
+          formats: args.formats,
+          outputDir: args.outputDir,
+          pattern: args.pattern,
+        });
+      } catch (error) {
+        return text(makeError('INVALID_ARGS', (error as Error).message), true);
+      }
+      const resized = await callRaw('bulk.resize_comp', {
+        comp: args.comp,
+        formats: targets.map((target) => ({ name: target.name, width: target.width, height: target.height })),
+        dryRun: false,
+      });
+      if (!resized.ok) {
+        return toResult(resized);
+      }
+      // aerender opens the saved project file, so save a version that holds the copies first.
+      const saved = await callRaw('project.increment_save');
+      if (!saved.ok) {
+        return toResult(saved);
+      }
+      const jobs: Record<string, unknown>[] = [];
+      for (const target of targets) {
+        const started = await startRender({ comp: target.name, output: target.output, project: args.project });
+        const first = started.content[0];
+        const body = first?.type === 'text' ? first.text : '{}';
+        if (started.isError) {
+          const message = (JSON.parse(body) as { message?: string }).message ?? 'render did not start';
+          jobs.push({ format: target.format, output: target.output, error: message });
+          continue;
+        }
+        const jobId = (JSON.parse(body) as { jobId: string }).jobId;
+        jobs.push({ format: target.format, comp: target.name, output: target.output, jobId });
+      }
+      return text({ jobs });
     },
   );
 

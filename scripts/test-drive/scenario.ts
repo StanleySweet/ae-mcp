@@ -771,6 +771,7 @@ export const scenario: Step[] = [
   // --- aerender: it reads the saved project file, so save the scratch project first
   op('project.save.copy', 'project.save', (s) => ({ path: outFile(s, 'drive-copy.aep'), overwrite: true })),
   op('project.save.scratch', 'project.save', (s) => ({ path: outFile(s, 'drive.aep'), overwrite: true })),
+  skipTool('export_preset', 'duplicates the comp per format and starts one aerender job each; it needs a saved project and a render the drive does not wait for'),
   tool('ae_render', 'ae_render', (s) => ({ comp: s.comp, output: outFile(s, 'render.mov'), startFrame: 0, endFrame: 29 }), {
     after: (result, state) => {
       const jobId = (result.json as { jobId?: string } | null)?.jobId;
