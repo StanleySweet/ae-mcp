@@ -24,6 +24,8 @@ const DOCUMENTED = new Set([
   'ADBE Effect Parade',
   'ADBE Mask Parade',
   'ADBE Marker',
+  'ADBE Audio Group',
+  'ADBE Audio Levels',
   'ADBE Text Properties',
   'ADBE Text Document',
   'ADBE Slider Control',

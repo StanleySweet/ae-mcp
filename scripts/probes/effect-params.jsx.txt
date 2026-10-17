@@ -1,0 +1,28 @@
+// Probe: lists effect parameter match names on live AE (#225). Run in an EMPTY untitled
+// project via DoScriptFile; writes .tmp/effect-params.json (toSource). Not part of the bridge.
+
+var names = ["ADBE Linear Wipe","ADBE Glo2","ADBE Gaussian Blur 2","ADBE Noise","ADBE Drop Shadow","CS Vignette","ADBE Radial Wipe","ADBE Fill","ADBE Tint","ADBE Turbulent Displace","ADBE Fractal Noise","ADBE Hue Saturation","ADBE Brightness & Contrast 2","ADBE Venetian Blinds","ADBE Motion Blur","ADBE Ramp","ADBE Stroke","ADBE Echo","ADBE Lens Flare","ADBE Set Matte3"];
+var out = [];
+var p = app.project;
+if (p.numItems !== 0 || p.file) { out.push({error: "project not empty/untitled; refusing"}); }
+else {
+  var comp = p.items.addComp("fx-probe", 640, 360, 1, 1, 24);
+  var layer = comp.layers.addSolid([0.5,0.5,0.5], "probe", 640, 360, 1);
+  var parade = layer.property("ADBE Effect Parade");
+  for (var i = 0; i < names.length; i++) {
+    var entry = { matchName: names[i], params: [] };
+    if (!parade.canAddProperty(names[i])) { entry.available = false; out.push(entry); continue; }
+    var fx = parade.addProperty(names[i]);
+    entry.name = fx.name;
+    for (var j = 1; j <= fx.numProperties; j++) {
+      var pr = fx.property(j);
+      var t = null; try { t = pr.propertyValueType; } catch (e) {}
+      entry.params.push({ index: j, name: pr.name, matchName: pr.matchName, valueType: t });
+    }
+    out.push(entry);
+  }
+  comp.remove(); 
+  var srcs = []; for (var k = 1; k <= p.numItems; k++) srcs.push(p.item(k));
+  for (var m = srcs.length - 1; m >= 0; m--) srcs[m].remove();
+}
+var f = new File("/Users/stan/dev/ae-mcp/.tmp/effect-params.json"); f.encoding = "UTF-8"; f.open("w"); f.write(out.toSource()); f.close();

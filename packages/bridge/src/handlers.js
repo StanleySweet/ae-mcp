@@ -20,6 +20,8 @@ var AEMCP_MATCH = {
     MASK_ATOM: 'ADBE Mask Atom',
     MASK_SHAPE: 'ADBE Mask Shape',
     MARKER: 'ADBE Marker',
+    AUDIO_GROUP: 'ADBE Audio Group',
+    AUDIO_LEVELS: 'ADBE Audio Levels',
     TEXT_PROPERTIES: 'ADBE Text Properties',
     TEXT_DOCUMENT: 'ADBE Text Document',
     SLIDER_CONTROL: 'ADBE Slider Control',
@@ -2510,7 +2512,7 @@ AEMCP.register('text.add', function (args) {
     var textString = args && args.text ? args.text : 'Text';
     var comp = aemcpRequireComp(compName);
     var textLayer = comp.layers.addText(textString);
-    var textProp = textLayer.property('Source Text');
+    var textProp = textLayer.property(AEMCP_MATCH.TEXT_PROPERTIES).property(AEMCP_MATCH.TEXT_DOCUMENT);
     var textDoc = textProp.value;
     var result = aemcpApplyTextStyle(textDoc, args || {});
     if (result.error) return { success: false, error: result.error };
@@ -2524,7 +2526,7 @@ AEMCP.register('text.set', function (args) {
     var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var textProp = layer.property('Source Text');
+    var textProp = aemcpSourceText(layer);
     if (!textProp) return { success: false, error: 'Source Text not found' };
     var textDoc = textProp.value;
     var result = aemcpApplyTextStyle(textDoc, args || {});
@@ -2539,7 +2541,7 @@ AEMCP.register('text.read', function (args) {
     var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var textProp = layer.property('Source Text');
+    var textProp = aemcpSourceText(layer);
     if (!textProp) return { success: false, error: 'Source Text not found' };
     var textDoc = textProp.value;
     return {
@@ -2563,11 +2565,25 @@ AEMCP.register('audio.set_levels', function (args) {
     var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var audioLevels = layer.property('Audio Levels');
+    var audioLevels = aemcpAudioLevels(layer);
     if (!audioLevels) return { success: false, error: 'Audio Levels property not found' };
-    audioLevels.setValue(levels);
+    aemcpSetValue(audioLevels, levels, comp.time);
     return { success: true };
 });
+
+// Source Text by match name (#257: display names follow the UI language).
+// Ref: https://ae-scripting.docsforadobe.dev/matchnames/layer/textlayer/
+function aemcpSourceText(layer) {
+    var group = layer.property(AEMCP_MATCH.TEXT_PROPERTIES);
+    return group ? group.property(AEMCP_MATCH.TEXT_DOCUMENT) : null;
+}
+
+// Audio Levels by match name: display names follow the UI language (#257).
+// Ref: https://ae-scripting.docsforadobe.dev/matchnames/layer/avlayer/
+function aemcpAudioLevels(layer) {
+    var group = layer.property(AEMCP_MATCH.AUDIO_GROUP);
+    return group ? group.property(AEMCP_MATCH.AUDIO_LEVELS) : null;
+}
 
 AEMCP.register('audio.info', function (args) {
     var compName = args && args.comp ? args.comp : null;
@@ -2577,7 +2593,7 @@ AEMCP.register('audio.info', function (args) {
     if (!layer) return { success: false, error: 'Layer not found' };
     var hasAudio = layer.hasAudio;
     var audioActive = layer.audioActive;
-    var audioLevels = layer.property('Audio Levels');
+    var audioLevels = aemcpAudioLevels(layer);
     return {
         hasAudio: hasAudio,
         audioActive: audioActive,
@@ -2592,7 +2608,7 @@ AEMCP.register('audio.peaks_to_markers', function (args) {
     var comp = aemcpRequireComp(compName);
     var layer = comp.layer(layerIndex);
     if (!layer) return { success: false, error: 'Layer not found' };
-    var markerProp = layer.property('Marker');
+    var markerProp = layer.property(AEMCP_MATCH.MARKER);
     if (!markerProp) return { success: false, error: 'Marker property not found' };
     for (var j = 0; j < peaks.length; j++) {
         var p = peaks[j];
