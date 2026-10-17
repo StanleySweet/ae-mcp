@@ -43,6 +43,7 @@ import { cleanupPartialOutput } from './render-output.js';
 import { batchJson, replayJsx, replaySteps } from './replay.js';
 import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks, type SetupDeps } from './setup-checks.js';
+import { loadUserSnippets, registerUserSnippets, resolveUserCall, TEMPLATE_OP } from './snippets.js';
 
 export const SERVER_NAME = 'ae-mcp';
 export const SERVER_VERSION = '1.4.1';
@@ -254,6 +255,9 @@ export function createServer(options: ServerOptions = {}): McpServer {
   const root = options.root ?? queueRoot();
   const maxResultBytes = options.maxResultBytes ?? MAX_RESULT_BYTES;
   const operations = options.operations ?? defaultOperationRegistry();
+  // User snippets and templates from <root>/snippets (#246); invalid files are reported by check_setup.
+  const userSnippets = loadUserSnippets(root, operations);
+  registerUserSnippets(operations, userSnippets);
   const history = new HistoryLog(root);
 
   /** Logs one bridge call so history_list and history_undo can name its undo group (#236). */
@@ -423,7 +427,9 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const checks = await runSetupChecks({
         root,
         applicationsDir: options.applicationsDir,
-        expectedOperations: operations.names(),
+        // template.user is answered by the server, not the bridge.
+        expectedOperations: operations.names().filter((name) => name !== TEMPLATE_OP),
+        snippetProblems: loadUserSnippets(root, operations).problems,
         expectedBridgeVersion: SERVER_VERSION,
         serverVersion: SERVER_VERSION,
         updateCheck: options.updateCheck,
@@ -922,7 +928,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'history_list',
     {
       description:
-        "List the last n operations Claude ran in After Effects (newest first): op, args, time, undo group name ('Claude: <op>') and whether it succeeded. Read-only; it does not touch the project.",
+        "Last n ops Claude ran (newest first): op, args, time, undo group, ok. Read-only.",
       inputSchema: {
         n: z.number().int().positive().max(MAX_HISTORY_LIST).optional(),
       },
@@ -934,7 +940,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'history_undo',
     {
       description:
-        "Name the undo steps that would revert Claude's last n mutating operations and tell the user to press Cmd+Z that many times in After Effects. This tool never undoes anything itself: scripted undo freezes After Effects (ADR-0009), and AE's undo stack cannot be read by script, so any edit the user made since those steps is undone first.",
+        "Names the undo steps for Claude's last n edits and how many Cmd+Z presses revert them. Never undoes by script (ADR-0009).",
       inputSchema: {
         n: z.number().int().positive().max(MAX_HISTORY_LIST).default(1),
       },
@@ -964,7 +970,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'history_export',
     {
       description:
-        "Export Claude's recorded steps as a replay. format 'batch' returns and writes the args for batch.run (run it with ae_do op batch.run, no tokens needed). format 'jsx' writes a standalone ExtendScript file that runs in After Effects without the server, using the installed bridge. comp retargets every step that names a comp. Failed and read-only steps are left out. Writes to path, default ~/.ae-mcp/replays/.",
+        "Export Claude's steps as a replay: 'batch' (batch.run args) or 'jsx' (standalone script). comp retargets steps. Default path ~/.ae-mcp/replays/.",
       inputSchema: {
         format: z.enum(['batch', 'jsx']).default('batch'),
         n: z.number().int().positive().max(MAX_HISTORY_LIST).optional(),
@@ -1085,7 +1091,12 @@ export function createServer(options: ServerOptions = {}): McpServer {
         args: z.record(z.string(), z.unknown()).optional(),
       },
     },
-    async (toolArgs) => {
+    async (incoming) => {
+      const resolved = resolveUserCall(incoming.op, incoming.args, userSnippets);
+      if (!resolved.ok) {
+        return text(makeError('INVALID_ARGS', resolved.message), true);
+      }
+      const toolArgs = { op: resolved.op, args: resolved.args };
       const definition = operations.get(toolArgs.op);
       if (definition === undefined) {
         const suggestions = closestNames(operations.names(), toolArgs.op);

@@ -71,6 +71,7 @@ describe('runSetupChecks', () => {
       'queue_permissions',
       'project_saved_version',
       'third_party_extensions',
+      'user_snippets',
     ]);
     expect(checks.every((c) => c.status === 'ok')).toBe(true);
   });

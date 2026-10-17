@@ -182,6 +182,24 @@ Save writes. Checkpoints are stored in `~/.ae-mcp/checkpoints.json`.
   state is kept as a version, then reopens the checkpoint's file (with `force`). It is
   refused in read-only mode, and so is `checkpoint_create`, because both save the project.
 
+## History, replay and user snippets
+
+- `history_list {n}` shows the last n operations Claude ran (default 20, newest first), with
+  each call's undo group name `Claude: <op>`. The log is `~/.ae-mcp/history.jsonl`.
+- `history_undo {n}` never undoes anything. It names the undo groups of Claude's last n
+  mutating steps and tells you to press Cmd+Z that many times in After Effects. Scripted
+  undo freezes After Effects (ADR-0009), and AE's undo stack cannot be read by script, so
+  any edit you made since those steps is undone first.
+- `history_export {format, n, comp, path}` turns the history into a replay. `format: "batch"`
+  writes the args for `batch.run` (run them with `ae_do` op `batch.run`). `format: "jsx"`
+  writes a standalone ExtendScript file that runs in After Effects without the server; it
+  needs the installed bridge. Failed and read-only calls are left out. `comp` retargets every
+  step that names a comp; set `AEMCP_REPLAY_COMP` in the jsx to retarget it at run time.
+- User snippets live in `~/.ae-mcp/snippets/*.json`. An `expression` file (`kind`, `name`,
+  `description`, `expression`) adds a snippet to `expression.snippet`. A `template` file
+  (`kind`, `name`, `description`, `ops`) adds the `template.user` op; `{{key}}` in its args is
+  filled from `args`. Invalid files are skipped, and `check_setup` lists each with its reason.
+
 ## Expression-driven properties
 
 A property whose value comes from an expression (for example one added by a preset, or a

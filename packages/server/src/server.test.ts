@@ -69,7 +69,7 @@ describe('mcp server skeleton', () => {
       expect(tool.description?.length ?? 0, tool.name).toBeLessThan(200);
     }
     const total = tools.tools.reduce((sum, tool) => sum + (tool.description?.length ?? 0), 0);
-    expect(total).toBe(2363);
+    expect(total).toBe(2708);
     await client.close();
     await server.close();
   });
@@ -106,6 +106,7 @@ describe('mcp server skeleton', () => {
       'queue_permissions',
       'project_saved_version',
       'third_party_extensions',
+      'user_snippets',
     ]);
     expect(checks.every((row) => row.status === 'ok' || row.status === 'fail')).toBe(true);
 

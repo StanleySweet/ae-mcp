@@ -29,6 +29,8 @@ export interface SetupDeps {
   serverVersion?: string;
   /** Test seams and opt-out for the update check (see update-check.ts). */
   updateCheck?: Pick<UpdateCheckOptions, 'env' | 'fetchLatest' | 'now' | 'timeoutMs'>;
+  /** Invalid files found in `<root>/snippets` (#246), each with its reason. */
+  snippetProblems?: Array<{ file: string; reason: string }>;
 }
 
 async function updateCheckRow(deps: SetupDeps): Promise<SetupCheck | null> {
@@ -54,6 +56,20 @@ async function updateCheckRow(deps: SetupDeps): Promise<SetupCheck | null> {
     case 'unavailable':
       return { check: 'extension_update', status: 'ok', detail: `update check unavailable: ${result.reason}` };
   }
+}
+
+
+function snippetsCheck(problems: Array<{ file: string; reason: string }> = []): SetupCheck {
+  if (problems.length === 0) {
+    return { check: 'user_snippets', status: 'ok' };
+  }
+  const detail = problems.map((problem) => `${problem.file}: ${problem.reason}`).join('; ');
+  return {
+    check: 'user_snippets',
+    status: 'fail',
+    fix: `These files in ~/.ae-mcp/snippets are skipped; fix or delete them. ${detail}`,
+    detail,
+  };
 }
 
 function fail(check: string, fix: string): SetupCheck {
@@ -200,6 +216,7 @@ export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {
     await queueDirCheck(deps.root),
     await projectSavedVersionCheck(deps.root),
     await extensionsCheck(deps.homeDir),
+    snippetsCheck(deps.snippetProblems),
   ];
   const update = await updateCheckRow(deps);
   if (update !== null) {
