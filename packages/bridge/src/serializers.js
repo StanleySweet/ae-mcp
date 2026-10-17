@@ -4,6 +4,20 @@ function aemcpRound(value) {
     return Math.round(value * 1000) / 1000;
 }
 
+// Reads a property's value without failing the call: NO_VALUE properties (e.g. Gradient Ramp
+// ADBE Ramp-0008) and any read that throws come back as null.
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertypropertyvaluetype
+function aemcpSafeValue(prop) {
+    if (prop.propertyValueType === PropertyValueType.NO_VALUE) {
+        return null;
+    }
+    try {
+        return prop.value;
+    } catch (e) {
+        return null;
+    }
+}
+
 function aemcpItemType(item) {
     if (item instanceof CompItem) {
         return 'Composition';
@@ -110,7 +124,7 @@ function aemcpSerializeProperty(property) {
         }
         out.keyframes = keyframes;
     } else {
-        out.value = aemcpCoerceValue(property.value);
+        out.value = aemcpCoerceValue(aemcpSafeValue(property));
     }
     if (property.expressionEnabled && property.expression) {
         out.expression = property.expression;
@@ -151,7 +165,7 @@ function aemcpSerializeEffects(layer) {
         effects.push({
             name: group.name,
             matchName: group.matchName,
-            enabled: effect.enabled ? effect.enabled.value : true,
+            enabled: effect.enabled ? aemcpSafeValue(effect.enabled) !== false : true,
             properties: group.properties
         });
     }
@@ -196,10 +210,11 @@ function aemcpSerializeText(layer) {
         return null;
     }
     var source = text.property(AEMCP_MATCH.TEXT_DOCUMENT);
-    if (!source || typeof source.value !== 'object' || source.value === null) {
+    var sourceValue = source ? aemcpSafeValue(source) : null;
+    if (typeof sourceValue !== 'object' || sourceValue === null) {
         return null;
     }
-    var document = source.value;
+    var document = sourceValue;
     return {
         text: document.text,
         fontSize: aemcpRound(document.fontSize),

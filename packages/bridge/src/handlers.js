@@ -1119,7 +1119,7 @@ AEMCP.register('property.get', function (args) {
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
-    return { name: prop.name, value: prop.value };
+    return { name: prop.name, value: aemcpSafeValue(prop) };
 });
 
 AEMCP.register('property.list', function (args) {

@@ -24,6 +24,7 @@ import {
   MockProperty,
   MockPropertyGroup,
   MockTextLayer,
+  PropertyValueType,
   runInMockAE,
 } from './mock-ae.js';
 
@@ -225,6 +226,33 @@ describe('bridge serializers', () => {
       ctx,
     );
     expect(unknown.comp).toBeNull();
+  });
+
+  it('reports a NO_VALUE property as null instead of failing ae_layer_info', async () => {
+    const { ctx, ae } = await payloadContext();
+    seed(ae);
+    const comp = ae.project.item(1) as MockCompItem;
+    const layer = new MockAVLayer('Ramp Layer', 'Layer');
+    layer.id = 9;
+    const effects = new MockPropertyGroup('Effects', 'ADBE Effect Parade');
+    const gradient = new MockEffect('Gradient Ramp', 'Test Gradient Ramp');
+    const ramp = new MockProperty('Ramp', 'Test NoValue', null);
+    ramp.propertyValueType = PropertyValueType.NO_VALUE;
+    gradient.add(ramp);
+    gradient.add(new MockProperty('Blend', 'Test Blend', 2));
+    effects.add(gradient);
+    layer.add(effects);
+    comp.addLayer(layer);
+
+    const info = vm.runInContext("AEMCP.invoke('ae_layer_info', { comp: 'Main' }, null)", ctx);
+    expect(info.ok).toBe(true);
+    const rampOut = info.value.layers[0].effects[0].properties.find(
+      (p: { matchName: string }) => p.matchName === 'Test NoValue',
+    );
+    expect(rampOut.value).toBeNull();
+    expect(info.value.layers[0].effects[0].properties).toContainEqual(
+      expect.objectContaining({ matchName: 'Test Blend', value: 2 }),
+    );
   });
 
   it('collects expression-driven properties across a layer property tree', async () => {

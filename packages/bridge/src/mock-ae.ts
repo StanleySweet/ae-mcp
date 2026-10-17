@@ -250,6 +250,10 @@ export const MockParagraphJustification = {
   MULTIPLE_JUSTIFICATIONS: 7420,
 };
 
+// Only the members the bridge reads. Numeric values are placeholders; the code compares by name.
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertypropertyvaluetype
+export const PropertyValueType = { NO_VALUE: 0, OneD: 1 } as const;
+
 export class MockProperty {
   // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybaseenabled
   enabled = true;
@@ -272,11 +276,29 @@ export class MockProperty {
   // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyselectedkeys
   selectedKeys: number[] = [];
 
+  // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertypropertyvaluetype
+  propertyValueType: number = PropertyValueType.OneD;
+  private storedValue: unknown;
+
   constructor(
     readonly name: string,
     readonly matchName: string,
-    public value: unknown = null,
-  ) {}
+    value: unknown = null,
+  ) {
+    this.storedValue = value;
+  }
+
+  // Reading the value of a NO_VALUE property throws, as in After Effects.
+  get value(): unknown {
+    if (this.propertyValueType === PropertyValueType.NO_VALUE) {
+      throw new Error("Impossible d'obtenir ou de définir une valeur à partir de cette propriété");
+    }
+    return this.storedValue;
+  }
+
+  set value(next: unknown) {
+    this.storedValue = next;
+  }
 
   get numKeys(): number {
     return this.keys.length;
@@ -1215,6 +1237,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     KeyframeEase: MockKeyframeEase,
     KeyframeInterpolationType: MockKeyframeInterpolationType,
     ParagraphJustification: MockParagraphJustification,
+    PropertyValueType,
     RQItemStatus,
     File: function (path: string): MockFile {
       return new MockFile(ae, path);
