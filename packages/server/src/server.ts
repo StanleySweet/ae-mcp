@@ -28,7 +28,7 @@ import { beginVerify, finishVerify } from './ae-do-verify.js';
 import { bridgeVersionWarning } from './bridge-version.js';
 import { isValidCheckpointName, readCheckpoints, saveCheckpoint } from './checkpoints.js';
 import { buildAeContext } from './context.js';
-import { dismissFrontDialog, listDialogs } from './dialogs.js';
+import { dismissFrontDialog, listDialogs, pressEscape } from './dialogs.js';
 import { type ExportTarget, planExportPreset } from './export-preset.js';
 import {
   compareFrames,
@@ -380,7 +380,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       appName: options.appName,
       applicationsDir: options.applicationsDir,
       runner: options.runner,
-    }).then((transport) => createAEClient({ transport, root }));
+    }).then((transport) => createAEClient({ transport, root, pressEscape: () => pressEscape() }));
     return clientPromise;
   };
 

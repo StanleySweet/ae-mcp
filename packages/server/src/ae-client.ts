@@ -39,7 +39,20 @@ export interface AEClientOptions {
   checkDialogs?: () => Promise<AeDialog[]>;
   /** Whether an After Effects process is running; default checks with `pgrep`. */
   isAeRunning?: () => Promise<boolean>;
+  /**
+   * Presses Escape in After Effects. When set, the client recovers from a blocking
+   * modal by itself: while an earlier job is unfinished in AE it presses Escape and
+   * waits for that job's result instead of sending a new script, which AE would answer
+   * with a "script already running" dialog. Unset (tests), there is no recovery.
+   */
+  pressEscape?: () => Promise<unknown>;
+  /** Sleep between recovery rounds (tests); default setTimeout. */
+  recoverySleep?: (ms: number) => Promise<void>;
 }
+
+/** Escape presses before the client gives up on a blocked After Effects. */
+const RECOVERY_ROUNDS = 4;
+const RECOVERY_WAIT_MS = 1500;
 
 export interface AEClient {
   call(tool: string, args?: unknown): Promise<ResultMessage>;
@@ -114,9 +127,51 @@ export function createAEClient(options: AEClientOptions): AEClient {
     );
   };
 
+  // Jobs whose script may still be running in AE: a call in flight, or one that timed
+  // out. Their result file appears in the outbox once AE is free again.
+  const unfinished = new Set<string>();
+  const recoverySleep =
+    options.recoverySleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+  const exists = (path: string): Promise<boolean> => stat(path).then(() => true, () => false);
+  const recover = async (pressEscape: () => Promise<unknown>): Promise<boolean> => {
+    for (let round = 0; ; round++) {
+      for (const id of [...unfinished]) {
+        if (await exists(join(outboxDir(options.root), `${id}.json`))) {
+          unfinished.delete(id);
+        }
+      }
+      if (unfinished.size === 0) {
+        return true;
+      }
+      if (round === RECOVERY_ROUNDS) {
+        return false;
+      }
+      await pressEscape();
+      await recoverySleep(RECOVERY_WAIT_MS);
+    }
+  };
+  const stillBlocked = (): ResultMessage => ({
+    protocolVersion: PROTOCOL_VERSION,
+    ok: false,
+    error: makeError(
+      'DIALOG_OPEN',
+      'After Effects is still running an earlier script, held by a dialog that Escape did not close. Answer it in After Effects (Cancel, never Save), then retry. No new script was sent.',
+    ),
+  });
+
   const attempt = async (job: JobMessage): Promise<ResultMessage> => {
+    if (options.pressEscape !== undefined) {
+      if (unfinished.size > 0 && !(await recover(options.pressEscape))) {
+        return stillBlocked();
+      }
+      unfinished.add(job.id);
+    }
     try {
       const result = await options.transport.call(job);
+      // A timed-out script may still run in AE; anything else has finished.
+      if (result.ok || (result.error.code !== 'AE_BUSY' && result.error.code !== 'TIMEOUT')) {
+        unfinished.delete(job.id);
+      }
       if (result.ok || (result.error.code !== 'TIMEOUT' && result.error.code !== 'BRIDGE_NOT_LOADED')) {
         return result;
       }
@@ -154,6 +209,7 @@ export function createAEClient(options: AEClientOptions): AEClient {
         },
       };
     } catch (error) {
+      unfinished.delete(job.id);
       if (await aeNotRunning()) {
         return notRunningResult();
       }

@@ -71,6 +71,21 @@ end tell
 return "none"
 `;
 
+// Escape to the front After Effects window, found or not: AE 26.5 hides its windows
+// from Accessibility, so a blocking modal can only be closed blind. Escape is a modal's
+// Cancel and does nothing harmful without one.
+const PRESS_ESCAPE = `
+tell application "System Events"
+  if not (exists process "After Effects") then return "none"
+  tell process "After Effects"
+    set frontmost to true
+    delay 0.3
+    key code 53
+  end tell
+end tell
+return "escape"
+`;
+
 function isPermissionError(error: unknown): boolean {
   const text = String((error as { stderr?: unknown })?.stderr ?? '') + String(error);
   return /-1719|-25211|assistive/i.test(text);
@@ -125,4 +140,9 @@ export async function dismissFrontDialog(
 
 export function describeDialog(dialog: AeDialog): string {
   return [dialog.title, ...dialog.texts].filter((s) => s.length > 0).join(' - ');
+}
+
+/** Presses Escape in After Effects without looking for a dialog (see PRESS_ESCAPE). */
+export async function pressEscape(runner: Runner = defaultRunner): Promise<DialogResult<string>> {
+  return run(runner, PRESS_ESCAPE);
 }

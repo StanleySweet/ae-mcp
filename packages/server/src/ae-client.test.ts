@@ -326,3 +326,68 @@ describe('ae client', () => {
     expect(result).toMatchObject({ ok: false, error: { code: 'TIMEOUT' } });
   });
 });
+
+// A job held by a modal keeps running in AE; another DoScriptFile then only stacks a
+// "script already running" dialog. The client presses Escape and waits instead.
+describe('ae client recovery from a blocking dialog', () => {
+  function timeout(): ResultMessage {
+    return { protocolVersion: PROTOCOL_VERSION, ok: false, error: makeError('TIMEOUT', 'job deadline exceeded') };
+  }
+
+  it('presses Escape until the held job reports, then sends the next job', async () => {
+    const root = await queueRoot();
+    await mkdir(outboxDir(root), { recursive: true });
+    const transport = new RecordingTransport();
+    transport.enqueue(timeout());
+    transport.enqueue(ok('next'));
+    let escapes = 0;
+    const ids = ['held', 'next'];
+    const client = createAEClient({
+      transport,
+      root,
+      newId: () => ids.shift()!,
+      retry: false,
+      checkDialogs: async () => [],
+      isAeRunning: async () => true,
+      recoverySleep: async () => undefined,
+      pressEscape: async () => {
+        escapes += 1;
+        // The second Escape closes the modal: the held script finishes and writes its result.
+        if (escapes === 2) await writeFile(join(outboxDir(root), 'held.json'), '{}');
+      },
+    });
+
+    expect((await client.call('mogrt.export')).ok).toBe(false);
+    const next = await client.call('project.info');
+
+    expect(next).toEqual(ok('next'));
+    expect(escapes).toBe(2);
+    expect(transport.jobs.map((job) => job.id)).toEqual(['held', 'next']);
+  });
+
+  it('sends no new script when Escape does not free After Effects', async () => {
+    const root = await queueRoot();
+    const transport = new RecordingTransport();
+    transport.enqueue(timeout());
+    const ids = ['held', 'next'];
+    let escapes = 0;
+    const client = createAEClient({
+      transport,
+      root,
+      newId: () => ids.shift()!,
+      retry: false,
+      checkDialogs: async () => [],
+      isAeRunning: async () => true,
+      recoverySleep: async () => undefined,
+      pressEscape: async () => void (escapes += 1),
+    });
+
+    await client.call('mogrt.export');
+    const next = await client.call('project.info');
+
+    expect(next.ok).toBe(false);
+    expect(next.ok ? '' : next.error.code).toBe('DIALOG_OPEN');
+    expect(escapes).toBe(4);
+    expect(transport.jobs).toHaveLength(1);
+  });
+});
