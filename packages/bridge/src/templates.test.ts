@@ -35,7 +35,7 @@ describe('template.title_card', () => {
   it('builds a background solid, a title and an optional subtitle with eased keys', async () => {
     const { ctx, ae } = await payloadContext();
     const out = invoke(ctx, 'template.title_card', { comp: 'Main', title: 'Opening', subtitle: 'Part 1', duration: 5 });
-    expect(out.value).toEqual({ layers: [1, 2, 3] });
+    expect(out.value).toMatchObject({ layers: [1, 2, 3] });
     const comp = ae.project.item(1) as MockCompItem;
     expect(comp.layer(1)!.name).toBe('Title Background');
     expect(comp.layer(2)!.outPoint).toBe(5);
@@ -47,7 +47,7 @@ describe('template.title_card', () => {
 
   it('omits the subtitle and requires a title', async () => {
     const { ctx } = await payloadContext();
-    expect(invoke(ctx, 'template.title_card', { comp: 'Main', title: 'Solo' }).value).toEqual({ layers: [1, 2] });
+    expect(invoke(ctx, 'template.title_card', { comp: 'Main', title: 'Solo' }).value).toMatchObject({ layers: [1, 2] });
     expect(invoke(ctx, 'template.title_card', { comp: 'Main' }).issue).toMatchObject({ code: 'INVALID_ARGS' });
   });
 });

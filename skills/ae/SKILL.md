@@ -39,6 +39,8 @@ Procedural motion:
 6. Parent only after checking the child's own keyframes: `layer.set_parent {comp, index, parent}`.
 7. Name a layer with `layer.rename {comp, index, name}`. Use `bulk.rename` only for many layers at once (see Bulk edits).
 
+Creating ops (`layer.add_*`, `text.add`, `shape.add` with a new layer, `rig.null_controller`, `template.lower_third`, `template.title_card`) return `{index, id, name}` for the new layer. Those that already returned `layerIndex` or `nullIndex` keep it.
+
 Layer ops accept `layer` in place of `index`: a 1-based index, an exact layer name (if several layers share it the call fails and lists their indices and ids), or `{id: n}` for the layer id. `index` keeps working.
 
 ## Parallax loop

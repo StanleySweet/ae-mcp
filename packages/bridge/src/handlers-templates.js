@@ -113,7 +113,9 @@ AEMCP.register('template.title_card', function (args) {
         subLayer.property(AEMCP_MATCH.TRANSFORM).property(AEMCP_MATCH.POSITION).setValue([comp.width / 2, comp.height / 2 + 50]);
         indices.push(subLayer.index);
     }
-    return { layers: indices };
+    var titleRef = aemcpLayerRef(titleLayer);
+    titleRef.layers = indices;
+    return titleRef;
 });
 
 // template.transition: `to` starts at `from`'s out point minus duration, so the

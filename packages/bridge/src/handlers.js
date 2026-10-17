@@ -417,6 +417,12 @@ function aemcpLayerAtIndex(comp, index) {
     return comp.layer(index);
 }
 
+// The {index, id, name} reference every creating operation returns (#228).
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerid
+function aemcpLayerRef(layer) {
+    return { index: layer.index, id: layer.id, name: layer.name };
+}
+
 // Read the comp key argument, accepting `comp` or `name` (the older spelling).
 function aemcpCompKey(args) {
     if (!args) {
@@ -1004,7 +1010,7 @@ AEMCP.register('layer.add_text', function (args) {
     if (args && args.name) {
         layer.name = args.name;
     }
-    return { index: layer.index, name: layer.name, id: layer.id };
+    return aemcpLayerRef(layer);
 });
 
 AEMCP.register('layer.add_shape', function (args) {
@@ -1012,7 +1018,7 @@ AEMCP.register('layer.add_shape', function (args) {
     var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addShape();
     layer.name = aemcpLayerName(args, 'Shape');
-    return { name: layer.name, id: layer.id };
+    return aemcpLayerRef(layer);
 });
 
 // Ref: https://ae-scripting.docsforadobe.dev/layer/layercollection/#layercollectionaddcamera
@@ -1021,7 +1027,7 @@ AEMCP.register('layer.add_camera', function (args) {
     var name = args && args.name ? args.name : 'Camera';
     var center = args && args.centerPoint ? args.centerPoint : [comp.width / 2, comp.height / 2];
     var layer = comp.layers.addCamera(name, center);
-    return { index: layer.index, name: layer.name, id: layer.id };
+    return aemcpLayerRef(layer);
 });
 
 // Ref: https://ae-scripting.docsforadobe.dev/layer/layercollection/#layercollectionaddlight
@@ -1039,7 +1045,9 @@ AEMCP.register('layer.add_light', function (args) {
     if (lightType !== null) {
         layer.lightType = types[lightType];
     }
-    return { index: layer.index, name: layer.name, id: layer.id, lightType: lightType };
+    var lightRef = aemcpLayerRef(layer);
+    lightRef.lightType = lightType;
+    return lightRef;
 });
 
 // Ref: https://ae-scripting.docsforadobe.dev/layer/avlayer/#avlayerthreedlayer
@@ -1066,7 +1074,7 @@ AEMCP.register('layer.add_solid', function (args) {
     var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addSolid(color, 'Solid', comp.width, comp.height, comp.pixelAspect, comp.duration);
     layer.name = aemcpLayerName(args, 'Solid');
-    return { name: layer.name, id: layer.id };
+    return aemcpLayerRef(layer);
 });
 
 AEMCP.register('layer.add_adjustment', function (args) {
@@ -1075,7 +1083,7 @@ AEMCP.register('layer.add_adjustment', function (args) {
     var layer = comp.layers.addSolid([0.5, 0.5, 0.5], 'Adjustment', comp.width, comp.height, comp.pixelAspect, comp.duration);
     layer.name = aemcpLayerName(args, 'Adjustment');
     layer.adjustmentLayer = true;
-    return { name: layer.name, id: layer.id };
+    return aemcpLayerRef(layer);
 });
 
 AEMCP.register('layer.add_null', function (args) {
@@ -1083,7 +1091,7 @@ AEMCP.register('layer.add_null', function (args) {
     var comp = aemcpRequireComp(compName);
     var layer = comp.layers.addNull(comp.duration);
     layer.name = aemcpLayerName(args, 'Null');
-    return { name: layer.name, id: layer.id };
+    return aemcpLayerRef(layer);
 });
 
 AEMCP.register('layer.add_footage', function (args) {
@@ -1104,7 +1112,7 @@ AEMCP.register('layer.add_footage', function (args) {
     }
     var layer = comp.layers.add(source);
     layer.name = footageName;
-    return { name: layer.name, id: layer.id };
+    return aemcpLayerRef(layer);
 });
 
 AEMCP.register('layer.center', function (args) {
@@ -1868,7 +1876,10 @@ AEMCP.register('template.lower_third', function (args) {
         position.setTemporalEaseAtKey(2, easeIn, easeOut);
         indices.push(m.layer.index);
     }
-    return { success: true, layers: indices };
+    var leadRef = aemcpLayerRef(made[1].layer);
+    leadRef.success = true;
+    leadRef.layers = indices;
+    return leadRef;
 });
 
 // E14-15: build a controller null with slider controls and parent layers to it.
@@ -1904,13 +1915,12 @@ AEMCP.register('rig.null_controller', function (args) {
     for (j = 0; j < targets.length; j++) {
         targets[j].parent = nullLayer;
     }
-    return {
-        success: true,
-        nullIndex: nullLayer.index,
-        name: name,
-        sliders: sliderNames,
-        linked: layerIndices
-    };
+    var nullRef = aemcpLayerRef(nullLayer);
+    nullRef.success = true;
+    nullRef.nullIndex = nullLayer.index;
+    nullRef.sliders = sliderNames;
+    nullRef.linked = layerIndices;
+    return nullRef;
 });
 
 // Effect operation handlers (mutating, run via ae_do). Every op takes a layer
@@ -2410,7 +2420,10 @@ AEMCP.register('shape.add', function (args) {
     // Last, because moveTo invalidates other references into the same group.
     // Ref: https://ae-scripting.docsforadobe.dev/property/propertybase/#propertybasemoveto
     if (args && args.front === true) shapeGroup.moveTo(1);
-    return { success: true, layerIndex: layer.index };
+    var shapeRef = aemcpLayerRef(layer);
+    shapeRef.success = true;
+    shapeRef.layerIndex = layer.index;
+    return shapeRef;
 });
 
 AEMCP.register('shape.set', function (args) {
@@ -2533,7 +2546,10 @@ AEMCP.register('text.add', function (args) {
     var result = aemcpApplyTextStyle(textDoc, args || {});
     if (result.error) return { success: false, error: result.error };
     if (result.changed) textProp.setValue(textDoc);
-    return { success: true, layerIndex: textLayer.index };
+    var textRef = aemcpLayerRef(textLayer);
+    textRef.success = true;
+    textRef.layerIndex = textLayer.index;
+    return textRef;
 });
 
 AEMCP.register('text.set', function (args) {
