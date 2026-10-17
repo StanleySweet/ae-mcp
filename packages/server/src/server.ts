@@ -65,6 +65,12 @@ import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from 
 import { registerPrompts } from './prompts.js';
 import { cleanupPartialOutput } from './render-output.js';
 import { createRenderProgress } from './render-progress.js';
+import {
+  checkFinishedOutput,
+  createRenderWatchdog,
+  DEFAULT_RENDER_WATCH,
+  type RenderWatchOptions,
+} from './render-watchdog.js';
 import { batchJson, replayJsx, replaySteps } from './replay.js';
 import { registerResources } from './resources.js';
 import { saveScript } from './script-save.js';
@@ -110,6 +116,8 @@ export interface ServerOptions {
   docsDir?: string;
   /** How long `ae_render_frame` waits for AE to finish writing the PNG (test seam). */
   frameWait?: FrameWait;
+  /** Stall and finished-output timing for ae_render jobs (test seam; defaults in render-watchdog.ts). */
+  renderWatch?: Partial<RenderWatchOptions>;
   /** Compares two rendered frames for `ae_render_frame` `compareWith` (test seam). */
   frameCompare?: (beforePng: string, afterPng: string) => Promise<FrameComparison>;
   /** Scales a rendered PNG so its longest edge is `maxEdge`, returning the new path or null (test seam). */
@@ -481,8 +489,15 @@ export function createServer(options: ServerOptions = {}): McpServer {
   const finishRenderJob = async (
     jobId: string,
     result: AerenderResult,
-    cleanup: { output: string | undefined; startedAt: number },
+    cleanup: { output: string | undefined; startedAt: number; stalled: string | null; watch: RenderWatchOptions },
   ): Promise<void> => {
+    if (cleanup.stalled !== null) {
+      if (cleanup.output !== undefined) {
+        await cleanupPartialOutput(cleanup.output, cleanup.startedAt).catch(() => undefined);
+      }
+      jobStore.fail(jobId, cleanup.stalled);
+      return;
+    }
     if (result.cancelled) {
       if (cleanup.output !== undefined) {
         await cleanupPartialOutput(cleanup.output, cleanup.startedAt).catch(() => undefined);
@@ -494,8 +509,9 @@ export function createServer(options: ServerOptions = {}): McpServer {
       // aerender can exit 0 without writing anything (seen with two renders of one
       // project at once). Check a literal output path; [name] or #### patterns can't be.
       const literal = cleanup.output !== undefined && !/[[#]/.test(cleanup.output);
-      if (literal && !(await stat(cleanup.output!).then(() => true, () => false))) {
-        jobStore.fail(jobId, `aerender exited with code 0 but wrote no file at ${cleanup.output}`);
+      const problem = literal ? await checkFinishedOutput(cleanup.output!, cleanup.watch) : null;
+      if (problem !== null) {
+        jobStore.fail(jobId, problem);
         return;
       }
       jobStore.succeed(jobId, { exitCode: 0 });
@@ -504,7 +520,14 @@ export function createServer(options: ServerOptions = {}): McpServer {
     const line = [...result.errors, ...result.output]
       .reverse()
       .find((entry) => entry.trim() !== '');
-    jobStore.fail(jobId, line ?? `aerender exited with code ${result.code ?? 'unknown'}`);
+    if (result.code === null) {
+      // Closed by a signal, or never started: name the signal, not "code unknown" (#270).
+      const how =
+        result.signal !== null ? `aerender killed by ${result.signal}` : 'aerender exited with code unknown';
+      jobStore.fail(jobId, line === undefined ? how : `${how}: ${line}`);
+      return;
+    }
+    jobStore.fail(jobId, line ?? `aerender exited with code ${result.code}`);
   };
 
   /** Operations the current policy lets this client see (ae_catalog and ae_describe). */
@@ -1055,7 +1078,17 @@ export function createServer(options: ServerOptions = {}): McpServer {
                 : undefined,
             send: (params) => extra!.sendNotification({ method: 'notifications/progress', params }),
           });
-    let handle: AerenderRunHandle;
+    const watch: RenderWatchOptions = { ...DEFAULT_RENDER_WATCH, ...options.renderWatch };
+    let stalled: string | null = null;
+    let handle: AerenderRunHandle | undefined;
+    const watchdog = createRenderWatchdog({
+      output: args.output,
+      watch,
+      onStall: (reason) => {
+        stalled = reason;
+        handle?.cancel();
+      },
+    });
     try {
       handle = runAerender({
         aerender,
@@ -1071,6 +1104,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         spawn: options.spawnAerender,
         onEvent: (event) => {
           if (event.type === 'progress') {
+            watchdog.noteProgress(`${event.frame}:${event.rendered}`);
             jobStore.progress(jobId, {
               frame: event.frame,
               rendered: event.rendered,
@@ -1086,11 +1120,14 @@ export function createServer(options: ServerOptions = {}): McpServer {
       jobStore.fail(jobId, message);
       return text(makeError('SCRIPT_ERROR', `could not start aerender: ${message}`), true);
     }
-    const done = handle.result.then((result) => {
+    const running = handle;
+    watchdog.start();
+    const done = running.result.then((result) => {
+      watchdog.stop();
       progress?.stop();
-      return finishRenderJob(jobId, result, { output: args.output, startedAt });
+      return finishRenderJob(jobId, result, { output: args.output, startedAt, stalled, watch });
     });
-    runs.set(jobId, { cancel: handle.cancel, done });
+    runs.set(jobId, { cancel: running.cancel, done });
     void done.finally(() => runs.delete(jobId));
     if (progress !== null) {
       // A client accepts progress only while the request is open, so with a

@@ -9,6 +9,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, describe, it, expect } from 'vitest';
 import type { AEClient } from './ae-client.js';
 import { JobStore } from './jobs.js';
+import type { RenderWatchOptions } from './render-watchdog.js';
 import { createServer, type ServerOptions } from './server.js';
 import type { Settings } from './settings.js';
 
@@ -70,6 +71,7 @@ async function connect(options: {
   aerender?: string;
   failSpawn?: boolean;
   settings?: Settings;
+  renderWatch?: Partial<RenderWatchOptions>;
 } = {}): Promise<Harness> {
   const store = new JobStore();
   const processes: FakeProcess[] = [];
@@ -92,6 +94,7 @@ async function connect(options: {
     jobStore: store,
     spawnAerender,
     settings: options.settings,
+    renderWatch: options.renderWatch,
   };
   if (options.aerender !== undefined) {
     serverOptions.aerender = options.aerender;
@@ -207,6 +210,113 @@ describe('ae_render / job_status', () => {
 
     const failed = await waitForStatus(harness.client, jobId, 'failed');
     expect(failed.error).toContain('wrote no file');
+  });
+
+  it('fails a literal-output job that exits 0 with an empty file', async () => {
+    const harness = await start({
+      aerender: '/fake/aerender',
+      renderWatch: { settleMs: 0, sizeOf: async () => 0 },
+    });
+    const dir = await mkdtemp(join(tmpdir(), 'ae-mcp-empty-'));
+    const output = join(dir, 'empty.mov');
+    const started = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main', output },
+    })) as { content: unknown[] };
+    const { jobId } = textContent(started);
+
+    harness.processes[0]!.close(0);
+
+    const failed = await waitForStatus(harness.client, jobId, 'failed');
+    expect(failed.error).toContain('wrote an empty file');
+  });
+
+  it('succeeds a literal-output job whose file is non-empty and stable', async () => {
+    const harness = await start({
+      aerender: '/fake/aerender',
+      renderWatch: { settleMs: 0, sizeOf: async () => 6 },
+    });
+    const dir = await mkdtemp(join(tmpdir(), 'ae-mcp-ok-'));
+    const output = join(dir, 'movie.mov');
+    const started = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main', output },
+    })) as { content: unknown[] };
+    const { jobId } = textContent(started);
+
+    harness.processes[0]!.close(0);
+
+    expect(await waitForStatus(harness.client, jobId, 'succeeded')).toMatchObject({
+      result: { exitCode: 0 },
+    });
+  });
+
+  it('fails a literal-output job whose file keeps changing size after exit 0', async () => {
+    let size = 0;
+    const harness = await start({
+      aerender: '/fake/aerender',
+      renderWatch: { settleMs: 0, sizeOf: async () => (size += 1) },
+    });
+    const dir = await mkdtemp(join(tmpdir(), 'ae-mcp-grow-'));
+    const output = join(dir, 'growing.mov');
+    const started = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main', output },
+    })) as { content: unknown[] };
+    const { jobId } = textContent(started);
+
+    harness.processes[0]!.close(0);
+
+    const failed = await waitForStatus(harness.client, jobId, 'failed');
+    expect(failed.error).toContain('was still changing');
+  });
+
+  it('fails a job whose output stops growing with the stall message and kills aerender', async () => {
+    const harness = await start({
+      aerender: '/fake/aerender',
+      renderWatch: { stallMs: 40, pollMs: 5, settleMs: 0, sizeOf: async () => 1024 },
+    });
+    const dir = await mkdtemp(join(tmpdir(), 'ae-mcp-stall-'));
+    const output = join(dir, 'stalled.mov');
+    const started = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main', output },
+    })) as { content: unknown[] };
+    const { jobId } = textContent(started);
+
+    const failed = await waitForStatus(harness.client, jobId, 'failed');
+    expect(failed.error).toMatch(/^render stalled: no progress and no output growth for \d+ s at 1024 bytes$/);
+    expect(harness.processes[0]!.killed).toBe('SIGTERM');
+  });
+
+  it('names the signal when aerender is killed, with its last output line', async () => {
+    const harness = await start({ aerender: '/fake/aerender' });
+    const started = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main' },
+    })) as { content: unknown[] };
+    const { jobId } = textContent(started);
+
+    const process = harness.processes[0]!;
+    process.stdout.write('PROGRESS: 00003 (4): 1 Seconds\nlast words\n');
+    process.close(null, 'SIGKILL');
+
+    const failed = await waitForStatus(harness.client, jobId, 'failed');
+    expect(failed.error).toBe('aerender killed by SIGKILL: last words');
+  });
+
+  it('says exit code unknown when aerender closes with no code, signal or output', async () => {
+    const harness = await start({ aerender: '/fake/aerender' });
+    const started = (await harness.client.callTool({
+      name: 'ae_render',
+      arguments: { comp: 'Main' },
+    })) as { content: unknown[] };
+    const { jobId } = textContent(started);
+
+    harness.processes[0]!.close(null, null);
+
+    const failed = await waitForStatus(harness.client, jobId, 'failed');
+    expect(failed.error).toBe('aerender exited with code unknown');
   });
 
   it('resolves the project file from the open project when omitted', async () => {
