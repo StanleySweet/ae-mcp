@@ -28,7 +28,7 @@ describe('bridge build', () => {
     await withOutDir(async (outDir) => {
       await build({ outDir });
       const loader = await readFile(join(outDir, 'loader.jsx'), 'utf8');
-      expect(loader).toMatch(/AEMCP_BRIDGE_VERSION = "0\.0\.0/);
+      expect(loader).toMatch(/AEMCP_BRIDGE_VERSION = "\d+\.\d+\.\d+/);
     });
   });
 

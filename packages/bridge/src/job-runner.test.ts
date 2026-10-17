@@ -223,7 +223,7 @@ describe('bridge batch.run', () => {
         ok: false,
         error: {
           code: 'SCRIPT_ERROR',
-          message: 'batch rolled back after ops[1] (a.boom) failed: Error: kaboom',
+          message: 'batch stopped at ops[1] (a.boom): Error: kaboom',
           rollback: true,
         },
       });

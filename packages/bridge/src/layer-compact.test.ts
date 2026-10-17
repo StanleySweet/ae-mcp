@@ -33,25 +33,21 @@ async function setup(): Promise<{ ctx: vm.Context; ae: MockAE }> {
   return { ctx, ae };
 }
 
-function setTransform(ae: MockAE, matchName: string, value: unknown): void {
-  const layer = (ae.project.item(1) as MockCompItem).layer(1) as unknown as MockPropertyGroup;
-  const transform = layer.property('ADBE Transform Group') as MockPropertyGroup;
-  (transform.property(matchName) as unknown as { value: unknown }).value = value;
-}
-
 function transformNames(layer: { transform?: { properties?: { matchName: string }[] } }): string[] {
   return (layer.transform?.properties ?? []).map((entry) => entry.matchName);
 }
 
 describe('ae_layer_info compact report (#250)', () => {
-  it('omits transform values at their factory defaults and empty arrays by default', async () => {
+  // Transform values are always reported: leaving Position or Anchor Point out at their
+  // defaults read as "missing" to a Claude Desktop session (2026-10-17).
+  it('keeps every transform value and drops only empty arrays by default', async () => {
     const { ctx } = await setup();
 
     const r = invoke(ctx, 'ae_layer_info', { comp: 'Main' });
 
     expect(r.ok).toBe(true);
     const layer = r.value.layers[0];
-    expect(layer.transform.properties).toBeUndefined();
+    expect(transformNames(layer)).toEqual(['ADBE Anchor Point', 'ADBE Position', 'ADBE Scale', 'ADBE Rotate Z', 'ADBE Opacity']);
     expect(layer.transform.groups).toBeUndefined();
     expect(layer.effects).toBeUndefined();
     expect(layer.masks).toBeUndefined();
@@ -59,37 +55,21 @@ describe('ae_layer_info compact report (#250)', () => {
     expect(layer.name).toBe('Null');
   });
 
-  it('keeps transform values that differ from their defaults', async () => {
-    const { ctx, ae } = await setup();
-    setTransform(ae, 'ADBE Opacity', 50);
-    setTransform(ae, 'ADBE Position', [100, 300, 0]);
-
-    const layer = invoke(ctx, 'ae_layer_info', { comp: 'Main' }).value.layers[0];
-
-    expect(transformNames(layer)).toEqual(['ADBE Position', 'ADBE Opacity']);
-    expect(layer.transform.properties[1].value).toBe(50);
-  });
-
-  it('keeps animated and expression-driven values even when they sit at the default', async () => {
+  it('leaves out X/Y/Z Position unless Position dimensions are separated', async () => {
     const { ctx, ae } = await setup();
     const layer = (ae.project.item(1) as MockCompItem).layer(1) as unknown as MockPropertyGroup;
-    const opacity = (layer.property('ADBE Transform Group') as MockPropertyGroup).property('ADBE Opacity') as unknown as {
-      keys: { time: number; value: unknown }[];
-      expressionEnabled: boolean;
-      expression: string;
-    };
-    opacity.keys.push({ time: 0, value: 100 });
-    setTransform(ae, 'ADBE Rotate Z', 0);
-    const rotate = (layer.property('ADBE Transform Group') as MockPropertyGroup).property('ADBE Rotate Z') as unknown as {
-      expressionEnabled: boolean;
-      expression: string;
-    };
-    rotate.expressionEnabled = true;
-    rotate.expression = 'time * 10';
+    const transform = layer.property('ADBE Transform Group') as MockPropertyGroup;
+    const position = transform.property('ADBE Position') as unknown as Record<string, unknown>;
+    const xPosition = transform.property('ADBE Opacity') as unknown as Record<string, unknown>;
+    // Stand-in follower: AE reports an unused X Position as 0 next to the real Position.
+    xPosition.isSeparationFollower = true;
+    xPosition.separationLeader = position;
 
-    const out = invoke(ctx, 'ae_layer_info', { comp: 'Main' }).value.layers[0];
+    position.dimensionsSeparated = false;
+    expect(transformNames(invoke(ctx, 'ae_layer_info', { comp: 'Main' }).value.layers[0])).not.toContain('ADBE Opacity');
 
-    expect(transformNames(out)).toEqual(['ADBE Rotate Z', 'ADBE Opacity']);
+    position.dimensionsSeparated = true;
+    expect(transformNames(invoke(ctx, 'ae_layer_info', { comp: 'Main' }).value.layers[0])).toContain('ADBE Opacity');
   });
 
   it('full returns every transform value and empty arrays', async () => {
@@ -117,14 +97,12 @@ describe('ae_layer_info compact report (#250)', () => {
     expect(layer.name).toBe('Null');
   });
 
-  it('fields including transform still omits defaults unless full is set', async () => {
+  it('fields including transform keeps the transform values', async () => {
     const { ctx } = await setup();
 
     const compact = invoke(ctx, 'ae_layer_info', { comp: 'Main', fields: ['transform'] }).value.layers[0];
-    const full = invoke(ctx, 'ae_layer_info', { comp: 'Main', fields: ['transform'], full: true }).value.layers[0];
 
-    expect(compact.transform.properties).toBeUndefined();
-    expect(transformNames(full)).toHaveLength(5);
+    expect(transformNames(compact)).toHaveLength(5);
   });
 
   it('summary returns only index, name and type per layer', async () => {

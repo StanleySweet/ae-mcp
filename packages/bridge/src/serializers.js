@@ -132,6 +132,16 @@ function aemcpSerializeProperty(property) {
     return out;
 }
 
+// X/Y/Z Position exist on every layer but only mean something once Position's dimensions
+// are separated; otherwise AE reports them as 0, which reads like a real position.
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyisseparationfollower
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyseparationleader
+// Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertydimensionsseparated
+function aemcpUnusedSeparationFollower(property) {
+    return property.isSeparationFollower === true && !!property.separationLeader &&
+        property.separationLeader.dimensionsSeparated !== true;
+}
+
 function aemcpSerializePropertyGroup(group) {
     var properties = [];
     var groups = [];
@@ -140,7 +150,7 @@ function aemcpSerializePropertyGroup(group) {
         var child = group.property(i);
         if (aemcpIsGroup(child)) {
             groups.push(aemcpSerializePropertyGroup(child));
-        } else {
+        } else if (!aemcpUnusedSeparationFollower(child)) {
             properties.push(aemcpSerializeProperty(child));
         }
     }
@@ -294,9 +304,8 @@ function aemcpSerializeLayer(layer) {
     return out;
 }
 
-// Compact layer report for ae_layer_info (#250). The default report drops transform
-// values that equal the After Effects factory default (no keyframes, no expression)
-// and empty arrays. `full` keeps everything; `fields` selects top-level keys; `summary`
+// Compact layer report for ae_layer_info (#250). The default report drops empty
+// arrays and empty transform groups (transform values are always kept). `full` keeps everything; `fields` selects top-level keys; `summary`
 // returns index, name and type only. Only the match names compared below are checked,
 // so any other property is always kept.
 var AEMCP_LAYER_FIELDS = [
@@ -306,65 +315,13 @@ var AEMCP_LAYER_FIELDS = [
     'masks', 'markers', 'text'
 ];
 
-function aemcpNear(a, b) {
-    return Math.abs(a - b) < 0.001;
-}
-
-// True when the vector matches `target` on every component it has (components past the
-// end of `target` count as 0).
-function aemcpVectorIs(value, target) {
-    var i;
-    if (typeof value !== 'object' || value === null || typeof value.length !== 'number' || value.length < 2) {
-        return false;
-    }
-    for (i = 0; i < value.length; i++) {
-        if (typeof value[i] !== 'number' || !aemcpNear(value[i], i < target.length ? target[i] : 0)) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// Factory defaults: Opacity 100, Rotation 0, Scale 100%, Position at the comp centre,
-// Anchor Point at the origin or (AV layers) the source centre. Animated or
-// expression-driven values are never defaults.
-function aemcpIsFactoryDefault(entry, out, comp) {
-    var match = entry.matchName;
-    var value = entry.value;
-    if (entry.keyframes !== undefined || entry.expression !== undefined) {
-        return false;
-    }
-    if (match === AEMCP_MATCH.OPACITY) {
-        return typeof value === 'number' && aemcpNear(value, 100);
-    }
-    if (match === AEMCP_MATCH.ROTATION) {
-        return typeof value === 'number' && aemcpNear(value, 0);
-    }
-    if (match === AEMCP_MATCH.SCALE) {
-        return aemcpVectorIs(value, [100, 100, 100]);
-    }
-    if (match === AEMCP_MATCH.POSITION) {
-        return aemcpVectorIs(value, [comp.width / 2, comp.height / 2, 0]);
-    }
-    if (match === AEMCP_MATCH.ANCHOR_POINT) {
-        return aemcpVectorIs(value, [0, 0, 0]) ||
-            (typeof out.width === 'number' && aemcpVectorIs(value, [out.width / 2, out.height / 2, 0]));
-    }
-    return false;
-}
-
-// Drops factory-default transform values and empty arrays from a serialized layer, in place.
-function aemcpCompactLayer(out, comp) {
-    var kept = [];
+// Drops empty transform groups and empty arrays from a serialized layer, in place.
+function aemcpCompactLayer(out) {
     var keys = ['effects', 'masks', 'markers'];
     var i;
     if (out.transform) {
-        for (i = 0; i < out.transform.properties.length; i++) {
-            if (!aemcpIsFactoryDefault(out.transform.properties[i], out, comp)) {
-                kept.push(out.transform.properties[i]);
-            }
-        }
-        out.transform.properties = kept;
+        // Transform values are always kept: leaving Position or Anchor Point out at their
+        // defaults read as "missing" to callers. Only empty groups and arrays are dropped.
         if (out.transform.properties.length === 0) {
             delete out.transform.properties;
         }
@@ -411,7 +368,7 @@ function aemcpLayerReport(out, comp, options) {
         return { index: out.index, name: out.name, type: out.type };
     }
     if (!options.full) {
-        aemcpCompactLayer(out, comp);
+        aemcpCompactLayer(out);
     }
     if (!options.fields) {
         return out;

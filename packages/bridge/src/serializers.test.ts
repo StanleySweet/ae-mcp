@@ -221,11 +221,10 @@ describe('bridge serializers', () => {
     expect(subset.layers.map((layer: { name: string }) => layer.name)).toEqual(['Layer 2']);
     expect(subset.missing).toEqual([9]);
 
-    const unknown = vm.runInContext(
-      "AEMCP.invoke('ae_layer_info', { comp: 'Nope' }, null).value",
-      ctx,
-    );
-    expect(unknown.comp).toBeNull();
+    // An unknown comp is an error: an empty report read as an empty comp.
+    const unknown = vm.runInContext("AEMCP.invoke('ae_layer_info', { comp: 'Nope' }, null)", ctx);
+    expect(unknown.ok).toBe(false);
+    expect(unknown.issue.message).toBe('comp not found: Nope');
   });
 
   it('reports a NO_VALUE property as null instead of failing ae_layer_info', async () => {
@@ -283,7 +282,7 @@ describe('bridge serializers', () => {
     const probe = vm.runInContext("AEMCP.invoke('ae_version_info', null, null).value", ctx);
     expect(probe).toMatchObject({
       aeVersion: 'MockAE-25',
-      bridgeVersion: expect.stringMatching(/^0\.0\.0/),
+      bridgeVersion: expect.stringMatching(/^\d+\.\d+\.\d+/),
     });
     expect(probe.capabilities).toContain('ae_version_info');
     expect(probe.capabilities).toContain('ae_project_info');

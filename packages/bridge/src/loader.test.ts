@@ -50,7 +50,7 @@ describe('bridge loader', () => {
     const beat = heartbeat(ae, home);
     expect(heartbeatSchema.parse(beat)).toMatchObject({
       protocolVersion: 1,
-      bridgeVersion: expect.stringMatching(/^0\.0\.0/),
+      bridgeVersion: expect.stringMatching(/^\d+\.\d+\.\d+/),
       aeVersion: 'MockAE-25',
       os: 'MockAE-OS',
       capabilities: expect.arrayContaining(CORE_TOOLS),
@@ -75,7 +75,7 @@ describe('bridge loader', () => {
     const aeHome = join(home, '.ae-mcp', 'bridge');
     runInMockAE(source, ae);
     expect(ae.evalFileCalls).toBe(1);
-    expect(ae.fs.get(join(aeHome, '.payload-version'))).toMatch(/^0\.0\.0.*\|/);
+    expect(ae.fs.get(join(aeHome, '.payload-version'))).toMatch(/^\d+\.\d+\.\d+.*\|/);
 
     ae.fs.set(
       join(aeHome, 'current.jsx'),

@@ -129,7 +129,7 @@ describe('batch.run step references', () => {
 
     expect(out.issue?.code).toBe('INVALID_ARGS');
     expect(out.issue?.rollback).toBe(true);
-    expect(out.issue?.message).toContain('batch rolled back after ops[2]');
+    expect(out.issue?.message).toContain('batch stopped at ops[2]');
   });
 
   it('leaves a string that is not a reference untouched', async () => {

@@ -32,8 +32,10 @@ function gitRevision(): string | null {
   }
 }
 
+// The release version lives in the root package.json (packages/bridge stays 0.0.0); the
+// server compares the bridge's release part with SERVER_VERSION (#247).
 async function bridgeVersion(): Promise<string> {
-  const pkg = JSON.parse(await readFile(join(SRC_DIR, '..', 'package.json'), 'utf8'));
+  const pkg = JSON.parse(await readFile(join(SRC_DIR, '..', '..', '..', 'package.json'), 'utf8'));
   const revision = gitRevision();
   return revision === null ? pkg.version : `${pkg.version}+${revision}`;
 }

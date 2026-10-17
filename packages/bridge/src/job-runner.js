@@ -335,7 +335,7 @@ AEMCP.register('batch.run', function (args) {
         outcome = resolved.ok ? aemcpRunHandler(sub.op, resolved.value) : { ok: false, issue: resolved.issue };
         if (!outcome.ok) {
             if (args.atomic !== false && changed) {
-                outcome.issue.message = 'batch rolled back after ops[' + i + '] (' + sub.op + ') failed: ' + outcome.issue.message;
+                outcome.issue.message = 'batch stopped at ops[' + i + '] (' + sub.op + '): ' + outcome.issue.message;
                 outcome.issue.rollback = true;
             }
             aemcpAbort(outcome.issue);

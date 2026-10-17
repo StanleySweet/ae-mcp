@@ -64,7 +64,7 @@ describe('vm test harness', () => {
   it('runs the built payload against a mock AE sandbox', async () => {
     const ae = new MockAE();
     const sandbox = runInMockAE(await builtPayload(), ae);
-    expect(vm.runInContext('AEMCP_BRIDGE_VERSION', sandbox)).toMatch(/^0\.0\.0/);
+    expect(vm.runInContext('AEMCP_BRIDGE_VERSION', sandbox)).toMatch(/^\d+\.\d+\.\d+/);
     expect(
       vm.runInContext('typeof Array.prototype.forEach', sandbox),
     ).toBe('function');

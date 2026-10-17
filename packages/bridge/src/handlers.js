@@ -796,8 +796,11 @@ AEMCP.register('ae_layer_info', function (args) {
     var layers = [];
     var missing = [];
     var requested, i, index, options;
+    // An unknown comp is an error, not an empty report: an empty list reads as an empty comp.
     if (!comp) {
-        return { comp: null, layers: layers, missing: missing };
+        aemcpAbortArgs(args && args.comp !== undefined && args.comp !== null
+            ? 'comp not found: ' + args.comp
+            : 'no active comp: pass comp (a name or index)');
     }
     requested = args && args.layers ? args.layers : null;
     options = aemcpLayerReportOptions(args);

@@ -35,7 +35,7 @@ async function connectServer(operations: OperationRegistry): Promise<Client> {
 async function catalog(
   client: Client,
   args: Record<string, unknown>,
-): Promise<{ operations: unknown[]; version?: string }> {
+): Promise<{ operations: unknown[]; version?: string; disabled?: { name: string; reason: string }[] }> {
   const result = await client.callTool({ name: 'ae_catalog', arguments: args });
   const [first] = result.content as Array<{ type: string; text: string }>;
   return JSON.parse(first!.text);
@@ -80,6 +80,13 @@ describe('ae_catalog', () => {
     };
     expect(rename.required).toEqual(['index', 'name']);
     expect(Object.keys(rename.schema)).toEqual(expect.arrayContaining(['index', 'name']));
+  });
+
+  // The bridge's capabilities include eval.run while the catalog hides it (off by default).
+  it('names the operations the policy hides and how to enable them', async () => {
+    const client = await connectServer(defaultOperationRegistry());
+    const result = await catalog(client, {});
+    expect(result.disabled).toEqual([{ name: 'eval.run', reason: expect.stringContaining('evalEnabled') }]);
   });
 
   it('returns an empty list when nothing is registered', async () => {

@@ -780,7 +780,7 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(
-    operation('batch.run', 'batch', 'Run many operations as one undo group. If a step fails after a changing step succeeded, the whole batch is rolled back (Edit > Undo) unless atomic is false. A step argument string "$<n>.<field>" (e.g. "$0.index", "$2.layers[1]") takes that field from earlier step n\'s result.', {
+    operation('batch.run', 'batch', 'Run many operations as one undo group. It stops at the first failing step; earlier steps stay applied, and one Cmd+Z in After Effects reverts the whole batch (never undone by script, ADR-0009). A step argument string "$<n>.<field>" (e.g. "$0.index", "$2.layers[1]") takes that field from earlier step n\'s result.', {
       required: ['ops'],
       schema: { ops: { type: 'array', items: { type: 'object' } }, atomic: { type: 'boolean' } },
     }),

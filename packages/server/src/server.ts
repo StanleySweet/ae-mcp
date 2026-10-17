@@ -818,14 +818,9 @@ export function createServer(options: ServerOptions = {}): McpServer {
         atKeys: z.boolean().optional(),
         layer: z.union([z.string(), z.number()]).optional(),
         index: z.number().int().optional(),
-        region: z
-          .tuple([
-            z.number().int().min(0),
-            z.number().int().min(0),
-            z.number().int().positive(),
-            z.number().int().positive(),
-          ])
-          .optional(),
+        // An array, not a tuple: a tuple's JSON Schema (items as an array) made Claude
+        // Desktop drop the whole tool as invalid.
+        region: z.array(z.number().int().min(0)).length(4).optional(),
         maxEdge: z.number().int().positive().optional(),
         compareWith: z.string().optional(),
       },
@@ -969,9 +964,9 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (first.size === null) {
         return text(makeError('SCRIPT_ERROR', `rendered frame is not a PNG: ${first.file}`), true);
       }
-      const region: [number, number, number, number] = args.region ?? [0, 0, first.size.width, first.size.height];
+      const region = (args.region ?? [0, 0, first.size.width, first.size.height]) as [number, number, number, number];
       const [x, y, w, h] = region;
-      if (x + w > first.size.width || y + h > first.size.height) {
+      if (w === 0 || h === 0 || x + w > first.size.width || y + h > first.size.height) {
         return text(
           makeError(
             'INVALID_ARGS',
@@ -1500,8 +1495,15 @@ export function createServer(options: ServerOptions = {}): McpServer {
         return text({ unchanged: true, version });
       }
       const allowed = await visibleOperations(args.category);
+      // The bridge lists every handler it has; say which ones the policy hides and why,
+      // so a caller comparing capabilities with the catalog is not left guessing.
+      const disabled =
+        operations.get('eval.run') !== undefined && !(await getSettings()).evalEnabled
+          ? [{ name: 'eval.run', reason: 'off by default; set "evalEnabled": true in ~/.ae-mcp/settings.json' }]
+          : [];
+      const extra = disabled.length > 0 ? { disabled } : {};
       if (args.verbose === true) {
-        return text({ operations: allowed, version });
+        return text({ operations: allowed, version, ...extra });
       }
       return text({
         operations: allowed.map((definition) => ({
@@ -1509,6 +1511,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
           description: definition.description,
         })),
         version,
+        ...extra,
       });
     },
   );
