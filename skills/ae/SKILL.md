@@ -33,6 +33,8 @@ After animating, check the result with `ae_render_frame {comp, times: [start, mi
 
 To keep a run as a script: `script_save {name: "Fix titles"}` writes it into AE's Scripts folder (File > Scripts after a restart; may need a restart).
 
+To keep a reusable script that is not a replay (parameters, loops), write it as ExtendScript and save it with `script_save {name, source}`. Before calling it with `source`, show the user the code and get their go-ahead. Use ES3 only (`var`, `function`, no `let`, `const`, `=>`, backticks, `class` or `...`); the server refuses those and names the line. Prefer `prompt()` for parameters, wrap changes in `app.beginUndoGroup`/`app.endUndoGroup`, and look up every AE API in the scripting guide first. The script is never run by the server; the user runs it from File > Scripts.
+
 ## Keyframes or expressions
 
 Read `docs/agents/animation-principles.md` first. Hand-authored motion gets keyframes. Procedural, random or linked motion gets an expression.

@@ -67,7 +67,7 @@ import { cleanupPartialOutput } from './render-output.js';
 import { createRenderProgress } from './render-progress.js';
 import { batchJson, replayJsx, replaySteps } from './replay.js';
 import { registerResources } from './resources.js';
-import { saveReplayScript } from './script-save.js';
+import { saveScript } from './script-save.js';
 import { loadSettings, type Settings } from './settings.js';
 import { runSetupChecks, type SetupDeps } from './setup-checks.js';
 import { loadUserSnippets, registerUserSnippets, resolveUserCall, TEMPLATE_OP } from './snippets.js';
@@ -1461,16 +1461,17 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'script_save',
     {
       description:
-        "Save Claude's recent steps as <name>.jsx in After Effects' Scripts folder (File > Scripts). Refuses an existing name unless overwrite. Restart AE to see it.",
+        "Save recent steps, or ExtendScript `source` you wrote (ES3, checked, never run), as <name>.jsx in AE's Scripts folder. Refuses an existing name unless overwrite. Restart AE to see it.",
       inputSchema: {
         name: z.string().min(1).max(100),
         n: z.number().int().positive().max(MAX_HISTORY_LIST).optional(),
         comp: z.string().optional(),
+        source: z.string().min(1).optional(),
         overwrite: z.boolean().default(false),
       },
     },
     async (args) => {
-      const saved = await saveReplayScript(
+      const saved = await saveScript(
         { root, history, operations, scriptsDir: options.scriptsDir, applicationsDir: options.applicationsDir },
         args,
       );
