@@ -25,6 +25,8 @@ export const errorSchema = z.object({
   code: errorCodeSchema,
   message: z.string(),
   hint: z.string().optional(),
+  // Precise context: arg, expected, allowed, closest (#237).
+  details: z.record(z.string(), z.unknown()).optional(),
   // Set by batch.run when the server must undo the batch as a separate job.
   rollback: z.boolean().optional(),
 });

@@ -50,6 +50,7 @@ import { JobStore } from './jobs.js';
 import {
   closestNames,
   defaultOperationRegistry,
+  unknownOperationDetails,
   validateOperationArgs,
   type OperationRegistry,
 } from './operations.js';
@@ -1293,13 +1294,13 @@ export function createServer(options: ServerOptions = {}): McpServer {
         const suggestions = closestNames(operations.names(), toolArgs.op);
         const suffix = suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : '';
         return text(
-          makeError('UNKNOWN_TOOL', `unknown operation '${toolArgs.op}'.${suffix}`),
+          makeError('UNKNOWN_TOOL', `unknown operation '${toolArgs.op}'.${suffix}`, unknownOperationDetails(operations.names(), toolArgs.op)),
           true,
         );
       }
       const validation = validateOperationArgs(definition.schema, toolArgs.args, definition.required);
       if (!validation.ok) {
-        return text(makeError('INVALID_ARGS', validation.message), true);
+        return text(makeError('INVALID_ARGS', validation.message, validation.details), true);
       }
       const settings = await getSettings();
       if (!isPermitted(definition, settings)) {
@@ -1322,7 +1323,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
           ? batchRunBlock(operations, validation.args.ops, settings)
           : null;
       if (blocked) {
-        return text(makeError(blocked.code, blocked.message), true);
+        return text(makeError(blocked.code, blocked.message, blocked.details), true);
       }
       const needsIncrement =
         definition.destructive ||
@@ -1394,14 +1395,14 @@ export function createServer(options: ServerOptions = {}): McpServer {
     if (definition === undefined) {
       const suggestions = closestNames(operations.names(), op);
       const suffix = suggestions.length > 0 ? ` Did you mean: ${suggestions.join(', ')}?` : '';
-      return failed(makeError('UNKNOWN_TOOL', `unknown operation '${op}'.${suffix}`));
+      return failed(makeError('UNKNOWN_TOOL', `unknown operation '${op}'.${suffix}`, unknownOperationDetails(operations.names(), op)));
     }
     if (definition.category !== 'bulk') {
       return failed(makeError('INVALID_ARGS', `operation '${op}' is not a bulk operation`));
     }
     const validation = validateOperationArgs(definition.schema, argsIn, definition.required);
     if (!validation.ok) {
-      return failed(makeError('INVALID_ARGS', validation.message));
+      return failed(makeError('INVALID_ARGS', validation.message, validation.details));
     }
     const settings = await getSettings();
     if (!isPermitted(definition, settings)) {

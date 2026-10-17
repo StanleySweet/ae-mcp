@@ -72,9 +72,16 @@ export const errorHintDetails: Record<ErrorCode, string> = {
 
 export const ERROR_HINTS_URI = 'ae-mcp://error-hints';
 
+/** Structured context for an error: the argument at fault, what it expected, the nearest known names (#237). */
+export type ErrorDetails = Record<string, unknown>;
+
+/** `details` is set only when given, so errors without it keep their shape. */
 export function makeError(
   code: ErrorCode,
   message: string,
-): { code: ErrorCode; message: string; hint: string } {
-  return { code, message, hint: errorHints[code] };
+  details?: ErrorDetails,
+): { code: ErrorCode; message: string; hint: string; details?: ErrorDetails } {
+  return details === undefined
+    ? { code, message, hint: errorHints[code] }
+    : { code, message, hint: errorHints[code], details };
 }

@@ -49,7 +49,7 @@ export function batchRunBlock(
     );
     const validation = validateOperationArgs(definition.schema, withoutRefs.args, withoutRefs.required);
     if (!validation.ok) {
-      return makeError('INVALID_ARGS', `ops[${index}] (${name}): ${validation.message}`);
+      return makeError('INVALID_ARGS', `ops[${index}] (${name}): ${validation.message}`, validation.details);
     }
     if (!isPermitted(definition, settings) || !evalRunEnabled(definition, settings)) {
       return makeError(

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultOperationRegistry, validateOperationArgs } from './operations.js';
+import { defaultOperationRegistry, unknownOperationDetails, validateOperationArgs } from './operations.js';
 
 // Every operation the bridge registers (`packages/bridge/src/handlers.js` plus
 // `batch.run` in `job-runner.js`), minus the top-level MCP tools.
@@ -174,6 +174,7 @@ describe('validateOperationArgs required arguments', () => {
     expect(validateOperationArgs(schema, { index: 1 }, ['index', 'name'])).toEqual({
       ok: false,
       message: "missing required argument 'name'",
+      details: { arg: 'name', expected: 'required' },
     });
   });
 
@@ -181,6 +182,7 @@ describe('validateOperationArgs required arguments', () => {
     expect(validateOperationArgs(schema, undefined, ['index'])).toEqual({
       ok: false,
       message: "missing required argument 'index'",
+      details: { arg: 'index', expected: 'required' },
     });
   });
 
@@ -201,7 +203,7 @@ describe('validateOperationArgs required arguments', () => {
   });
 
   it('rejects layer on an operation whose schema has no index', () => {
-    expect(validateOperationArgs({ name: { type: 'string' } }, { layer: 'Hero' })).toEqual({
+    expect(validateOperationArgs({ name: { type: 'string' } }, { layer: 'Hero' })).toMatchObject({
       ok: false,
       message: "unknown argument 'layer'",
     });
@@ -209,5 +211,70 @@ describe('validateOperationArgs required arguments', () => {
 
   it('keeps accepting calls without args when nothing is required', () => {
     expect(validateOperationArgs(schema, undefined)).toEqual({ ok: true, args: {} });
+  });
+});
+
+describe('validateOperationArgs details (#237)', () => {
+  const schema = {
+    index: { type: 'number' },
+    name: { type: 'string' },
+    lightType: { type: 'string', enum: ['parallel', 'spot', 'point', 'ambient'] },
+  };
+
+  it('names the enum values allowed and the closest one for a misspelled enum value', () => {
+    expect(validateOperationArgs(schema, { lightType: 'sopt' })).toEqual({
+      ok: false,
+      message: `argument 'lightType' must be one of ["parallel","spot","point","ambient"]`,
+      details: {
+        arg: 'lightType',
+        expected: 'one of the allowed values',
+        allowed: ['parallel', 'spot', 'point', 'ambient'],
+        closest: ['spot'],
+      },
+    });
+  });
+
+  it('omits closest for an enum value nothing resembles', () => {
+    const result = validateOperationArgs(schema, { lightType: 'zzzzzzzz' });
+    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ details: { arg: 'lightType', allowed: expect.any(Array) } });
+    expect((result as { details: object }).details).not.toHaveProperty('closest');
+  });
+
+  it('gives the argument and its expected type for a wrong type', () => {
+    expect(validateOperationArgs(schema, { index: 'one' })).toEqual({
+      ok: false,
+      message: "argument 'index' must be a number",
+      details: { arg: 'index', expected: 'number' },
+    });
+  });
+
+  it('suggests the closest argument name for an unknown argument', () => {
+    expect(validateOperationArgs(schema, { nmae: 'Hero' })).toEqual({
+      ok: false,
+      message: "unknown argument 'nmae'",
+      details: { arg: 'nmae', closest: ['name'] },
+    });
+  });
+
+  it('omits closest for an unknown argument with no close name', () => {
+    expect(validateOperationArgs(schema, { qqqqqqqqqqqq: 1 })).toEqual({
+      ok: false,
+      message: "unknown argument 'qqqqqqqqqqqq'",
+      details: { arg: 'qqqqqqqqqqqq' },
+    });
+  });
+});
+
+describe('unknownOperationDetails', () => {
+  it('suggests the closest operation name', () => {
+    expect(unknownOperationDetails(['layer.rename', 'comp.create'], 'layer.renam')).toEqual({
+      arg: 'op',
+      closest: ['layer.rename'],
+    });
+  });
+
+  it('omits closest when no operation name is close', () => {
+    expect(unknownOperationDetails(['layer.rename'], 'zzzzzzzzzzzzzzzz')).toEqual({ arg: 'op' });
   });
 });

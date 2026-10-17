@@ -214,7 +214,7 @@ AEMCP.register('property.sample', function (args) {
     }
     prop = aemcpResolveProperty(layer, args.property);
     if (!prop || aemcpIsGroup(prop)) {
-        aemcpAbortArgs('property not found: ' + args.property);
+        aemcpAbortPropertyNotFound(layer, args.property, 'property not found: ' + args.property);
     }
     for (i = 0; i < times.length; i++) {
         // Ref: https://ae-scripting.docsforadobe.dev/property/property/#propertyvalueattime

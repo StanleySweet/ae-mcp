@@ -15,7 +15,7 @@ export {
   errorHints,
   makeError,
 } from './errors.js';
-export type { ErrorCode } from './errors.js';
+export type { ErrorCode, ErrorDetails } from './errors.js';
 export {
   queueRoot,
   bridgeDir,

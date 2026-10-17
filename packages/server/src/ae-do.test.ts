@@ -215,6 +215,7 @@ describe('ae_do', () => {
     const error = errorSchema.parse(JSON.parse(text));
     expect(error.code).toBe('UNKNOWN_TOOL');
     expect(error.message).toContain('layer.rename');
+    expect(error.details).toEqual({ arg: 'op', closest: ['layer.rename'] });
     expect(calls).toEqual([]);
   });
 

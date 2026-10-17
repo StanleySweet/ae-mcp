@@ -1362,7 +1362,7 @@ function aemcpKeyTimes(keys) {
 function aemcpRequireKeyedProperty(layer, path) {
     var prop = typeof path === 'string' && path !== '' ? aemcpResolveProperty(layer, path) : null;
     if (!prop || typeof prop.numKeys !== 'number') {
-        aemcpAbortArgs('property not found: ' + path);
+        aemcpAbortPropertyNotFound(layer, path, 'property not found: ' + path);
     }
     if (prop.numKeys === 0) {
         aemcpAbortArgs('property has no keyframes: ' + path);
@@ -1423,7 +1423,7 @@ AEMCP.register('keyframe.copy', function (args) {
     var src = aemcpRequireKeyedProperty(srcLayer, from.property);
     var dst = typeof to.property === 'string' && to.property !== '' ? aemcpResolveProperty(dstLayer, to.property) : null;
     if (!dst || typeof dst.setValueAtTime !== 'function') {
-        aemcpAbortArgs('property not found: ' + to.property);
+        aemcpAbortPropertyNotFound(dstLayer, to.property, 'property not found: ' + to.property);
     }
     var keys = aemcpReadKeys(src);
     var i;
@@ -1464,7 +1464,7 @@ AEMCP.register('keyframe.add', function (args) {
     var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
-    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
+    if (!prop) aemcpAbortPropertyNotFound(layer, propertyName, 'Property not found: ' + propertyName);
     prop.setValueAtTime(time, value);
     return aemcpWithExpressionWarning(prop, { success: true, time: time, property: propertyName });
 });
@@ -1477,7 +1477,7 @@ AEMCP.register('keyframe.remove', function (args) {
     var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
-    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
+    if (!prop) aemcpAbortPropertyNotFound(layer, propertyName, 'Property not found: ' + propertyName);
     var j;
     for (j = prop.numKeys; j >= 1; j--) {
         if (Math.abs(prop.keyTime(j) - time) < 0.0001) {
@@ -1512,7 +1512,7 @@ AEMCP.register('keyframe.set_easing', function (args) {
     var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
-    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
+    if (!prop) aemcpAbortPropertyNotFound(layer, propertyName, 'Property not found: ' + propertyName);
     var keyIndex = null;
     var j;
     for (j = 1; j <= prop.numKeys; j++) {
@@ -1556,7 +1556,7 @@ AEMCP.register('keyframe.ease_preset', function (args) {
     var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
-    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
+    if (!prop) aemcpAbortPropertyNotFound(layer, propertyName, 'Property not found: ' + propertyName);
     var selection = prop.selectedKeys || [];
     if (!selection.length) {
         return { success: false, error: 'No keyframes selected on ' + propertyName + '. Select them in the Timeline or Graph Editor first.' };
@@ -2030,7 +2030,7 @@ AEMCP.register('effect.set_property', function (args) {
     var effect = aemcpFindEffect(parade, effectName);
     if (!effect) return { success: false, error: 'Effect not found: ' + effectName };
     var prop = aemcpResolveProperty(effect, propertyName);
-    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
+    if (!prop) aemcpAbortPropertyNotFound(effect, propertyName, 'Property not found: ' + propertyName);
     aemcpSetValue(prop, value, comp.time);
     return aemcpWithExpressionWarning(prop, { success: true });
 });
@@ -2054,7 +2054,7 @@ AEMCP.register('effect.set_keyframe', function (args) {
     var effect = aemcpFindEffect(parade, effectName);
     if (!effect) return { success: false, error: 'Effect not found: ' + effectName };
     var prop = aemcpResolveProperty(effect, propertyName);
-    if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
+    if (!prop) aemcpAbortPropertyNotFound(effect, propertyName, 'Property not found: ' + propertyName);
     prop.setValueAtTime(time, value);
     return aemcpWithExpressionWarning(prop, { success: true });
 });

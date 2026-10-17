@@ -1,4 +1,4 @@
-import type { OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
+import type { ErrorDetails, OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
 import { registerEvalOperations } from './operations-eval.js';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
 import { registerLayerOperations } from './operations-layers.js';
@@ -811,7 +811,9 @@ export function validateOperationArgs(
   schema: Record<string, unknown>,
   args: unknown,
   required: readonly string[] = [],
-): { ok: true; args: Record<string, unknown> } | { ok: false; message: string } {
+):
+  | { ok: true; args: Record<string, unknown> }
+  | { ok: false; message: string; details?: ErrorDetails } {
   if (args !== undefined && args !== null && (typeof args !== 'object' || Array.isArray(args))) {
     return { ok: false, message: 'arguments must be an object' };
   }
@@ -820,7 +822,11 @@ export function validateOperationArgs(
     // `layer` (index, name or {id}) satisfies a required `index`.
     if (name === 'index' && values.layer !== undefined) continue;
     if (values[name] === undefined) {
-      return { ok: false, message: `missing required argument '${name}'` };
+      return {
+        ok: false,
+        message: `missing required argument '${name}'`,
+        details: { arg: name, expected: 'required' },
+      };
     }
   }
   for (const [key, value] of Object.entries(values)) {
@@ -828,17 +834,34 @@ export function validateOperationArgs(
     // `layer` is accepted wherever an operation takes `index`.
     if (property === undefined && key === 'layer' && schema.index !== undefined) continue;
     if (property === undefined) {
-      return { ok: false, message: `unknown argument '${key}'` };
+      const closest = closeNames(Object.keys(schema), key);
+      return {
+        ok: false,
+        message: `unknown argument '${key}'`,
+        details: { arg: key, ...(closest.length > 0 ? { closest } : {}) },
+      };
     }
     if (Array.isArray(property.enum) && !property.enum.includes(value)) {
+      const allowed = property.enum as unknown[];
+      const closest = typeof value === 'string' ? closeNames(allowed.map(String), value) : [];
       return {
         ok: false,
         message: `argument '${key}' must be one of ${JSON.stringify(property.enum)}`,
+        details: {
+          arg: key,
+          expected: 'one of the allowed values',
+          allowed,
+          ...(closest.length > 0 ? { closest } : {}),
+        },
       };
     }
     const check = typeof property.type === 'string' ? typeChecks[property.type] : undefined;
     if (check && !check(value)) {
-      return { ok: false, message: `argument '${key}' must be a ${property.type}` };
+      return {
+        ok: false,
+        message: `argument '${key}' must be a ${property.type}`,
+        details: { arg: key, expected: property.type },
+      };
     }
   }
   return { ok: true, args: values };
@@ -865,4 +888,21 @@ export function closestNames(names: string[], query: string, limit = 3): string[
     .sort((a, b) => a.distance - b.distance || a.name.localeCompare(b.name))
     .slice(0, limit)
     .map((entry) => entry.name);
+}
+
+/** Details for an unknown operation name: `closest` only when a name is plausibly meant (#237). */
+export function unknownOperationDetails(names: string[], op: string): ErrorDetails {
+  const closest = closeNames(names, op);
+  return closest.length > 0 ? { arg: 'op', closest } : { arg: 'op' };
+}
+
+/**
+ * Up to three names that are plausibly what was meant (a typo or a case slip), nearest
+ * first. Empty when nothing is close, so callers can leave `closest` out (#237).
+ */
+export function closeNames(names: string[], query: string): string[] {
+  const limit = Math.max(2, Math.floor(query.length / 4));
+  return closestNames(names, query).filter(
+    (name) => levenshtein(name.toLowerCase(), query.toLowerCase()) <= limit,
+  );
 }

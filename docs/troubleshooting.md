@@ -89,6 +89,11 @@ short `hint`. The codes and their hints:
 The longer explanation of each code is served once as the MCP resource
 `ae-mcp://error-hints` (JSON, code to text).
 
+An `INVALID_ARGS` or `UNKNOWN_TOOL` error can carry `details`: `arg` (the argument
+at fault), `expected`, `allowed` (the valid enum values) and `closest` (a likely
+intended operation or property match name). `closest` is left out when nothing is
+close. Retry with the suggested name instead of repeating the same input.
+
 The two most common: `AE_NOT_RUNNING` (After Effects is closed) and
 `BRIDGE_NOT_LOADED` (AE is open but the startup loader has not run — restart
 AE). Both point at the same thing the `bridge_heartbeat` check verifies.
