@@ -771,14 +771,21 @@ export const scenario: Step[] = [
   // --- aerender: it reads the saved project file, so save the scratch project first
   op('project.save.copy', 'project.save', (s) => ({ path: outFile(s, 'drive-copy.aep'), overwrite: true })),
   op('project.save.scratch', 'project.save', (s) => ({ path: outFile(s, 'drive.aep'), overwrite: true })),
-  // #241: the project is saved now. One control is required: without it AE shows a modal.
-  op('mogrt.export', 'mogrt.export', (s) => ({
+  // #241: AE exports only a saved project with at least one control, else it shows a
+  // modal. The first call adds the control and stops (exported: false), then save, export.
+  op('mogrt.export.controls', 'mogrt.export', (s) => ({
     comp: s.comp,
     path: outFile(s, 'drive.mogrt'),
-    overwrite: true,
     controls: [{ layer: layerIndex(s, 'Text'), property: 'Opacity', name: 'Drive Fade' }],
   }), {
-    after: (_result, state) => {
+    after: (result) => {
+      if (payload(result).exported !== false) throw new Error(`expected exported: false, got ${result.text.slice(0, 300)}`);
+    },
+  }),
+  op('project.save.mogrt', 'project.save', (s) => ({ path: outFile(s, 'drive.aep'), overwrite: true })),
+  op('mogrt.export', 'mogrt.export', (s) => ({ comp: s.comp, path: outFile(s, 'drive.mogrt'), overwrite: true }), {
+    after: (result, state) => {
+      if (payload(result).exported !== true) throw new Error(`mogrt.export did not export: ${result.text.slice(0, 300)}`);
       if (!existsSync(outFile(state, 'drive.mogrt'))) throw new Error('mogrt.export wrote no drive.mogrt');
     },
   }),

@@ -50,11 +50,28 @@ AEMCP.register('mogrt.export', function (args) {
     if (comp.motionGraphicsTemplateControllerCount === 0) {
         aemcpAbortArgs('the comp needs at least one Essential Graphics control: pass controls [{layer, property, name}]');
     }
-    comp.motionGraphicsTemplateName = name;
+    // Unsaved changes (the controls added above, a new template name, or earlier edits)
+    // make AE ask "ce projet doit être enregistré" in a modal instead of exporting, so
+    // stop here and let the caller save first (project.save is never done silently).
+    // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectdirty
+    var renamed = comp.motionGraphicsTemplateName !== name;
+    if (renamed) {
+        comp.motionGraphicsTemplateName = name;
+    }
+    if (controls.length > 0 || renamed || app.project.dirty || !app.project.file) {
+        return {
+            exported: false,
+            reason: 'save the project (project.save), then call mogrt.export again with the same path',
+            path: folder + '/' + name + '.mogrt',
+            name: name,
+            controls: aemcpMogrtControls(comp)
+        };
+    }
     if (!comp.exportAsMotionGraphicsTemplate(overwrite, folder)) {
         aemcpAbort(aemcpErrorIssue('SCRIPT_ERROR', 'exportAsMotionGraphicsTemplate returned false'));
     }
     return {
+        exported: true,
         path: folder + '/' + name + '.mogrt',
         name: name,
         controls: aemcpMogrtControls(comp)

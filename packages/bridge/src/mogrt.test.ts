@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import vm from 'node:vm';
 import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
-import { MockAE, MockCompItem, runInMockAE } from './mock-ae.js';
+import { MockAE, MockCompItem, MockFile, runInMockAE } from './mock-ae.js';
 
 interface Outcome {
   ok: boolean;
@@ -25,6 +25,14 @@ async function payloadContext(): Promise<{ ctx: vm.Context; ae: MockAE }> {
 
 function invoke(ctx: vm.Context, tool: string, args: unknown): Outcome {
   return vm.runInContext(`AEMCP.invoke(${JSON.stringify(tool)}, ${JSON.stringify(args)}, null)`, ctx);
+}
+
+// A saved project whose Hero comp already has one control and its template name: ready to export.
+function readyToExport(ae: MockAE, comp: MockCompItem): void {
+  comp.egpControls.push('Fade');
+  comp.motionGraphicsTemplateName = 'Hero';
+  ae.project.file = new MockFile(ae, '/p/hero.aep');
+  ae.project.dirty = false;
 }
 
 function seedHero(ae: MockAE): MockCompItem {
@@ -53,16 +61,12 @@ describe('mogrt.export', () => {
     const { ctx, ae } = await payloadContext();
     const comp = seedHero(ae);
     ae.fs.set('/out/Hero.mogrt', '');
+    readyToExport(ae, comp);
 
-    const outcome = invoke(ctx, 'mogrt.export', {
-      comp: 'Hero',
-      path: '/out/Hero.mogrt',
-      overwrite: true,
-      controls: [{ layer: 1, property: 'Opacity', name: 'Fade' }],
-    });
+    const outcome = invoke(ctx, 'mogrt.export', { comp: 'Hero', path: '/out/Hero.mogrt', overwrite: true });
 
     expect(outcome.ok).toBe(true);
-    expect(outcome.value).toMatchObject({ path: '/out/Hero.mogrt', name: 'Hero' });
+    expect(outcome.value).toMatchObject({ exported: true, path: '/out/Hero.mogrt', name: 'Hero' });
     expect(comp.motionGraphicsTemplateName).toBe('Hero');
     expect(comp.mogrtExports).toEqual([{ overwrite: true, folder: '/out' }]);
   });
@@ -77,9 +81,36 @@ describe('mogrt.export', () => {
       controls: [{ layer: 1, property: 'Opacity', name: 'Fade' }],
     });
 
+    // Adding a control is an unsaved change: AE would ask to save in a modal, so no export yet.
     expect(outcome.ok).toBe(true);
-    expect(outcome.value?.controls).toEqual([{ index: 1, name: 'Fade' }]);
+    expect(outcome.value).toMatchObject({ exported: false, controls: [{ index: 1, name: 'Fade' }] });
+    expect(String(outcome.value?.reason)).toMatch(/project\.save/);
     expect(comp.egpControls).toEqual(['Fade']);
+    expect(comp.mogrtExports).toEqual([]);
+  });
+
+  it('does not export a project with unsaved changes', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedHero(ae);
+    readyToExport(ae, comp);
+    ae.project.dirty = true;
+
+    const outcome = invoke(ctx, 'mogrt.export', { comp: 'Hero', path: '/out/Hero.mogrt' });
+
+    expect(outcome.value).toMatchObject({ exported: false });
+    expect(comp.mogrtExports).toEqual([]);
+  });
+
+  it('does not export a project that was never saved', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedHero(ae);
+    readyToExport(ae, comp);
+    ae.project.file = null;
+
+    const outcome = invoke(ctx, 'mogrt.export', { comp: 'Hero', path: '/out/Hero.mogrt' });
+
+    expect(outcome.value).toMatchObject({ exported: false });
+    expect(comp.mogrtExports).toEqual([]);
   });
 
   it('refuses a control that the essential graphics panel cannot take', async () => {
