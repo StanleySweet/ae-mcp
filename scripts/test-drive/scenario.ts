@@ -389,6 +389,7 @@ export const scenario: Step[] = [
     style: 'wipe',
     duration: 0.5,
   })),
+  refreshLayers('ae_layer_info.before-glitch'),
   op('template.logo_reveal.glitch', 'template.logo_reveal', (s) => ({
     comp: s.comp,
     index: layerIndex(s, 'Text'),
@@ -945,8 +946,9 @@ export const scenario: Step[] = [
   ),
   op('marker.list.after-rollback', 'marker.list', (s) => ({ comp: s.comp }), {
     after: (result) => {
-      if (result.text.includes('batch rolled back')) {
-        throw new Error('batch rollback left its marker behind');
+      // No scripted undo (ADR-0009): the failed batch's first step stays applied.
+      if (!result.text.includes('batch rolled back')) {
+        throw new Error('failed batch removed its marker; batch.run must not undo by script');
       }
     },
   }),
@@ -1001,7 +1003,6 @@ export const scenario: Step[] = [
 
   // --- explicit skips --------------------------------------------------------
   skipOp('project.new', 'run.ts starts the drive with it (fresh scratch project); a mid-drive call would wipe the scratch comp'),
-  skipOp('project.undo', 'Edit > Undo rewrites the user undo history'),
   skipOp('command.execute', 'runs arbitrary menu commands; unsafe in an unattended drive'),
 ];
 
