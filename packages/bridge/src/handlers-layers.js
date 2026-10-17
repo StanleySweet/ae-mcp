@@ -7,7 +7,7 @@ AEMCP.register('layer.rename', function (args) {
         aemcpAbortArgs('name must be a non-empty string');
     }
     var comp = aemcpRequireComp(args && args.comp);
-    var layer = comp.layer(args.index);
+    var layer = aemcpRequireLayer(comp, args);
     if (!layer) {
         aemcpAbortArgs('layer not found: ' + args.index);
     }

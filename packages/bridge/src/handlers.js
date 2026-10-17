@@ -374,6 +374,49 @@ function aemcpRequireComp(key) {
     return comp;
 }
 
+// Resolve the layer an operation targets. `layer` is a 1-based index, an exact name,
+// or {id}; `index` is the older index-only argument. With neither, use defaultIndex
+// when given, else abort. Ref: https://ae-scripting.docsforadobe.dev/item/compitem/ (layer(index), numLayers)
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerid
+function aemcpRequireLayer(comp, args, defaultIndex) {
+    var key = args ? args.layer : undefined;
+    if (key === undefined || key === null) {
+        var index = args && args.index ? args.index : defaultIndex;
+        if (!index) {
+            aemcpAbortArgs('layer is required: pass layer (index, name or {id}) or index');
+        }
+        return aemcpLayerAtIndex(comp, index);
+    }
+    if (typeof key === 'number') return aemcpLayerAtIndex(comp, key);
+    if (typeof key === 'string') {
+        var named = [];
+        for (var i = 1; i <= comp.numLayers; i++) {
+            if (comp.layer(i).name === key) named.push(comp.layer(i));
+        }
+        if (named.length === 0) aemcpAbortArgs('layer not found: name "' + key + '"');
+        if (named.length > 1) {
+            var described = [];
+            for (var j = 0; j < named.length; j++) {
+                described.push('index ' + named[j].index + ' (id ' + named[j].id + ')');
+            }
+            aemcpAbortArgs('layer name "' + key + '" is not unique, matches: ' + described.join(', '));
+        }
+        return named[0];
+    }
+    if (typeof key === 'object' && typeof key.id === 'number') {
+        for (var k = 1; k <= comp.numLayers; k++) {
+            if (comp.layer(k).id === key.id) return comp.layer(k);
+        }
+        aemcpAbortArgs('layer not found: id ' + key.id);
+    }
+    aemcpAbortArgs('layer must be an index, an exact name, or {id}');
+}
+
+function aemcpLayerAtIndex(comp, index) {
+    if (index < 1 || index > comp.numLayers) aemcpAbortArgs('layer not found: ' + index);
+    return comp.layer(index);
+}
+
 // Read the comp key argument, accepting `comp` or `name` (the older spelling).
 function aemcpCompKey(args) {
     if (!args) {
@@ -1004,7 +1047,7 @@ AEMCP.register('layer.add_light', function (args) {
 // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/ (LightLayer inherits from Layer)
 AEMCP.register('layer.set_3d', function (args) {
     var comp = aemcpRequireComp(aemcpCompKey(args));
-    var layer = comp.layer(args ? args.index : 0);
+    var layer = aemcpRequireLayer(comp, args);
     if (!layer) {
         aemcpAbortArgs('layer not found: ' + (args ? args.index : undefined));
     }
@@ -1102,7 +1145,7 @@ AEMCP.register('layer.set_transform', function (args) {
         aemcpAbortArgs('nothing to set: pass anchorPoint, position, scale, rotation or opacity');
     }
     var comp = aemcpRequireComp(args && args.comp);
-    var layer = comp.layer(args.index);
+    var layer = aemcpRequireLayer(comp, args);
     if (!layer) {
         aemcpAbortArgs('layer not found: ' + args.index);
     }
@@ -1117,10 +1160,9 @@ AEMCP.register('layer.set_transform', function (args) {
 
 AEMCP.register('layer.set_parent', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var parentIndex = args && args.parent ? args.parent : 0;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     layer.parentIndex = parentIndex;
     return { success: true };
@@ -1128,9 +1170,8 @@ AEMCP.register('layer.set_parent', function (args) {
 
 AEMCP.register('layer.delete', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     // Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerremove
     layer.remove();
@@ -1139,9 +1180,8 @@ AEMCP.register('layer.delete', function (args) {
 
 AEMCP.register('layer.bounds', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     if (typeof layer.sourceRectAtTime !== 'function') {
         return { success: false, error: 'Layer does not report bounds: ' + layer.name };
@@ -1179,9 +1219,8 @@ function aemcpWithExpressionWarning(prop, result) {
 AEMCP.register('property.get', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.name ? args.name : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
@@ -1223,9 +1262,8 @@ AEMCP.register('property.set', function (args) {
     var propertyName = args && args.name ? args.name : null;
     // 0, [], "" and false are valid values, so test presence, not truthiness.
     var value = args && args.value !== undefined ? args.value : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
@@ -1337,7 +1375,7 @@ function aemcpNumberArg(args, name) {
 // so the motion plays backwards with the same ease shape.
 function aemcpRetimeKeys(args, transform, mirrored) {
     var comp = aemcpRequireComp(aemcpCompKey(args));
-    var layer = comp.layer(args && args.index ? args.index : 1);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) {
         aemcpAbortArgs('layer not found: ' + (args && args.index));
     }
@@ -1409,13 +1447,12 @@ AEMCP.register('keyframe.scale_time', function (args) {
 // Keyframe operation handlers (mutating, run via ae_do).
 AEMCP.register('keyframe.add', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var time = args && args.time ? args.time : 0;
     // 0 is a valid keyframe value (e.g. opacity off), so test presence, not truthiness.
     var value = args && args.value !== undefined ? args.value : [0, 0];
     var propertyName = args && args.property ? args.property : null;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
@@ -1425,11 +1462,10 @@ AEMCP.register('keyframe.add', function (args) {
 
 AEMCP.register('keyframe.remove', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var time = args && args.time ? args.time : 0;
     var propertyName = args && args.property ? args.property : null;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
@@ -1460,12 +1496,11 @@ function aemcpEaseArray(prop, speed, influence) {
 
 AEMCP.register('keyframe.set_easing', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var time = args && args.time ? args.time : 0;
     var easing = args && args.easing ? args.easing : 'linear';
     var propertyName = args && args.property ? args.property : null;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
@@ -1499,7 +1534,6 @@ AEMCP.register('keyframe.set_easing', function (args) {
 // E14-12: apply an easing preset to the keyframes selected on a property.
 AEMCP.register('keyframe.ease_preset', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var propertyName = args && args.property ? args.property : null;
     var preset = args && args.preset ? args.preset : null;
     // ponytail: KeyframeEase speed is absolute (units/sec), so a fixed speed means
@@ -1510,7 +1544,7 @@ AEMCP.register('keyframe.ease_preset', function (args) {
     var curve = curves[preset];
     if (!curve) return { success: false, error: 'Unknown preset: ' + preset };
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found: ' + propertyName };
@@ -1541,10 +1575,9 @@ AEMCP.register('keyframe.ease_preset', function (args) {
 // sourcePointToComp throws or returns NaN in older AE builds.
 AEMCP.register('anchor.move_preserving', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var anchor = args && args.anchor !== undefined ? args.anchor : 'center';
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     if (!layer.property) return { success: false, error: 'Not an AV layer' };
     var transform = layer.property(AEMCP_MATCH.TRANSFORM);
@@ -1608,9 +1641,8 @@ AEMCP.register('expression.set', function (args) {
     // An empty string is a valid expression (it clears the driver), so test
     // presence, not truthiness.
     var value = args && args.value !== undefined ? args.value : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
@@ -1624,9 +1656,8 @@ AEMCP.register('expression.set', function (args) {
 AEMCP.register('expression.clear', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.property ? args.property : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
@@ -1638,9 +1669,8 @@ AEMCP.register('expression.clear', function (args) {
 AEMCP.register('expression.check_errors', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.property ? args.property : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
@@ -1747,9 +1777,8 @@ AEMCP.register('expression.snippet', function (args) {
     }
     var compName = args && args.comp ? args.comp : null;
     var propertyName = args && args.property ? args.property : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var prop = aemcpResolveProperty(layer, propertyName);
     if (!prop) return { success: false, error: 'Property not found' };
@@ -1767,7 +1796,7 @@ AEMCP.register('text.animate', function (args) {
     var preset = args && args.preset ? args.preset : null;
     var duration = aemcpSnippetNumber(args, 'duration', 1, 0.001);
     var comp = aemcpRequireComp(args && args.comp ? args.comp : null);
-    var layer = comp.layer(args && args.index ? args.index : 1);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var span = 'inPoint, inPoint + ' + duration;
     var prop, code;
@@ -1916,12 +1945,11 @@ function aemcpFindEffect(parade, name) {
 AEMCP.register('effect.apply', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var effectName = args && args.effect ? args.effect : null;
-    var layerIndex = args && args.index ? args.index : 1;
     if (!effectName) {
         return { success: false, error: 'Effect required' };
     }
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var parade = aemcpEffectParade(layer);
     if (!parade) return { success: false, error: 'Effect parade not found' };
@@ -1937,9 +1965,8 @@ AEMCP.register('effect.apply', function (args) {
 
 AEMCP.register('effect.list_on_layer', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var parade = aemcpEffectParade(layer);
     var effects = [];
@@ -1979,7 +2006,6 @@ AEMCP.register('effect.set_property', function (args) {
     var propertyName = args && args.property ? args.property : null;
     // 0, [], "" and false are valid values, so test presence, not truthiness.
     var value = args && args.value !== undefined ? args.value : null;
-    var layerIndex = args && args.index ? args.index : 1;
     if (!effectName) {
         return { success: false, error: 'Effect required' };
     }
@@ -1987,7 +2013,7 @@ AEMCP.register('effect.set_property', function (args) {
         return { success: false, error: 'Property required' };
     }
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var parade = aemcpEffectParade(layer);
     var effect = aemcpFindEffect(parade, effectName);
@@ -2002,7 +2028,6 @@ AEMCP.register('effect.set_keyframe', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var effectName = args && args.effect ? args.effect : null;
     var propertyName = args && args.property ? args.property : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var time = args && args.time ? args.time : 0;
     var value = args && args.value !== undefined ? args.value : null;
     if (!effectName) {
@@ -2012,7 +2037,7 @@ AEMCP.register('effect.set_keyframe', function (args) {
         return { success: false, error: 'Property required' };
     }
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var parade = aemcpEffectParade(layer);
     var effect = aemcpFindEffect(parade, effectName);
@@ -2026,12 +2051,11 @@ AEMCP.register('effect.set_keyframe', function (args) {
 AEMCP.register('effect.remove', function (args) {
     var compName = args && args.comp ? args.comp : null;
     var effectName = args && args.effect ? args.effect : null;
-    var layerIndex = args && args.index ? args.index : 1;
     if (!effectName) {
         return { success: false, error: 'Effect required' };
     }
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     var parade = aemcpEffectParade(layer);
     var effect = aemcpFindEffect(parade, effectName);
@@ -2043,10 +2067,9 @@ AEMCP.register('effect.remove', function (args) {
 // Preset operation handlers (mutating, run via ae_do).
 AEMCP.register('preset.apply_ffx', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var layerIndex = args && args.index ? args.index : 1;
     var presetPath = args && args.path ? args.path : null;
     var comp = aemcpRequireComp(compName);
-    var layer = comp.layer(layerIndex);
+    var layer = aemcpRequireLayer(comp, args, 1);
     if (!layer) return { success: false, error: 'Layer not found' };
     if (!presetPath) return { success: false, error: 'Preset path required' };
     var ffxFile = new File(presetPath);

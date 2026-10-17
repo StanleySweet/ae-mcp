@@ -817,12 +817,16 @@ export function validateOperationArgs(
   }
   const values = (args ?? {}) as Record<string, unknown>;
   for (const name of required) {
+    // `layer` (index, name or {id}) satisfies a required `index`.
+    if (name === 'index' && values.layer !== undefined) continue;
     if (values[name] === undefined) {
       return { ok: false, message: `missing required argument '${name}'` };
     }
   }
   for (const [key, value] of Object.entries(values)) {
     const property = schema[key] as PropertySchema | undefined;
+    // `layer` is accepted wherever an operation takes `index`.
+    if (property === undefined && key === 'layer' && schema.index !== undefined) continue;
     if (property === undefined) {
       return { ok: false, message: `unknown argument '${key}'` };
     }

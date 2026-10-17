@@ -194,6 +194,18 @@ describe('validateOperationArgs required arguments', () => {
     expect(validateOperationArgs(schema, { index: 0, name: '' }, ['index', 'name']).ok).toBe(true);
   });
 
+  it('accepts layer by name or {id} in place of a required index', () => {
+    expect(validateOperationArgs(schema, { layer: 'Hero', name: 'Hero2' }, ['index', 'name']).ok).toBe(true);
+    expect(validateOperationArgs(schema, { layer: { id: 7 }, name: 'Hero2' }, ['index', 'name']).ok).toBe(true);
+  });
+
+  it('rejects layer on an operation whose schema has no index', () => {
+    expect(validateOperationArgs({ name: { type: 'string' } }, { layer: 'Hero' })).toEqual({
+      ok: false,
+      message: "unknown argument 'layer'",
+    });
+  });
+
   it('keeps accepting calls without args when nothing is required', () => {
     expect(validateOperationArgs(schema, undefined)).toEqual({ ok: true, args: {} });
   });
