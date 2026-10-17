@@ -48,6 +48,25 @@ not written down is lost. Before handing off:
 `CONTEXT.md` is the only file you rewrite. Everything else is **append-only**: you do
 not erase history, you add an entry that supersedes the previous one.
 
+**When.** "Before handing off" also means: before a long session gets compacted (a summary
+keeps the outline, not the details), after each round of agent branches is merged, and right
+after a live test drive finds something. Do not wait for the end of the day.
+
+**Defects become issues.** A bug or gap you notice in passing and do not fix now goes into
+a GitHub issue, not only into the journal. Nobody reads old journal entries looking for work.
+
+**Search before you write.** Look for an existing issue (`gh issue list --state all --search`),
+finding or ADR (`grep -ril <word> docs/findings docs/decisions`) first. Comment on the open
+issue, or add a superseding entry, instead of creating a duplicate.
+
+**Write rules, not stories.** A finding states the trap and the rule that avoids it ("AE
+26.5 hides its windows from Accessibility: dialogs cannot be read by script"), with the
+evidence below it. The incident narrative belongs in the journal.
+
+**Leave open threads visible.** End the journal entry with what is still running or
+unverified (an agent branch, a drive not re-run, a step only the user can do) and the next
+step for each.
+
 ### Decide vs. ask
 
 You decide alone: naming, file split, test structure, local refactor.
