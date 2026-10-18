@@ -1225,7 +1225,10 @@ export class MockRenderQueueItem {
   readonly templates = ['Best Settings', 'Draft Settings'];
   private readonly first: MockOutputModule = new MockOutputModule();
 
-  constructor(readonly comp: MockItem) {}
+  constructor(
+    readonly comp: MockItem,
+    private readonly queue: MockRenderQueue | null = null,
+  ) {}
 
   // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueueitem/
   get status(): number {
@@ -1255,8 +1258,10 @@ export class MockRenderQueueItem {
     return [this.first];
   }
 
+  // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueueitem/#renderqueueitemremove
   remove(): void {
     this.removed = true;
+    this.queue?.drop(this);
   }
 }
 
@@ -1267,7 +1272,7 @@ export class MockRenderQueue {
   // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/rqitemcollection/
   readonly items = {
     add: (comp: MockItem): MockRenderQueueItem => {
-      const item = new MockRenderQueueItem(comp);
+      const item = new MockRenderQueueItem(comp, this);
       this.list.push(item);
       return item;
     },
@@ -1279,6 +1284,12 @@ export class MockRenderQueue {
 
   item(index: number): MockRenderQueueItem | null {
     return this.list[index - 1] ?? null;
+  }
+
+  /** Takes an item out of the queue; the items after it move up one index. */
+  drop(item: MockRenderQueueItem): void {
+    const at = this.list.indexOf(item);
+    if (at >= 0) this.list.splice(at, 1);
   }
 
   // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueue/

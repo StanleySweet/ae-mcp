@@ -120,6 +120,7 @@ const BRIDGE_OPS = [
   'batch.run',
   'eval.run',
   'layer.move',
+  'render.queue_remove',
 ];
 
 describe('server operation registry', () => {

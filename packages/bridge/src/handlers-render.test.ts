@@ -110,8 +110,8 @@ describe('render.frame', () => {
     const file = outcome.value?.file as string;
     expectFreshName(file, `${home}/.ae-mcp/render/Main-50-`);
     expect(ae.fs.get(file)).toBe('PNG:Main:2');
-    expect(ae.project.renderQueue.numItems).toBe(1);
-    expect(ae.project.renderQueue.item(1)?.removed).toBe(true);
+    // The fallback removes its temporary queue item again, so the queue is left empty.
+    expect(ae.project.renderQueue.numItems).toBe(0);
   });
 
   it('defaults to the active comp and reports an unknown comp as INVALID_ARGS', async () => {

@@ -4,13 +4,14 @@ import { registerAudioOperations } from './operations-audio.js';
 import { registerEvalOperations } from './operations-eval.js';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
 import { registerKeyTimeOperations } from './operations-keytimes.js';
-import { registerLayerOperations } from './operations-layers.js';
 import { registerLayerMoveOperations } from './operations-layer-move.js';
+import { registerLayerOperations } from './operations-layers.js';
 import { registerLocalizeOperations } from './operations-localize.js';
 import { registerMogrtOperations } from './operations-mogrt.js';
 import { registerProjectOperations } from './operations-project.js';
 import { registerRelinkOperations } from './operations-relink.js';
 import { registerRenderTemplateOperations } from './operations-render-templates.js';
+import { registerRenderOperations } from './operations-render.js';
 
 import { registerTemplateOperations } from './operations-templates.js';
 import { registerVerifyOperations } from './operations-verify.js';
@@ -803,6 +804,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerAnimateOperations(register);
   registerRenderTemplateOperations(register);
   registerLayerMoveOperations(register);
+  registerRenderOperations(register);
 
   return registry;
 }

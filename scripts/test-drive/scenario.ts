@@ -778,12 +778,17 @@ export const scenario: Step[] = [
     timeSpanStart: 0,
     timeSpanDuration: 1,
   })),
+  // E16-6: a spare item added and removed again, so item 1 stays for the steps below.
+  op('render.queue_add.spare', 'render.queue_add', (s) => ({ comp: s.comp, timeSpanStart: 0, timeSpanDuration: 1 })),
+  op('render.queue_remove', 'render.queue_remove', () => ({ index: 2 })),
   op('render.queue_set_output', 'render.queue_set_output', (s) => ({
     item: 1,
     file: `${s.vars.outputDir as string}/${s.prefix} queue.mov`,
   })),
   op('render.status', 'render.status', () => ({})),
   op('render.templates', 'render.templates', (s) => ({ comp: s.comp })),
+  // E16-6: dry run only; lists what is under <root>/render without deleting anything.
+  tool('render_clean.dry', 'render_clean', () => ({ dryRun: true })),
 
   // --- aerender: it reads the saved project file, so save the scratch project first
   op('project.save.copy', 'project.save', (s) => ({ path: outFile(s, 'drive-copy.aep'), overwrite: true })),

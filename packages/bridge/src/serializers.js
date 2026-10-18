@@ -68,6 +68,8 @@ function aemcpSerializeProject() {    var project = app.project;
     }
     return {
         file: project.file ? project.file.fsName : null,
+        // Ref: https://ae-scripting.docsforadobe.dev/general/project/#projectdirty
+        dirty: project.dirty,
         numItems: project.numItems,
         bitsPerChannel: project.bitsPerChannel,
         activeItem: active,

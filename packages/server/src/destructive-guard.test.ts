@@ -537,6 +537,93 @@ describe('E13-5 saved version path reporting', () => {
   });
 });
 
+// E16-6: project.new with force discards the open project, so the guard protects it only when
+// it has unsaved changes or was never saved. A saved, clean project has nothing to lose.
+describe('E16-6 project.new with force', () => {
+  const closes: (() => Promise<void>)[] = [];
+
+  afterEach(async () => {
+    for (const close of closes.splice(0)) {
+      await close();
+    }
+  });
+
+  function newRegistry(): OperationRegistry {
+    const registry = new OperationRegistry();
+    registry.register({
+      name: 'project.new',
+      category: 'project',
+      description: 'Open a fresh untitled project.',
+      readOnly: false,
+      destructive: true,
+      schema: { force: { type: 'boolean' } },
+    });
+    return registry;
+  }
+
+  function projectInfo(info: Record<string, unknown>): Record<string, (args?: unknown) => unknown> {
+    return {
+      'project.info': () => info,
+      'project.new': () => {
+        return { numItems: 0 };
+      },
+    };
+  }
+
+  it('skips the increment save when the project is saved and clean', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      operations: newRegistry(),
+      extraHandlers: projectInfo({ file: '/projects/P.aep', dirty: false }),
+    });
+    closes.push(close);
+
+    const result = await call(client, 'project.new', { force: true });
+    expect(result.isError).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it('keeps the increment save when the project has unsaved changes', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      operations: newRegistry(),
+      extraHandlers: projectInfo({ file: '/projects/P.aep', dirty: true }),
+    });
+    closes.push(close);
+
+    const result = await call(client, 'project.new', { force: true });
+    expect(result.isError).toBe(false);
+    expect(calls).toEqual(['project.increment_save']);
+  });
+
+  it('keeps refusing when a never-saved project has content', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      operations: newRegistry(),
+      incrementResult: new HandlerError('UNSAVED_PROJECT', 'project has never been saved'),
+      extraHandlers: projectInfo({ file: null, dirty: true }),
+    });
+    closes.push(close);
+
+    const result = await call(client, 'project.new', { force: true });
+    expect(result.isError).toBe(true);
+    expect(errorSchema.parse(JSON.parse(result.text)).code).toBe('UNSAVED_PROJECT');
+    expect(calls).toEqual(['project.increment_save']);
+  });
+
+  it('keeps the guard without force', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      operations: newRegistry(),
+      extraHandlers: projectInfo({ file: '/projects/P.aep', dirty: false }),
+    });
+    closes.push(close);
+
+    await call(client, 'project.new', {});
+    expect(calls).toEqual(['project.increment_save']);
+  });
+});
+
 describe('E13-6 guard cannot be bypassed', () => {
   const closes: (() => Promise<void>)[] = [];
 

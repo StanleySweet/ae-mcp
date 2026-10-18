@@ -146,6 +146,15 @@ The guard is on when `incrementBeforeDestructive` is enabled, which is the defau
 setting is owned by the Setup app and Claude cannot change it; the environment variable
 `AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE` overrides it.
 
+`project.new` with `force: true` is the exception: when the open project has a file on disk and
+no unsaved changes, there is nothing to lose, so no increment save is made. With unsaved changes,
+or a project that was never saved and has content, the guard runs as usual.
+
+Render queue cleanup: `render.queue_remove {index}` removes one queue item, `{all: true}` empties
+the queue. `render_clean {olderThanMinutes?, pattern?, dryRun?}` lists the files under `<root>/render`
+(where ae-mcp renders) and deletes them only when `dryRun` is `false`. `pattern` is a file-name
+wildcard (`*`, `?`). It never follows symlinks and never leaves that folder.
+
 Operations flagged destructive:
 
 - `layer.delete`, `keyframe.remove`, `effect.remove` — deletes and removals

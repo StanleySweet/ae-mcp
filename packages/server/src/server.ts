@@ -62,7 +62,9 @@ import {
 import { selectTransport, type Runner } from './osascript-transport.js';
 import { PlanStore } from './plans.js';
 import { batchHasDestructive, batchRunBlock, evalRunEnabled, isPermitted } from './policy.js';
+import { projectNewDiscardsNothing } from './project-new.js';
 import { registerPrompts } from './prompts.js';
+import { renderClean } from './render-clean.js';
 import { cleanupPartialOutput } from './render-output.js';
 import { createRenderProgress } from './render-progress.js';
 import { checkRenderTemplates } from './render-templates.js';
@@ -1530,6 +1532,20 @@ export function createServer(options: ServerOptions = {}): McpServer {
   );
 
   server.registerTool(
+    'render_clean',
+    {
+      description:
+        'List, or delete when dryRun is false, rendered files in <root>/render. Dry run by default; symlinks are never followed.',
+      inputSchema: {
+        olderThanMinutes: z.number().nonnegative().optional(),
+        pattern: z.string().max(200).optional(),
+        dryRun: z.boolean().default(true),
+      },
+    },
+    async (args) => text(await renderClean({ root, ...args })),
+  );
+
+  server.registerTool(
     'ae_catalog',
     {
       description:
@@ -1649,8 +1665,10 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (blocked) {
         return text(makeError(blocked.code, blocked.message, blocked.details), true);
       }
+      // project.new with force on a saved, clean project discards nothing, so it skips the guard (E16-6).
+      const discardsNothing = await projectNewDiscardsNothing(definition.name, validation.args, () => callRaw('project.info'));
       const needsIncrement =
-        definition.destructive ||
+        (definition.destructive && !discardsNothing) ||
         (definition.name === 'batch.run' && batchHasDestructive(operations, validation.args.ops));
       let incrementInfo: Record<string, unknown> | null = null;
       if (needsIncrement && settings.incrementBeforeDestructive) {
