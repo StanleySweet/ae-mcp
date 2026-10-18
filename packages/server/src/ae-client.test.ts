@@ -390,4 +390,32 @@ describe('ae client recovery from a blocking dialog', () => {
     expect(escapes).toBe(4);
     expect(transport.jobs).toHaveLength(1);
   });
+
+  it('drops a job lost when After Effects crashed and was relaunched (#283)', async () => {
+    const root = await queueRoot();
+    const transport = new RecordingTransport();
+    transport.enqueue(timeout());
+    transport.enqueue(ok('next'));
+    const ids = ['lost', 'next'];
+    const pids = ['111'];
+    let escapes = 0;
+    const client = createAEClient({
+      transport,
+      root,
+      newId: () => ids.shift()!,
+      retry: false,
+      checkDialogs: async () => [],
+      isAeRunning: async () => true,
+      aeProcessId: async () => pids.shift() ?? '222',
+      recoverySleep: async () => undefined,
+      pressEscape: async () => void (escapes += 1),
+    });
+
+    await client.call('project.info');
+    const next = await client.call('project.info');
+
+    expect(next).toEqual(ok('next'));
+    expect(escapes).toBe(0);
+    expect(transport.jobs.map((job) => job.id)).toEqual(['lost', 'next']);
+  });
 });

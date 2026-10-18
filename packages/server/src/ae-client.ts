@@ -9,7 +9,7 @@ import {
   type JobMessage,
   type ResultMessage,
 } from '@ae-mcp/protocol';
-import { isAeRunning as defaultIsAeRunning } from './ae-process.js';
+import { aeProcessId as defaultAeProcessId, isAeRunning as defaultIsAeRunning } from './ae-process.js';
 import { describeDialog, listDialogs, type AeDialog } from './dialogs.js';
 import { detectStall } from './stall.js';
 import type { Transport } from './transport.js';
@@ -39,6 +39,8 @@ export interface AEClientOptions {
   checkDialogs?: () => Promise<AeDialog[]>;
   /** Whether an After Effects process is running; default checks with `pgrep`. */
   isAeRunning?: () => Promise<boolean>;
+  /** Process id of the running After Effects, or null; default reads `pgrep`. */
+  aeProcessId?: () => Promise<string | null>;
   /**
    * Presses Escape in After Effects. When set, the client recovers from a blocking
    * modal by itself: while an earlier job is unfinished in AE it presses Escape and
@@ -128,15 +130,19 @@ export function createAEClient(options: AEClientOptions): AEClient {
   };
 
   // Jobs whose script may still be running in AE: a call in flight, or one that timed
-  // out. Their result file appears in the outbox once AE is free again.
-  const unfinished = new Set<string>();
+  // out. Their result file appears in the outbox once AE is free again. Each job keeps
+  // the AE process id it was sent to: a crashed or relaunched AE never reports it (#283).
+  const unfinished = new Map<string, string | null>();
+  const aeProcessId = options.aeProcessId ?? (() => defaultAeProcessId());
+  const currentPid = (): Promise<string | null> => aeProcessId().catch(() => null);
   const recoverySleep =
     options.recoverySleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
   const exists = (path: string): Promise<boolean> => stat(path).then(() => true, () => false);
   const recover = async (pressEscape: () => Promise<unknown>): Promise<boolean> => {
     for (let round = 0; ; round++) {
-      for (const id of [...unfinished]) {
-        if (await exists(join(outboxDir(options.root), `${id}.json`))) {
+      const pid = await currentPid();
+      for (const [id, sentTo] of [...unfinished]) {
+        if ((sentTo !== null && sentTo !== pid) || (await exists(join(outboxDir(options.root), `${id}.json`)))) {
           unfinished.delete(id);
         }
       }
@@ -164,7 +170,7 @@ export function createAEClient(options: AEClientOptions): AEClient {
       if (unfinished.size > 0 && !(await recover(options.pressEscape))) {
         return stillBlocked();
       }
-      unfinished.add(job.id);
+      unfinished.set(job.id, await currentPid());
     }
     try {
       const result = await options.transport.call(job);
