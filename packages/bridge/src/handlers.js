@@ -122,8 +122,8 @@ AEMCP.register('project.info', function () {
 });
 
 // Snapshot the whole project as JSON, for later import (project.import_json).
-AEMCP.register('project.export_json', function () {
-    return AEMCP.serialize.projectSnapshot();
+AEMCP.register('project.export_json', function (args) {
+    return AEMCP.serialize.projectSnapshot(args && args.items ? args.items : null);
 });
 
 // Save the open project, or Save As when `path` is given (no dialog either way).

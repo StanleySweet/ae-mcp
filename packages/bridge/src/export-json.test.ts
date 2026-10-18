@@ -76,6 +76,16 @@ interface Snapshot {
 }
 
 describe('project.export_json', () => {
+  it('exports only the named or id-matched items when items is given', async () => {
+    const { ctx, ae } = await payloadContext();
+    seed(ae);
+
+    const snapshot = invoke(ctx, 'project.export_json', { items: ['Main', 3] }).value as Snapshot;
+
+    expect(snapshot.items.map((item) => item.name)).toEqual(['Main', 'clip.mov']);
+    expect(snapshot.numItems).toBe(3);
+  });
+
   it('exports the full project structure as a snapshot', async () => {
     const { ctx, ae } = await payloadContext();
     seed(ae);

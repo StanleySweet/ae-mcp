@@ -84,8 +84,9 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Project.
   register(operation('project.info', 'project', 'Report the open project summary.', { readOnly: true }));
-  register(operation('project.export_json', 'project', 'Snapshot the whole project as JSON.', {
+  register(operation('project.export_json', 'project', 'Snapshot the project as JSON; items limits it to those names or ids.', {
     readOnly: true,
+    schema: { items: { type: 'array', description: 'item names or ids to export; omit for the whole project' } },
   }));
   register(operation('project.report_usage', 'project', 'Report unused items and footage with a missing source file.', {
     readOnly: true,

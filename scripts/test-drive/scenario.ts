@@ -944,7 +944,8 @@ export const scenario: Step[] = [
   skipOp('eval.run', 'off by default; runs arbitrary code'),
 
   // --- project snapshot round trip -------------------------------------------
-  op('project.export_json', 'project.export_json', () => ({}), {
+  // The whole drive project outgrows the result limit; export the drive comp only.
+  op('project.export_json', 'project.export_json', (s) => ({ items: [s.comp] }), {
     after: (result, state) => {
       const snapshot = payload(result) as { items?: Array<{ name: string; type: string }> };
       const items = (snapshot.items ?? [])

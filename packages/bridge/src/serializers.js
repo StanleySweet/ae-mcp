@@ -420,12 +420,20 @@ function aemcpSerializeSnapshotItem(item) {
     return out;
 }
 
-function aemcpSerializeProjectSnapshot() {
+// `only` (optional): item names or ids to keep, so a large project fits the result limit.
+function aemcpSerializeProjectSnapshot(only) {
     var project = app.project;
     var items = [];
-    var i;
+    var i, j, item, keep;
     for (i = 1; i <= project.numItems; i++) {
-        items.push(aemcpSerializeSnapshotItem(project.item(i)));
+        item = project.item(i);
+        keep = !only || only.length === 0;
+        for (j = 0; !keep && j < only.length; j++) {
+            keep = only[j] === item.name || only[j] === item.id;
+        }
+        if (keep) {
+            items.push(aemcpSerializeSnapshotItem(item));
+        }
     }
     return {
         format: 'aemcp-project/v1',
