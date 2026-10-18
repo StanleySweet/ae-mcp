@@ -79,4 +79,12 @@
     }
 
     if (!Object.keys) { Object.keys = keys; }
+
+    // ExtendScript has no Array.isArray ("La fonction Array.isArray n'est pas définie" on
+    // AE 26.5, seen in anchor.move_preserving).
+    function isArray(value) {
+        return Object.prototype.toString.call(value) === '[object Array]';
+    }
+
+    if (!Array.isArray) { Array.isArray = isArray; }
 }());
