@@ -1057,7 +1057,8 @@ export const scenario: Step[] = [
     ops: [{ op: 'marker.add', args: { comp: s.comp, time: 4.5, comment: 'batch id' } }],
   }), {
     after: (result, state) => {
-      state.vars.batchId = payload(result).batchId;
+      // ae_do returns batchId next to result, not inside it (#279).
+      state.vars.batchId = (result.json as { batchId?: unknown } | null)?.batchId;
     },
   }),
   op('batch.status', 'batch.status', (s) => ({ batchId: s.vars.batchId }), {
