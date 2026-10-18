@@ -1078,19 +1078,18 @@ AEMCP.register('layer.add_light', function (args) {
     if (lightType !== null && !types.hasOwnProperty(lightType)) {
         aemcpAbortArgs('unknown lightType: ' + lightType + ' (parallel, spot, point, ambient, environment)');
     }
+    // An environment light with a source layer crashed AE 26.5 on the next render (render-hash
+    // recursion between the light and its source), so the source is refused before anything is added.
+    // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlightsource
+    // See docs/findings/2026-10-18-environment-light-recursion-crash.md (#282).
+    if (args && args.lightSource !== undefined && args.lightSource !== null) {
+        aemcpAbortArgs('lightSource is refused: an environment light with a source layer crashed After Effects 26.5 on render (#282); add the environment light without lightSource');
+    }
     var name = args && args.name ? args.name : 'Light';
     var center = args && args.centerPoint ? args.centerPoint : [comp.width / 2, comp.height / 2];
     var layer = comp.layers.addLight(name, center);
     if (lightType !== null) {
         layer.lightType = types[lightType];
-    }
-    // An environment light lights and reflects from a 2D layer of the same comp (AE 25.2+).
-    // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlightsource
-    if (args && args.lightSource !== undefined && args.lightSource !== null) {
-        if (lightType !== 'environment') {
-            aemcpAbortArgs('lightSource needs lightType environment');
-        }
-        layer.lightSource = aemcpRequireLayer(comp, { layer: args.lightSource });
     }
     var lightRef = aemcpLayerRef(layer);
     lightRef.lightType = lightType;

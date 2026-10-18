@@ -101,15 +101,24 @@ describe('Advanced 3D support', () => {
     expect(bad.issue?.message).toContain('available: Classic 3D, Advanced 3D');
   });
 
-  it('adds an environment light that reflects from a 2D layer', async () => {
+  it('refuses an environment light source layer, which crashed AE 26.5 on render (#282)', async () => {
     const { ctx, ae } = await payloadContext();
     invoke(ctx, 'comp.create', { name: 'Main', width: 800, height: 600, fps: 24, duration: 5 });
     invoke(ctx, 'layer.add_null', { comp: 'Main', name: 'Env Map' });
 
     const out = invoke(ctx, 'layer.add_light', { comp: 'Main', name: 'Env', lightType: 'environment', lightSource: 'Env Map' });
 
+    expect(out.ok).toBe(false);
+    expect(out.issue?.message).toContain('#282');
+    expect((ae.project.item(1) as MockCompItem).numLayers).toBe(1);
+  });
+
+  it('adds an environment light without a source layer', async () => {
+    const { ctx } = await payloadContext();
+    invoke(ctx, 'comp.create', { name: 'Main', width: 800, height: 600, fps: 24, duration: 5 });
+
+    const out = invoke(ctx, 'layer.add_light', { comp: 'Main', name: 'Env', lightType: 'environment' });
+
     expect(out.ok).toBe(true);
-    const light = (ae.project.item(1) as MockCompItem).layer(out.value.index) as unknown as { lightSource: { name: string } };
-    expect(light.lightSource.name).toBe('Env Map');
   });
 });

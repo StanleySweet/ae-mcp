@@ -976,7 +976,6 @@ export class MockCameraLayer extends MockLayer {}
 export class MockLightLayer extends MockLayer {
   lightType = 0;
   // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlightsource
-  lightSource: MockLayer | null = null;
 }
 
 // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlighttype

@@ -196,7 +196,7 @@ export function defaultOperationRegistry(): OperationRegistry {
       name: { type: 'string' },
       centerPoint,
       lightType: { type: 'string', enum: ['parallel', 'spot', 'point', 'ambient', 'environment'] },
-      lightSource: { description: 'environment light only: a 2D layer of the comp (index, name or {id}) to light and reflect from' },
+      lightSource: { description: 'refused: an environment light with a source layer crashed AE 26.5 on render (#282); omit it' },
     },
   }));
   register(operation('layer.set_3d', 'layer', 'Turn the 3D switch on or off for a layer (not camera/light).', {
