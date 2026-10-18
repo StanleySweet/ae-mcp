@@ -281,8 +281,8 @@ Save writes. Checkpoints are stored in `~/.ae-mcp/checkpoints.json`.
 
 Setup installs `ae-mcp-panel.jsx` into `Scripts/ScriptUI Panels` next to the startup loader.
 Open it from the Window menu in After Effects (quit and reopen After Effects after the first
-install). It is a floating palette, not a dockable panel: the dockable `this instanceof Panel`
-pattern is not in the JavaScript Tools Guide, so the panel does not use it.
+install). Opened from the Window menu it is a dockable panel, like After Effects' own panels;
+run any other way (File > Scripts > Run Script File) it opens as a floating palette.
 
 - **Steps**: the last 20 operations Claude ran, newest first, read from `~/.ae-mcp/history.jsonl`.
   Press Refresh to read the log again.

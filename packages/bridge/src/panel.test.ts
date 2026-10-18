@@ -112,3 +112,35 @@ describe('aemcpPanelHistoryEntries', () => {
     expect(call(panelIn(ae, panel), 'aemcpPanelHistoryEntries().length')).toBe(0);
   });
 });
+
+describe('aemcpPanelOpen', () => {
+  // A ScriptUI Panels script gets its dock panel as `this`; it must build into it, not a palette.
+  it('builds into the dock panel it is given and opens no palette', async () => {
+    const { home, panel } = await bridgeFiles();
+    const ae = new MockAE();
+    ae.env.HOME = home;
+    const ctx = panelIn(ae, panel);
+
+    const result = call(
+      ctx,
+      `(function () {
+        function Panel() { this.items = []; this.layout = { done: false, layout: function () { this.done = true; } }; }
+        Panel.prototype.add = function (type) {
+          var control = { type: type, removeAll: function () {}, add: function () {} };
+          this.items.push(control);
+          return control;
+        };
+        this.Panel = Panel;
+        var palettes = 0;
+        this.Window = function () { palettes += 1; };
+        var host = new Panel();
+        aemcpPanelOpen(host);
+        return [host.items.length, host.layout.done, palettes];
+      })()`,
+    ) as [number, boolean, number];
+
+    expect(result[0]).toBeGreaterThan(0);
+    expect(result[1]).toBe(true);
+    expect(result[2]).toBe(0);
+  });
+});

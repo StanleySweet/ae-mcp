@@ -1,7 +1,8 @@
 // ae-mcp Claude panel (E15-2, #264). ES3 ExtendScript, built into dist/ae-mcp-panel.jsx.
-// A floating ScriptUI palette (the documented `palette` window). The dockable
-// `this instanceof Panel` pattern is not in the JavaScript Tools Guide (ADR-0011), so
-// it is not used. Every handler is wrapped: an error here raises a modal in After Effects.
+// Docks when run from the ScriptUI Panels folder (Window menu): AE passes the panel as the
+// script's `this`. Run any other way, it opens a floating `palette` window instead.
+// Ref: https://ae-scripting.docsforadobe.dev/introduction/overview/#running-scripts-from-the-window-menu
+// Every handler is wrapped: an error here raises a modal in After Effects.
 
 var AEMCP_PANEL_HISTORY_SHOWN = 20;
 var AEMCP_PANEL_WINDOW = null;
@@ -148,9 +149,10 @@ function aemcpPanelCopyForClaude() {
     }
 }
 
-function aemcpPanelOpen() {
+function aemcpPanelOpen(host) {
+    var docked = typeof Panel !== 'undefined' && host instanceof Panel;
     // Ref: https://extendscript.docsforadobe.dev/user-interface-tools/window-object/ (Window constructor: "palette" type and creation_properties)
-    var win = new Window('palette', 'ae-mcp: Claude', undefined, { resizeable: true });
+    var win = docked ? host : new Window('palette', 'ae-mcp: Claude', undefined, { resizeable: true });
     AEMCP_PANEL_WINDOW = win;
     // Ref: https://extendscript.docsforadobe.dev/user-interface-tools/window-object/ (add: type, bounds, text)
     win.add('statictext', undefined, 'Claude steps (newest first)');
@@ -168,15 +170,20 @@ function aemcpPanelOpen() {
     // Ref: https://extendscript.docsforadobe.dev/user-interface-tools/control-objects/ (edittext multiline)
     win.context = win.add('edittext', [0, 0, 360, 110], '', { multiline: true });
     aemcpPanelRefresh();
-    win.show();
+    if (docked) {
+        // Ref: https://extendscript.docsforadobe.dev/user-interface-tools/layoutmanager-object/ (layout(recalculate))
+        win.layout.layout(true);
+    } else {
+        win.show();
+    }
 }
 
-// Scripts in the ScriptUI Panels folder run once when chosen; open the palette then.
+// Scripts in the ScriptUI Panels folder run when chosen; top-level `this` is the panel.
 // Never throws: an error at load would raise a modal in After Effects.
-(function () {
+(function (host) {
     try {
-        aemcpPanelOpen();
+        aemcpPanelOpen(host);
     } catch (error) {
-        // the palette could not open; nothing else to do
+        // the panel could not open; nothing else to do
     }
-})();
+})(this);
