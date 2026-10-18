@@ -150,7 +150,7 @@ export function defaultOperationRegistry(): OperationRegistry {
         frameRate: { type: 'number' },
         bgColor: { type: 'array' },
         newName: comp,
-        renderer: { type: 'string', description: 'a member of CompItem.renderers, e.g. the Advanced 3D renderer' },
+        renderer: { type: 'string', description: 'a member of CompItem.renderers; on AE 26.5 ADBE Calder is Advanced 3D (extrusion), ADBE Advanced 3d is Classic 3D' },
       },
     }),
   );
