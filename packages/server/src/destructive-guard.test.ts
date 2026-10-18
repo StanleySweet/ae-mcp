@@ -374,7 +374,7 @@ describe('E13-3 destructive guard', () => {
       'project.save',
       'bulk.remove_unused',
     ]);
-    expect(appliedPayload.increment).toEqual({ backupFile: join(home, '.ae-mcp', 'backups', 'P', 'P.backup.aep') });
+    expect(appliedPayload.increment).toMatchObject({ backupFile: join(home, '.ae-mcp', 'backups', 'P', 'P.backup.aep') });
 
     await client.close();
     await server.close();
@@ -527,7 +527,7 @@ describe('E13-5 saved version path reporting', () => {
     const result = await call(client, 'layer.delete', { index: 1 });
     expect(result.isError).toBe(false);
     const parsed = JSON.parse(result.text);
-    expect(parsed.increment).toEqual({ backupFile: join(home, '.ae-mcp', 'backups', 'P', 'P.backup.aep') });
+    expect(parsed.increment).toMatchObject({ backupFile: join(home, '.ae-mcp', 'backups', 'P', 'P.backup.aep') });
 
     const savedVersion = await readFile(join(home, '.ae-mcp', 'bridge', 'last-saved-version'), 'utf8');
     expect(savedVersion.trim()).toBe(join(home, 'projects', 'P.aep'));
@@ -679,7 +679,7 @@ describe('E13-6 guard cannot be bypassed', () => {
     const result = await call(client, 'eval.run', { code: '1+1' });
     expect(result.isError).toBe(false);
     expect(calls).toEqual(['project.save', 'eval.run']);
-    expect(JSON.parse(result.text).increment).toEqual({ backupFile: expect.stringMatching(/P\.backup\.aep$/) });
+    expect(JSON.parse(result.text).increment).toMatchObject({ backupFile: expect.stringMatching(/P\.backup\.aep$/) });
   });
 
   it('cannot smuggle a destructive eval.run through batch.run', async () => {

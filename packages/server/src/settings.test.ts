@@ -85,20 +85,21 @@ describe('loadSettings', () => {
     await expect(loadSettings({ root, env: {} })).rejects.toThrow();
   });
 
-  it('rejects an unknown backupMode in the file or the environment', async () => {
+  it('rejects an unknown backupMode in the file and ignores one in the environment', async () => {
     const root = await settingsRoot();
     await writeSettings(root, { backupMode: 'many' });
     await expect(loadSettings({ root, env: {} })).rejects.toThrow();
     await writeSettings(root, {});
-    await expect(loadSettings({ root, env: { AE_MCP_BACKUP_MODE: 'many' } })).rejects.toThrow(/AE_MCP_BACKUP_MODE/);
+    // An invalid environment value is ignored rather than breaking every tool.
+    expect((await loadSettings({ root, env: { AE_MCP_BACKUP_MODE: 'many' } })).backupMode).toBe('single');
   });
 
-  it('rejects a backupKeep that is not a positive whole number', async () => {
+  it('rejects an invalid backupKeep in the file and ignores one in the environment', async () => {
     const root = await settingsRoot();
     await writeSettings(root, { backupKeep: 0 });
     await expect(loadSettings({ root, env: {} })).rejects.toThrow();
     await writeSettings(root, {});
-    await expect(loadSettings({ root, env: { AE_MCP_BACKUP_KEEP: 'two' } })).rejects.toThrow(/AE_MCP_BACKUP_KEEP/);
+    expect((await loadSettings({ root, env: { AE_MCP_BACKUP_KEEP: 'two' } })).backupKeep).toBe(5);
   });
 
   it('maps the legacy incrementBeforeDestructive switch: false is off, true is increment', async () => {

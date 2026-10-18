@@ -50,18 +50,14 @@ function legacyMode(enabled: boolean): BackupMode {
   return enabled ? 'increment' : 'off';
 }
 
-function parseBackupMode(value: string, source: string): BackupMode {
-  if ((BACKUP_MODES as readonly string[]).includes(value)) {
-    return value as BackupMode;
-  }
-  throw new Error(`${source} must be one of ${BACKUP_MODES.join(', ')}, got "${value}"`);
+// An invalid environment value is ignored (the file or the default applies), so a typo in a
+// client config does not make every tool fail.
+function parseBackupMode(value: string): BackupMode | null {
+  return (BACKUP_MODES as readonly string[]).includes(value) ? (value as BackupMode) : null;
 }
 
-function parseBackupKeep(value: string, source: string): number {
-  if (!/^[1-9]\d*$/.test(value)) {
-    throw new Error(`${source} must be a positive whole number, got "${value}"`);
-  }
-  return Number(value);
+function parseBackupKeep(value: string): number | null {
+  return /^[1-9]\d*$/.test(value) ? Number(value) : null;
 }
 
 /**
@@ -72,8 +68,9 @@ function resolveBackupMode(
   file: z.infer<typeof settingsSchema>,
   env: Record<string, string | undefined>,
 ): BackupMode {
-  if (env.AE_MCP_BACKUP_MODE) {
-    return parseBackupMode(env.AE_MCP_BACKUP_MODE, 'AE_MCP_BACKUP_MODE');
+  const fromEnv = env.AE_MCP_BACKUP_MODE ? parseBackupMode(env.AE_MCP_BACKUP_MODE) : null;
+  if (fromEnv !== null) {
+    return fromEnv;
   }
   if (env.AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE) {
     return legacyMode(envBool(env.AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE, true));
@@ -115,8 +112,9 @@ export async function loadSettings(
           : categories.split(','),
     evalEnabled: envBool(env.AE_MCP_EVAL_ENABLED, fromFile.evalEnabled ?? DEFAULT_SETTINGS.evalEnabled),
     backupMode: resolveBackupMode(fromFile, env),
-    backupKeep: env.AE_MCP_BACKUP_KEEP
-      ? parseBackupKeep(env.AE_MCP_BACKUP_KEEP, 'AE_MCP_BACKUP_KEEP')
-      : (fromFile.backupKeep ?? DEFAULT_SETTINGS.backupKeep),
+    backupKeep:
+      (env.AE_MCP_BACKUP_KEEP ? parseBackupKeep(env.AE_MCP_BACKUP_KEEP) : null) ??
+      fromFile.backupKeep ??
+      DEFAULT_SETTINGS.backupKeep,
   };
 }

@@ -484,7 +484,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
       };
     }
     await persistSavedVersionPath(root, file);
-    return { ok: true, info: backupFile === null ? null : { backupFile } };
+    // incrementedFile is kept for callers that read it before backup modes (ADR-0012).
+    return { ok: true, info: backupFile === null ? null : { backupFile, incrementedFile: backupFile } };
   };
 
   const jobStore = options.jobStore ?? new JobStore();
@@ -816,6 +817,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         name: checkpoint.name,
         file: checkpoint.file,
         backupFile: guard.info?.backupFile ?? null,
+        incrementedFile: guard.info?.backupFile ?? null,
         opened: opened.result,
       });
     },
