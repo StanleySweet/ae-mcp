@@ -27,3 +27,5 @@ STATUS: DONE | BLOCKED | FAILED
 CHANGES: files changed and what changed
 VERIFY: command run and result
 ISSUES: blockers only, or NONE
+
+- Run `npm run check` and every other command in the foreground (Bash timeout up to 600000 ms), never with `run_in_background`. Leave no background command running: once your final report is sent, you are done and must stop.

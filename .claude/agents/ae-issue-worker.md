@@ -97,3 +97,5 @@ main checkout.
 - Add one line per change to `docs/agents/code-map.md`. Do not edit `JOURNAL.md` or `CONTEXT.md`.
 - Report, short: branch name, commit shas with subjects, deviations, and what you could not
   verify (no real AE run is the usual one).
+
+- Run `npm run check` and every other command in the foreground (Bash timeout up to 600000 ms), never with `run_in_background`. Leave no background command running: once your final report is sent, you are done and must stop.
