@@ -82,6 +82,7 @@ const BRIDGE_OPS = [
   'mask.set',
   'mask.read',
   'shape.add',
+  'layer.set_blend_mode',
   'shape.set',
   'shape.read',
   'text.add',

@@ -14,6 +14,7 @@
 var AEMCP_CURVES = {
     linear: [1 / 3, 1 / 3, 2 / 3, 2 / 3],
     smooth: [0.45, 0, 0.55, 1],
+    expo_in: [0.7, 0, 0.84, 0],
     expo_out: [0.16, 1, 0.3, 1],
     expo_in_out: [0.87, 0, 0.13, 1],
     back_out: [0.34, 1.56, 0.64, 1],
@@ -50,7 +51,7 @@ function aemcpCurvePoints(curve) {
     var c = curve;
     if (typeof curve === 'string') {
         if (!AEMCP_CURVES.hasOwnProperty(curve)) {
-            aemcpAbortArgs('unknown curve: ' + curve + ' (linear, smooth, expo_out, expo_in_out, back_out, snappy, or [x1, y1, x2, y2])');
+            aemcpAbortArgs('unknown curve: ' + curve + ' (linear, smooth, expo_in, expo_out, expo_in_out, back_out, snappy, or [x1, y1, x2, y2])');
         }
         return AEMCP_CURVES[curve];
     }

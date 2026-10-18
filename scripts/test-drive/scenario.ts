@@ -454,6 +454,7 @@ export const scenario: Step[] = [
   // E16-5: move Text to the top of the stack, then refresh the layer list the later steps read.
   op('layer.move', 'layer.move', (s) => ({ comp: s.comp, index: layerIndex(s, 'Text'), to: 'top' })),
   refreshLayers('layers.after_move'),
+  op('layer.set_blend_mode', 'layer.set_blend_mode', (s) => ({ comp: s.comp, layer: 'Text', mode: 'screen' })),
   op('layer.bounds', 'layer.bounds', (s) => ({ comp: s.comp, index: layerIndex(s, 'Shapes'), time: 1 })),
   op('anchor.move_preserving', 'anchor.move_preserving', (s) => ({
     comp: s.comp,

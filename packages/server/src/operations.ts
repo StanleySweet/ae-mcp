@@ -1,6 +1,7 @@
 import type { ErrorDetails, OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
 import { registerAnimateOperations } from './operations-animate.js';
 import { registerAudioOperations } from './operations-audio.js';
+import { registerBlendOperations } from './operations-blend.js';
 import { registerEvalOperations } from './operations-eval.js';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
 import { registerKeyTimeOperations } from './operations-keytimes.js';
@@ -482,6 +483,7 @@ export function defaultOperationRegistry(): OperationRegistry {
         layerName: { type: 'string' },
         size: { type: 'array' },
         position: { type: 'array' },
+        roundness: { type: 'number', description: 'rect corner radius in px' },
         vertices: { type: 'array' },
         inTangents: { type: 'array' },
         outTangents: { type: 'array' },
@@ -783,7 +785,7 @@ export function defaultOperationRegistry(): OperationRegistry {
 
   // Batch (container; the E13 guard checks its sub-operations).
   register(
-    operation('batch.run', 'batch', 'Run many operations as one undo group. It stops at the first failing step; earlier steps stay applied, and one Cmd+Z in After Effects reverts the whole batch (never undone by script, ADR-0009). A step argument string "$<n>.<field>" (e.g. "$0.index", "$2.layers[1]") takes that field from earlier step n\'s result.', {
+    operation('batch.run', 'batch', 'Run many operations as one undo group. It stops at the first failing step; earlier steps stay applied, and one Cmd+Z in After Effects reverts the whole batch (never undone by script, ADR-0009). A step argument string "$<n>.<field>" (e.g. "$0.index", "$2.layers[1]") takes that field from earlier step n\'s result. project.save, project.open, project.new and project.increment_save cannot run inside a batch; call them on their own.', {
       required: ['ops'],
       schema: { ops: { type: 'array', items: { type: 'object' } }, atomic: { type: 'boolean' } },
     }),
@@ -804,6 +806,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerAnimateOperations(register);
   registerRenderTemplateOperations(register);
   registerLayerMoveOperations(register);
+  registerBlendOperations(register);
   registerRenderOperations(register);
 
   return registry;

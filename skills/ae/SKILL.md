@@ -24,6 +24,7 @@ Reach for a named motion first. One `animate` call replaces a chain of `keyframe
 | "slide in from the left" | `animate {comp, layer, preset: "slide_in", direction: "left", distance, start, duration}` |
 | "pop" / "bounce in" | `animate {comp, layer, preset: "pop", start, duration}` |
 | "settle" / "ease to a stop" | `animate {comp, layer, tracks: {...}, curve: "expo_out"}` |
+| "accelerate away" / "launch out" | `animate {comp, layer, tracks: {...}, curve: "expo_in"}` |
 | "smooth move" | `animate {comp, layer, tracks: {...}, curve: "smooth"}` |
 | "snappy UI motion" | `animate {comp, layer, tracks: {...}, curve: "snappy"}` |
 
@@ -40,7 +41,7 @@ To keep a reusable script that is not a replay (parameters, loops), write it as 
 Read `docs/agents/animation-principles.md` first. Hand-authored motion gets keyframes. Procedural, random or linked motion gets an expression.
 
 Animate in one call (prefer this over per-key calls):
-- `ae_do {op: "animate", args: {comp, layer, tracks: {"ADBE Transform Group/ADBE Position": [[0, [200, 540]], [1, [960, 540]]]}, curve: "expo_out"}}` sets every key and eases it from a real bezier. Curves: linear, smooth, expo_out, expo_in_out, back_out, snappy, or `[x1, y1, x2, y2]`.
+- `ae_do {op: "animate", args: {comp, layer, tracks: {"ADBE Transform Group/ADBE Position": [[0, [200, 540]], [1, [960, 540]]]}, curve: "expo_out"}}` sets every key and eases it from a real bezier. Curves: linear, smooth, expo_in, expo_out, expo_in_out, back_out, snappy, or `[x1, y1, x2, y2]`.
 - Presets in one call: `{comp, layer, preset: "fade_in" | "slide_in" | "pop", start, duration}`; `slide_in` also takes `direction` (left, right, up, down) and `distance`.
 
 Keyframed move with easing:

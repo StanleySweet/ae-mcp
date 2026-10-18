@@ -315,6 +315,8 @@ export class MockKeyframeEase {
 
 // Ref: https://ae-scripting.docsforadobe.dev/property/property/#keyframeinterpolationtype
 export const MockKeyframeInterpolationType = { LINEAR: 1, BEZIER: 2, HOLD: 3 };
+// Ref: https://ae-scripting.docsforadobe.dev/layer/avlayer/#avlayerblendingmode (a subset is enough for tests)
+export const MockBlendingMode = { NORMAL: 5201, ADD: 5202, SCREEN: 5203, OVERLAY: 5204, MULTIPLY: 5205, SOFT_LIGHT: 5206 };
 
 // Ref: https://ae-scripting.docsforadobe.dev/text/textdocument/#textdocumentjustification
 export const MockParagraphJustification = {
@@ -810,6 +812,7 @@ export class MockAVLayer extends MockLayer {
   hasVideo = true;
   hasAudio = false;
   threeDLayer = false;
+  blendingMode = MockBlendingMode.NORMAL;
   source: MockItem | null = null;
 
   private transformValue(matchName: string): number[] | null {
@@ -908,6 +911,7 @@ export class MockVectorsGroup extends MockPropertyGroup {
     } else if (matchName === 'ADBE Vector Shape - Rect') {
       item.add(new MockProperty('Size', 'ADBE Vector Rect Size', [100, 100]));
       item.add(new MockProperty('Position', 'ADBE Vector Rect Position', [0, 0]));
+      item.add(new MockProperty('Roundness', 'ADBE Vector Rect Roundness', 0));
     } else if (matchName === 'ADBE Vector Shape - Ellipse') {
       item.add(new MockProperty('Size', 'ADBE Vector Ellipse Size', [100, 100]));
       item.add(new MockProperty('Position', 'ADBE Vector Ellipse Position', [0, 0]));
@@ -1629,6 +1633,7 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     MarkerValue: MockMarkerValue,
     KeyframeEase: MockKeyframeEase,
     KeyframeInterpolationType: MockKeyframeInterpolationType,
+    BlendingMode: MockBlendingMode,
     ParagraphJustification: MockParagraphJustification,
     PropertyValueType,
     RQItemStatus,

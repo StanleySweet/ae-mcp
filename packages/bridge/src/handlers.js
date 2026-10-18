@@ -32,6 +32,7 @@ var AEMCP_MATCH = {
     SHAPE_PATH_VALUE: 'ADBE Vector Shape',
     SHAPE_RECT: 'ADBE Vector Shape - Rect',
     SHAPE_RECT_SIZE: 'ADBE Vector Rect Size',
+    SHAPE_RECT_ROUNDNESS: 'ADBE Vector Rect Roundness',
     SHAPE_ELLIPSE: 'ADBE Vector Shape - Ellipse',
     SHAPE_ELLIPSE_SIZE: 'ADBE Vector Ellipse Size',
     SHAPE_FILL: 'ADBE Vector Graphic - Fill',
@@ -2438,6 +2439,8 @@ AEMCP.register('shape.add', function (args) {
         var rect = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_RECT);
         if (args.size) rect.property(AEMCP_MATCH.SHAPE_RECT_SIZE).setValue(args.size);
         if (args.position !== undefined) rect.property(AEMCP_MATCH.SHAPE_RECT_POSITION).setValue(args.position);
+        // Ref: https://ae-scripting.docsforadobe.dev/matchnames/layer/shapelayer/
+        if (typeof args.roundness === 'number') rect.property(AEMCP_MATCH.SHAPE_RECT_ROUNDNESS).setValue(args.roundness);
     } else if (shapeType === 'ellipse') {
         var ellipse = aemcpAddProperty(groupContents, AEMCP_MATCH.SHAPE_ELLIPSE);
         if (args.size) ellipse.property(AEMCP_MATCH.SHAPE_ELLIPSE_SIZE).setValue(args.size);

@@ -213,4 +213,17 @@ describe('animate: motion presets', () => {
     expect(invoke(ctx, 'animate', { comp: 'Main', layer: 1, preset: 'fade_in', tracks: { 'ADBE Opacity': [[0, 0]] } }).ok).toBe(false);
     expect(invoke(ctx, 'animate', { comp: 'Main', layer: 1 }).ok).toBe(false);
   });
+
+  it('expo_in is the mirror of expo_out: a slow start and a fast arrival', async () => {
+    const { ctx, opacity } = await fixture();
+
+    invoke(ctx, 'animate', { comp: 'Main', layer: 1, tracks: { 'ADBE Opacity': [[0, 0], [1, 100]] }, curve: 'expo_in' });
+
+    // Curve (0.7, 0, 0.84, 0): out influence 70, out speed (0 / 0.7) * 100 = 0.
+    expect(influences(opacity.keyOutTemporalEase(1))[0]).toBeCloseTo(70, 6);
+    expect(speeds(opacity.keyOutTemporalEase(1))[0]).toBeCloseTo(0, 6);
+    // In influence (1 - 0.84) * 100 = 16; in speed (1 - 0) / (1 - 0.84) * 100 = 625.
+    expect(influences(opacity.keyInTemporalEase(2))[0]).toBeCloseTo(16, 6);
+    expect(speeds(opacity.keyInTemporalEase(2))[0]).toBeCloseTo(625, 6);
+  });
 });

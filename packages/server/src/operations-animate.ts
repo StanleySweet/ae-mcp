@@ -20,7 +20,7 @@ function operation(
 }
 
 export function registerAnimateOperations(register: (d: OperationDefinition) => void): void {
-  register(operation('animate', 'keyframe', 'Set keys on several properties of one layer in one call and ease each key from a cubic-bezier curve, so speed follows the distance travelled. Pass tracks: {"ADBE Opacity": [[time, value], ...]} with curve (linear, smooth, expo_out, expo_in_out, back_out, snappy, or [x1, y1, x2, y2]; default smooth), or pass preset: fade_in, slide_in (direction left/right/up/down, distance) or pop, with start and duration. The first and last keys get speed 0 on their outer side.', {
+  register(operation('animate', 'keyframe', 'Set keys on several properties of one layer in one call and ease each key from a cubic-bezier curve, so speed follows the distance travelled. Pass tracks: {"ADBE Opacity": [[time, value], ...]} with curve (linear, smooth, expo_in, expo_out, expo_in_out, back_out, snappy, or [x1, y1, x2, y2]; default smooth), or pass preset: fade_in, slide_in (direction left/right/up/down, distance) or pop, with start and duration. The first and last keys get speed 0 on their outer side.', {
     required: ['layer'],
     schema: {
       comp: { type: 'string' },
