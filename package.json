@@ -1,6 +1,6 @@
 {
   "name": "ae-mcp",
-  "version": "1.9.1",
+  "version": "1.10.0",
   "private": true,
   "type": "module",
   "description": "MCP server that lets Claude Desktop see and edit the After Effects project the user has open.",

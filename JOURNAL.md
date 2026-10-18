@@ -3,6 +3,14 @@
 Append-only progress log. Newest entry first. One entry per session or per landed
 chunk of work; don't rewrite old entries — supersede them.
 
+## 2026-10-18 (late)
+
+- **`chore(release): v1.10.0`**: ships #288, #289 (ADR-0012, decided by the engineer).
+  - Backups before destructive operations: `backupMode` single (default) | increment (keeps `backupKeep`, 5) | off. Copies go to `~/.ae-mcp/backups/<project>/`; the project is saved in place and keeps its file name. `incrementedFile` stays as an alias of `backupFile`. Invalid env values are ignored.
+  - The panel is now "Claude for After Effects" with a Settings section writing `~/.ae-mcp/settings.json`. Claude can read settings in check_setup but not change them.
+  - Test drive in single mode: 213 passed, 0 failed, 8 skipped; `drive.backup.aep` written live.
+  - Open: a human check of the renamed panel and its Settings section in AE (needs installer Repair and an AE restart).
+
 ## 2026-10-18 (night)
 
 - **`chore(release): v1.9.1`**: ships #264.
