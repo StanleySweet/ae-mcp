@@ -84,7 +84,7 @@ import { truncateLongStrings } from './truncate-values.js';
 import { buildVersions, formatForPath, parseDataRows, type PlainVersion, type VersionRow } from './versions.js';
 
 export const SERVER_NAME = 'ae-mcp';
-export const SERVER_VERSION = '1.6.2';
+export const SERVER_VERSION = '1.7.0';
 export const MAX_RESULT_BYTES = 200_000;
 export const MAX_RENDER_BYTES = 20_000_000;
 

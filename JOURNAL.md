@@ -3,6 +3,28 @@
 Append-only progress log. Newest entry first. One entry per session or per landed
 chunk of work; don't rewrite old entries — supersede them.
 
+## 2026-10-18
+
+- **`chore(release): v1.7.0`**: epic E16 (renders you can trust, and a tidy machine), from a Claude Desktop session that could not render a finished 12-second comp ("LATENT").
+  - **`ae_render`:**
+    - fails a render that shows no progress or output growth for 120 s;
+    - succeeds only on a finished, stable file;
+    - reports the signal and aerender's last line instead of "exit code unknown" (#270).
+  - **Render templates:** `render.templates` lists the output-module and render-settings templates in AE's own language, and `ae_render` checks names before running (#271).
+  - **Frames:** `ae_render_frame` writes a fresh file every call and waits until the PNG is complete (#272).
+  - **New and fixed ops:**
+    - `font.list` returns real font names (#273);
+    - `layer.move` reorders layers (#274);
+    - `project.new` goes through when nothing is lost;
+    - `render.queue_remove` and `render_clean` were added (#275).
+  - **Setup and docs:** Accessibility steps documented (#276). Setup installs the newest GitHub release, checked against `SHA256SUMS.txt`, and falls back to the bundled payload (#277). The `.mcpb` now carries the bridge payload.
+  - **Found by the live drive:**
+    - `Array.isArray` is missing in ExtendScript and is now polyfilled;
+    - old drive frames are cleaned before the render folder is imported.
+  - **Machine:** the LATENT leftovers went to `~/.Trash/ae-mcp-latent-leftovers/`; `Latent_v002.aep` was kept. Vitest timeout is 20 s, and the agent worktrees are excluded from Spotlight.
+  - **Test drive on AE 26.5:** 208 passed, 0 failed, 6 skipped.
+  - **Open:** a render that exits 0 with a truncated file of stable size is not detected. #238, #249 and #264 need the user.
+
 ## 2026-10-17
 
 - **`chore(release): v1.6.2`**: `script_save {name, source}` saves a script Claude wrote, for reusable tools that then run with no Claude and no tokens (#268).
