@@ -178,9 +178,23 @@ describe('server operation registry', () => {
     }
   });
 
+  it('advertises layer on every operation that takes index or layerIndex, and does not require index', () => {
+    const registry = defaultOperationRegistry();
+    const layerOps = registry.list().filter((op) => {
+      const schema = op.schema as Record<string, unknown>;
+      return schema.comp !== undefined && (schema.index !== undefined || schema.layerIndex !== undefined);
+    });
+    expect(layerOps.length).toBeGreaterThan(20);
+    for (const op of layerOps) {
+      expect(Object.keys(op.schema), op.name).toContain('layer');
+      expect((op.required ?? []).filter((arg) => arg === 'index' || arg === 'layerIndex'), op.name).toEqual([]);
+    }
+  });
+
   it('lists the required arguments of layer.rename and keyframe.add', () => {
     const registry = defaultOperationRegistry();
-    expect(registry.get('layer.rename')!.required).toEqual(['index', 'name']);
+    expect(registry.get('layer.rename')!.required).toEqual(['name']);
+    expect(Object.keys(registry.get('layer.rename')!.schema)).toEqual(expect.arrayContaining(['layer', 'index', 'name']));
     expect(registry.get('keyframe.add')!.required).toEqual(['property', 'time', 'value']);
     expect(registry.get('render.frame')!.required).toEqual([]);
   });

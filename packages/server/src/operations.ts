@@ -7,6 +7,7 @@ import { registerEvalOperations } from './operations-eval.js';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
 import { registerKeyTimeOperations } from './operations-keytimes.js';
 import { registerLayerMoveOperations } from './operations-layer-move.js';
+import { withLayerRef } from './operations-layer-ref.js';
 import { registerLayerOperations } from './operations-layers.js';
 import { registerLocalizeOperations } from './operations-localize.js';
 import { registerMogrtOperations } from './operations-mogrt.js';
@@ -54,14 +55,15 @@ function operation(
     required?: string[];
   } = {},
 ): OperationDefinition {
+  const { schema, required } = withLayerRef(options.schema ?? {}, options.required ?? []);
   return {
     name,
     category,
     description,
     readOnly: options.readOnly ?? false,
     destructive: options.destructive ?? false,
-    schema: options.schema ?? {},
-    required: options.required ?? [],
+    schema,
+    required,
   };
 }
 
@@ -854,8 +856,8 @@ export function validateOperationArgs(
   // `layer` is accepted wherever an operation takes `index` or `layerIndex`.
   const takesLayer = schema.index !== undefined || schema.layerIndex !== undefined;
   const unknown = Object.keys(values).filter((key) => schema[key] === undefined && !(key === 'layer' && takesLayer));
-  // `layer` (index, name or {id}) satisfies a required `index`.
-  const missing = required.filter((name) => values[name] === undefined && !(name === 'index' && values.layer !== undefined));
+  // `layer` (index, name or {id}) satisfies a required `index` or `layerIndex`.
+  const missing = required.filter((name) => values[name] === undefined && !((name === 'index' || name === 'layerIndex') && values.layer !== undefined));
   // One message names every wrong and missing argument and lists the accepted ones, so a
   // caller that passed `name` for `property` fixes it in one retry instead of looping.
   if (unknown.length > 0 || missing.length > 0) {

@@ -1,4 +1,5 @@
 import type { OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
+import { withLayerRef } from './operations-layer-ref.js';
 
 // Template and look operations (#217, #225). Same `operation(...)` helper shape as
 // operations.ts; kept here so this file does not import from its own caller.
@@ -8,14 +9,15 @@ function operation(
   description: string,
   options: { schema?: Record<string, unknown>; required?: string[] } = {},
 ): OperationDefinition {
+  const { schema, required } = withLayerRef(options.schema ?? {}, options.required ?? []);
   return {
     name,
     category,
     description,
     readOnly: false,
     destructive: false,
-    schema: options.schema ?? {},
-    required: options.required ?? [],
+    schema,
+    required,
   };
 }
 

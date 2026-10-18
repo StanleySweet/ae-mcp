@@ -174,7 +174,7 @@ AEMCP.register('template.logo_reveal', function (args) {
     if (style !== 'fade_scale' && style !== 'slide' && style !== 'spin' && style !== 'glitch') {
         aemcpAbortArgs('style must be fade_scale, slide, spin or glitch');
     }
-    var layer = aemcpTplLayerAt(comp, args.index);
+    var layer = aemcpRequireLayer(comp, args);
     var t0 = layer.inPoint;
     var t1 = t0 + 0.8;
     var transform = aemcpTplTransform(layer);
@@ -257,7 +257,7 @@ function aemcpLookSpec(look) {
 // comp time (aemcpSetValue, so a keyed parameter gets a key).
 AEMCP.register('look.apply', function (args) {
     var comp = aemcpRequireComp(args && args.comp ? args.comp : null);
-    var layer = aemcpTplLayerAt(comp, args.index);
+    var layer = aemcpRequireLayer(comp, args);
     var look = args && args.look ? args.look : null;
     var spec = aemcpLookSpec(look);
     if (!spec) {

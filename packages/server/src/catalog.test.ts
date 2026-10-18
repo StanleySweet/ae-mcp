@@ -78,8 +78,8 @@ describe('ae_catalog', () => {
       schema: Record<string, unknown>;
       required: string[];
     };
-    expect(rename.required).toEqual(['index', 'name']);
-    expect(Object.keys(rename.schema)).toEqual(expect.arrayContaining(['index', 'name']));
+    expect(rename.required).toEqual(['name']);
+    expect(Object.keys(rename.schema)).toEqual(expect.arrayContaining(['layer', 'index', 'name']));
   });
 
   // The bridge's capabilities include eval.run while the catalog hides it (off by default).
@@ -160,9 +160,9 @@ describe('ae_describe', () => {
     const { isError, body } = await describeOp(client, 'layer.rename');
     expect(isError).toBeFalsy();
     expect(body.name).toBe('layer.rename');
-    expect(body.required).toEqual(['index', 'name']);
+    expect(body.required).toEqual(['name']);
     expect(Object.keys(body.schema as Record<string, unknown>)).toEqual(
-      expect.arrayContaining(['index', 'name']),
+      expect.arrayContaining(['layer', 'index', 'name']),
     );
   });
 

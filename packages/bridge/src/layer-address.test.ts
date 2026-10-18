@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import vm from 'node:vm';
 import { describe, it, expect } from 'vitest';
 import { build } from './build.js';
-import { MockAE, MockAVLayer, MockCompItem, MockMaskParade, runInMockAE } from './mock-ae.js';
+import { MockAE, MockAVLayer, MockCompItem, MockMaskParade, MockProperty, MockPropertyGroup, runInMockAE } from './mock-ae.js';
 
 async function payloadContext(): Promise<{ ctx: vm.Context; ae: MockAE }> {
   const home = await mkdtemp(join(tmpdir(), 'ae-mcp-address-'));
@@ -173,5 +173,97 @@ describe('layer addressing on shape, mask, marker and text ops', () => {
 
     const read = invoke(ctx, 'text.read', { comp: 'Main', layer: { id: idOf(ae, 'Title') } });
     expect(read.value).toMatchObject({ text: 'Hi', tracking: 50 });
+  });
+});
+
+// The same layer, addressed three ways: by index, by exact name and by {id}. Alpha is index 2
+// in setup(), and its name is unique, so every form must reach the same layer.
+function alphaRefs(ids: { alpha: number }): Array<{ label: string; ref: Record<string, unknown> }> {
+  return [
+    { label: 'index', ref: { index: 2 } },
+    { label: 'name', ref: { layer: 'Alpha' } },
+    { label: 'id', ref: { layer: { id: ids.alpha } } },
+  ];
+}
+
+describe('layer addressing on property, effect, keyframe and transform ops', () => {
+  it('property.set and property.list take index, name or {id}', async () => {
+    for (const { label, ref } of alphaRefs({ alpha: 0 }).slice(0, 2)) {
+      const { ctx, ae } = await setup();
+      const set = invoke(ctx, 'property.set', { comp: 'Main', ...ref, name: 'Opacity', value: 30 });
+      expect(set.ok, label).toBe(true);
+      const opacity = ((ae.project.item(1) as MockCompItem).layer(2) as unknown as MockPropertyGroup)
+        .property('ADBE Transform Group') as MockPropertyGroup;
+      expect((opacity.property('ADBE Opacity') as MockProperty).value, label).toBe(30);
+    }
+    const { ctx, ids } = await setup();
+    const listed = invoke(ctx, 'property.list', { comp: 'Main', layer: { id: ids.alpha } });
+    expect(listed.ok).toBe(true);
+    expect((listed.value as { layers: Array<{ name: string }> }).layers.map((l) => l.name)).toEqual(['Alpha']);
+  });
+
+  it('property.set takes {id} as well', async () => {
+    const { ctx, ae, ids } = await setup();
+    expect(invoke(ctx, 'property.set', { comp: 'Main', layer: { id: ids.alpha }, name: 'Opacity', value: 45 }).ok).toBe(true);
+    const transform = (ae.project.item(1) as MockCompItem).layer(2) as unknown as MockPropertyGroup;
+    expect(((transform.property('ADBE Transform Group') as MockPropertyGroup).property('ADBE Opacity') as MockProperty).value).toBe(45);
+  });
+
+  it('layer.set_transform takes index, name or {id}', async () => {
+    for (const { label, ref } of alphaRefs({ alpha: 0 })) {
+      const { ctx, ae, ids } = await setup();
+      const useRef = label === 'id' ? { layer: { id: ids.alpha } } : ref;
+      const r = invoke(ctx, 'layer.set_transform', { comp: 'Main', ...useRef, opacity: 25 });
+      expect(r.ok, label).toBe(true);
+      const layer = (ae.project.item(1) as MockCompItem).layer(2) as unknown as MockPropertyGroup;
+      expect(((layer.property('ADBE Transform Group') as MockPropertyGroup).property('ADBE Opacity') as MockProperty).value, label).toBe(25);
+    }
+  });
+
+  it('effect.set_property takes index, name or {id}', async () => {
+    for (const label of ['index', 'name', 'id']) {
+      const { ctx, ae, ids } = await setup();
+      const ref = label === 'index' ? { index: 2 } : label === 'name' ? { layer: 'Alpha' } : { layer: { id: ids.alpha } };
+      expect(invoke(ctx, 'effect.apply', { comp: 'Main', ...ref, effect: 'ADBE Slider Control' }).ok, label).toBe(true);
+      const r = invoke(ctx, 'effect.set_property', {
+        comp: 'Main',
+        ...ref,
+        effect: 'ADBE Slider Control',
+        property: 'ADBE Slider Control-0001',
+        value: 42,
+      });
+      expect(r.ok, label).toBe(true);
+      const alpha = (ae.project.item(1) as MockCompItem).layer(2) as unknown as MockPropertyGroup;
+      const parade = alpha.property('ADBE Effect Parade') as MockPropertyGroup;
+      const slider = (parade.property(1) as MockPropertyGroup).property('ADBE Slider Control-0001') as MockProperty;
+      expect(slider.value, label).toBe(42);
+    }
+  });
+
+  it('keyframe.remove takes index, name or {id}', async () => {
+    for (const label of ['index', 'name', 'id']) {
+      const { ctx, ae, ids } = await setup();
+      const ref = label === 'index' ? { index: 2 } : label === 'name' ? { layer: 'Alpha' } : { layer: { id: ids.alpha } };
+      expect(invoke(ctx, 'keyframe.add', { comp: 'Main', ...ref, property: 'Opacity', time: 1, value: 50 }).ok, label).toBe(true);
+      const alpha = (ae.project.item(1) as MockCompItem).layer(2) as unknown as MockPropertyGroup;
+      const opacity = (alpha.property('ADBE Transform Group') as MockPropertyGroup).property('ADBE Opacity') as MockProperty;
+      expect(opacity.numKeys, label).toBe(1);
+      expect(invoke(ctx, 'keyframe.remove', { comp: 'Main', ...ref, property: 'Opacity', time: 1 }).ok, label).toBe(true);
+      expect(opacity.numKeys, label).toBe(0);
+    }
+  });
+
+  it('mask.add takes index, name or {id} on the same layer', async () => {
+    const { ctx, ae } = await typedSetup();
+    const comp = ae.project.item(1) as MockCompItem;
+    let hostIndex = 0;
+    for (let i = 1; i <= comp.numLayers; i++) if (comp.layer(i)?.name === 'Mask Host') hostIndex = i;
+    // The mock gives id only to layers it creates itself, so give the manually added host one.
+    (comp.layer(hostIndex) as unknown as { id: number }).id = 900;
+    const hostId = idOf(ae, 'Mask Host');
+    const vertices = [[0, 0], [10, 0], [10, 10]];
+    expect(invoke(ctx, 'mask.add', { comp: 'Main', index: hostIndex, vertices, closed: true }).ok).toBe(true);
+    expect(invoke(ctx, 'mask.add', { comp: 'Main', layer: 'Mask Host', vertices, closed: true }).ok).toBe(true);
+    expect(invoke(ctx, 'mask.add', { comp: 'Main', layer: { id: hostId }, vertices, closed: true }).ok).toBe(true);
   });
 });

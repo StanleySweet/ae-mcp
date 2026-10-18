@@ -1320,7 +1320,9 @@ AEMCP.register('property.list', function (args) {
     }
     var indices = [];
     var i;
-    if (args && args.index !== undefined && args.index !== null) {
+    if (args && args.layer !== undefined && args.layer !== null) {
+        indices.push(aemcpRequireLayer(comp, args).index);
+    } else if (args && args.index !== undefined && args.index !== null) {
         var index = args.index;
         if (typeof index !== 'number' || index !== Math.floor(index) || index < 1 || index > comp.numLayers) {
             aemcpAbortArgs('layer not found: ' + index);
