@@ -262,6 +262,14 @@ async function waitForCompletePng(file: string, wait: FrameWait): Promise<Buffer
   }
 }
 
+/** The error when AE has not finished a frame in time; names both ways out (#278). */
+function frameTimeoutMessage(wait: FrameWait, file: string): string {
+  return (
+    `rendered frame was not finished writing after ${wait.timeoutMs} ms: ${file}. ` +
+    'Pass a larger timeoutSeconds (max 180), or draft: true for a half-resolution preview.'
+  );
+}
+
 /** True when `file` resolves to `<root>/render` or a path inside it. */
 export function isInsideRenderDir(root: string, file: string): boolean {
   const renderDir = resolve(root, 'render');
@@ -285,7 +293,7 @@ export async function readRenderedFrame(
   if (!buffer) {
     return {
       ok: false,
-      message: `rendered frame was not finished writing after ${wait.timeoutMs} ms: ${file}`,
+      message: frameTimeoutMessage(wait, file),
     };
   }
   // Downscale when the file is too large to return, or when its longest edge exceeds maxEdge.
@@ -846,7 +854,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
     'ae_render_frame',
     {
       description:
-        'Render frame(s) to PNG (default: active comp, frame 0). maxEdge 768. times or atKeys: contact sheet (max 36). region [x,y,w,h]: crop. compareWith: diff. See docs/user-guide.md.',
+        'Render frame(s) to PNG (default: active comp, frame 0). maxEdge 768. times/atKeys: contact sheet. region: crop. compareWith: diff. draft, timeoutSeconds: heavy 3D. See docs/user-guide.md.',
       inputSchema: {
         comp: z.union([z.string(), z.number()]).optional(),
         time: z.number().optional(),
@@ -859,6 +867,10 @@ export function createServer(options: ServerOptions = {}): McpServer {
         region: z.array(z.number().int().min(0)).length(4).optional(),
         maxEdge: z.number().int().positive().optional(),
         compareWith: z.string().optional(),
+        // Seconds to wait for AE to write the PNG (default 15, max 180) (#278).
+        timeoutSeconds: z.number().min(1).max(180).optional(),
+        // Half resolution for this frame only (CompItem.resolutionFactor [2,2]), then restored (#278).
+        draft: z.boolean().optional(),
       },
     },
     async (input) => {
@@ -886,7 +898,11 @@ export function createServer(options: ServerOptions = {}): McpServer {
         return text(makeError('INVALID_ARGS', 'compareWith compares one frame; drop times'), true);
       }
       const maxEdge = args.maxEdge ?? DEFAULT_RENDER_EDGE;
-      const wait = options.frameWait ?? DEFAULT_FRAME_WAIT;
+      const baseWait = options.frameWait ?? DEFAULT_FRAME_WAIT;
+      const wait: FrameWait =
+        args.timeoutSeconds === undefined ? baseWait : { ...baseWait, timeoutMs: args.timeoutSeconds * 1000 };
+      // Metadata says draft: true only when draft was requested (#278).
+      const draftMeta = args.draft === true ? { draft: true } : {};
 
       // Compares the new frame with compareWith; returns an error result instead when that is invalid.
       const compareNew = async (file: string): Promise<{ compare?: FrameComparison; error?: ToolResult }> => {
@@ -920,7 +936,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
 
       if (args.times === undefined && args.region === undefined) {
         // One frame: the PNG from AE, scaled down only when it is larger than maxEdge.
-        const result = await callRaw('render.frame', { comp: args.comp, time: args.time });
+        const result = await callRaw('render.frame', { comp: args.comp, time: args.time, draft: args.draft });
         if (!result.ok) {
           return toResult(result);
         }
@@ -957,6 +973,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
                 width: value.width ?? null,
                 height: value.height ?? null,
                 image: pngSize(Buffer.from(read.data, 'base64')),
+                ...draftMeta,
                 ...(compared.compare !== undefined ? { compare: compared.compare } : {}),
               }),
             },
@@ -968,7 +985,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const times = args.times ?? [args.time ?? 0];
       const frames: RenderedFrame[] = [];
       for (const requested of times) {
-        const result = await callRaw('render.frame', { comp: args.comp, time: requested });
+        const result = await callRaw('render.frame', { comp: args.comp, time: requested, draft: args.draft });
         if (!result.ok) {
           return toResult(result);
         }
@@ -983,7 +1000,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         const buffer = await waitForCompletePng(file, wait);
         if (!buffer) {
           return text(
-            makeError('SCRIPT_ERROR', `rendered frame was not finished writing after ${wait.timeoutMs} ms: ${value.file}`),
+            makeError('SCRIPT_ERROR', frameTimeoutMessage(wait, value.file)),
             true,
           );
         }
@@ -1045,6 +1062,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
               region,
               image: { width: image.width, height: image.height },
               ...(single ? {} : { cells: frames.map((frame) => ({ time: frame.time, frame: frame.frame, file: frame.file })) }),
+              ...draftMeta,
               ...(compared.compare !== undefined ? { compare: compared.compare } : {}),
             }),
           },

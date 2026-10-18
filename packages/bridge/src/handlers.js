@@ -644,14 +644,28 @@ AEMCP.register('render.frame', function (args) {
     var file = aemcpRenderPath(comp, time);
     var frame = Math.round(time * comp.frameRate);
     var method = typeof comp.saveFrameToPng === 'function' ? 'direct' : 'queue';
-    if (method === 'direct') {
-        // Not on the scripting guide (ae-scripting.docsforadobe.dev, checked for E16-3); the write
-        // can finish after this call returns, so the server waits for the file to settle (#176, #272).
-        comp.saveFrameToPng(time, new File(file));
-    } else {
-        aemcpRenderFrameViaQueue(comp, time, file);
+    var draft = args && args.draft === true;
+    var savedFactor = null;
+    if (draft) {
+        // Half resolution for this frame only; restored in finally (#278).
+        // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemresolutionfactor
+        savedFactor = [comp.resolutionFactor[0], comp.resolutionFactor[1]];
+        comp.resolutionFactor = [2, 2];
     }
-    return {
+    try {
+        if (method === 'direct') {
+            // Not on the scripting guide (ae-scripting.docsforadobe.dev, checked for E16-3); the write
+            // can finish after this call returns, so the server waits for the file to settle (#176, #272).
+            comp.saveFrameToPng(time, new File(file));
+        } else {
+            aemcpRenderFrameViaQueue(comp, time, file);
+        }
+    } finally {
+        if (savedFactor !== null) {
+            comp.resolutionFactor = savedFactor;
+        }
+    }
+    var result = {
         method: method,
         comp: comp.name,
         file: file,
@@ -660,6 +674,10 @@ AEMCP.register('render.frame', function (args) {
         width: comp.width,
         height: comp.height
     };
+    if (draft) {
+        result.draft = true;
+    }
+    return result;
 });
 
 // Render queue helpers.

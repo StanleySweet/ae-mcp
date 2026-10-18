@@ -777,6 +777,15 @@ export const scenario: Step[] = [
       }
     },
   }),
+  // #278: a draft frame (half resolution, restored after) must report draft: true.
+  tool('ae_render_frame.draft', 'ae_render_frame', (s) => ({ comp: s.comp, time: 2, draft: true, timeoutSeconds: 60 }), {
+    after: (result) => {
+      const meta = result.json as { draft?: unknown } | null;
+      if (result.isError || meta?.draft !== true) {
+        throw new Error('ae_render_frame draft frame did not report draft: true: ' + result.text);
+      }
+    },
+  }),
   op('render.frame', 'render.frame', (s) => ({ comp: s.comp, time: 4 })),
   op('render.queue_add', 'render.queue_add', (s) => ({
     comp: s.comp,

@@ -174,6 +174,8 @@ export class MockCompItem extends MockItem {
   pixelAspect = 1;
   bgColor: [number, number, number] = [0, 0, 0];
   motionBlur = false;
+  // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemresolutionfactor
+  resolutionFactor: [number, number] = [1, 1];
   workAreaStart = 0;
   workAreaDuration = 0;
   // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemtime (current time)

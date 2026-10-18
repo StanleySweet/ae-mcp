@@ -100,6 +100,47 @@ describe('render.frame', () => {
     expect(ae.fs.has(custom)).toBe(false);
   });
 
+  // draft: true renders at half resolution for that one frame, then restores the comp (#278).
+  // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemresolutionfactor
+  it('renders a draft frame at half resolution and restores the comp', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, 1);
+    let during: unknown = null;
+    Object.defineProperty(comp, 'saveFrameToPng', {
+      value: (): void => {
+        during = [comp.resolutionFactor[0], comp.resolutionFactor[1]];
+      },
+      configurable: true,
+    });
+    const outcome = invoke(ctx, 'render.frame', { comp: 'Main', time: 1, draft: true });
+    expect(outcome.ok).toBe(true);
+    expect(outcome.value).toMatchObject({ method: 'direct', draft: true });
+    expect(during).toEqual([2, 2]);
+    expect(comp.resolutionFactor).toEqual([1, 1]);
+  });
+
+  it('restores the resolution factor when the draft render throws', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, 1);
+    Object.defineProperty(comp, 'saveFrameToPng', {
+      value: (): void => {
+        throw new Error('render failed');
+      },
+      configurable: true,
+    });
+    const outcome = invoke(ctx, 'render.frame', { comp: 'Main', time: 1, draft: true });
+    expect(outcome.ok).toBe(false);
+    expect(comp.resolutionFactor).toEqual([1, 1]);
+  });
+
+  it('omits the draft flag from the result when draft is not requested', async () => {
+    const { ctx, ae } = await payloadContext();
+    const comp = seedComp(ae, 1);
+    const outcome = invoke(ctx, 'render.frame', { comp: 'Main', time: 1 });
+    expect(outcome.value).not.toHaveProperty('draft');
+    expect(comp.resolutionFactor).toEqual([1, 1]);
+  });
+
   it('falls back to the render queue when saveFrameToPng is unavailable', async () => {
     const { ctx, ae, home } = await payloadContext();
     const comp = seedComp(ae);

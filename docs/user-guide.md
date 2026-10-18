@@ -203,6 +203,17 @@ consecutive keys. It reads the times with the read-only `keyframe.times` op. Key
 sorted; more than 36 moments are thinned evenly to 36. `atKeys` cannot be combined with `time` or `times`.
 Use it after animating to check the motion.
 
+## Heavy 3D frames
+
+A comp with Advanced 3D, depth of field or many layers can take longer than the default 15 s
+for AE to write one frame. `ae_render_frame` then fails with "not finished writing after 15000 ms",
+and the error names both fixes:
+
+- `timeoutSeconds` (default 15, max 180) waits longer for the PNG.
+- `draft: true` renders that one frame at half resolution (the comp's `resolutionFactor` is set
+  to `[2, 2]` and restored straight after the render). The metadata then has `draft: true`.
+  Use it for quick previews; render at full quality for the final check.
+
 ## Comparing frames
 
 `ae_render_frame` takes an optional `compareWith`: the path of an earlier frame that

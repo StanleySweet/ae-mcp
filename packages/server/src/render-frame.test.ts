@@ -185,6 +185,68 @@ describe('ae_render_frame tool', () => {
     expect(error.message).toContain('outside the render directory');
   });
 
+  // timeoutSeconds overrides the 1 s test wait, so a slow heavy 3D frame still arrives (#278).
+  it('waits as long as timeoutSeconds asks for a slow frame', async () => {
+    const client = await start((root) => ({
+      'render.frame': async () => {
+        const file = join(root, 'render', 'slow.png');
+        await mkdir(join(root, 'render'), { recursive: true });
+        setTimeout(() => void writeFile(file, FAKE_PNG), 1_500);
+        return { method: 'direct', comp: 'Main', file, time: 0, frame: 0 };
+      },
+    }));
+    const result = (await client.callTool({
+      name: 'ae_render_frame',
+      arguments: { timeoutSeconds: 4 },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(result.isError).toBeFalsy();
+    expect(imageContent(result).data).toBe(FAKE_PNG.toString('base64'));
+  });
+
+  // The timeout error names both ways out: a longer timeoutSeconds or draft (#278).
+  it('names timeoutSeconds and draft when the frame never finishes', async () => {
+    const client = await start((root) => ({
+      'render.frame': () => ({
+        method: 'direct',
+        comp: 'Main',
+        file: join(root, 'render', 'never.png'),
+        time: 0,
+        frame: 0,
+      }),
+    }));
+    const result = (await client.callTool({
+      name: 'ae_render_frame',
+      arguments: { timeoutSeconds: 1 },
+    })) as { content: unknown[]; isError?: boolean };
+    expect(result.isError).toBe(true);
+    const [first] = result.content as Array<{ type: string; text: string }>;
+    const message = errorSchema.parse(JSON.parse(first!.text)).message;
+    expect(message).toContain('not finished writing after 1000 ms');
+    expect(message).toContain('timeoutSeconds');
+    expect(message).toContain('draft: true');
+  });
+
+  // draft is passed to render.frame and reported back in the metadata.
+  it('passes draft to render.frame and reports it', async () => {
+    const seen: unknown[] = [];
+    const client = await start((root) => ({
+      'render.frame': async (args) => {
+        seen.push((args as { draft?: unknown }).draft);
+        const file = join(root, 'render', 'Main-draft.png');
+        await mkdir(join(root, 'render'), { recursive: true });
+        await writeFile(file, FAKE_PNG);
+        return { method: 'direct', comp: 'Main', file, time: 0, frame: 0, draft: true };
+      },
+    }));
+    const result = (await client.callTool({ name: 'ae_render_frame', arguments: { draft: true } })) as {
+      content: unknown[];
+      isError?: boolean;
+    };
+    expect(result.isError).toBeFalsy();
+    expect(seen).toEqual([true]);
+    expect(textContent(result)).toMatchObject({ draft: true });
+  });
+
   it('reports a missing rendered file', async () => {
     const client = await start((root) => ({
       'render.frame': () => ({
