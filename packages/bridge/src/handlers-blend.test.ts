@@ -88,3 +88,28 @@ describe('layer.set_parent', () => {
     expect(child.parent).toBeNull();
   });
 });
+
+describe('Advanced 3D support', () => {
+  it('switches the comp renderer and refuses an unknown one', async () => {
+    const { ctx, ae } = await payloadContext();
+    invoke(ctx, 'comp.create', { name: 'Main', width: 800, height: 600, fps: 24, duration: 5 });
+
+    expect(invoke(ctx, 'comp.set_settings', { comp: 'Main', renderer: 'Advanced 3D' }).ok).toBe(true);
+    expect((ae.project.item(1) as unknown as { renderer: string }).renderer).toBe('Advanced 3D');
+
+    const bad = invoke(ctx, 'comp.set_settings', { comp: 'Main', renderer: 'Ray-traced' });
+    expect(bad.issue?.message).toContain('available: Classic 3D, Advanced 3D');
+  });
+
+  it('adds an environment light that reflects from a 2D layer', async () => {
+    const { ctx, ae } = await payloadContext();
+    invoke(ctx, 'comp.create', { name: 'Main', width: 800, height: 600, fps: 24, duration: 5 });
+    invoke(ctx, 'layer.add_null', { comp: 'Main', name: 'Env Map' });
+
+    const out = invoke(ctx, 'layer.add_light', { comp: 'Main', name: 'Env', lightType: 'environment', lightSource: 'Env Map' });
+
+    expect(out.ok).toBe(true);
+    const light = (ae.project.item(1) as MockCompItem).layer(out.value.index) as unknown as { lightSource: { name: string } };
+    expect(light.lightSource.name).toBe('Env Map');
+  });
+});

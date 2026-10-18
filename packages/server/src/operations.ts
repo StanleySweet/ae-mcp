@@ -137,7 +137,7 @@ export function defaultOperationRegistry(): OperationRegistry {
     }),
   );
   register(
-    operation('comp.set_settings', 'comp', 'Change a composition width, height, pixel aspect, duration, frame rate, background colour or name.', {
+    operation('comp.set_settings', 'comp', 'Change a composition width, height, pixel aspect, duration, frame rate, background colour, name or 3D renderer.', {
       schema: {
         comp,
         name: comp,
@@ -149,6 +149,7 @@ export function defaultOperationRegistry(): OperationRegistry {
         frameRate: { type: 'number' },
         bgColor: { type: 'array' },
         newName: comp,
+        renderer: { type: 'string', description: 'a member of CompItem.renderers, e.g. the Advanced 3D renderer' },
       },
     }),
   );
@@ -194,7 +195,8 @@ export function defaultOperationRegistry(): OperationRegistry {
       comp,
       name: { type: 'string' },
       centerPoint,
-      lightType: { type: 'string', enum: ['parallel', 'spot', 'point', 'ambient'] },
+      lightType: { type: 'string', enum: ['parallel', 'spot', 'point', 'ambient', 'environment'] },
+      lightSource: { description: 'environment light only: a 2D layer of the comp (index, name or {id}) to light and reflect from' },
     },
   }));
   register(operation('layer.set_3d', 'layer', 'Turn the 3D switch on or off for a layer (not camera/light).', {

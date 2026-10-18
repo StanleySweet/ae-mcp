@@ -529,6 +529,21 @@ AEMCP.register('comp.set_settings', function (args) {
         comp.name = args.newName;
         changed += 1;
     }
+    // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemrenderer
+    // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemrenderers
+    if (args && typeof args.renderer === 'string') {
+        var renderers = comp.renderers;
+        var known = false;
+        var r;
+        for (r = 0; r < renderers.length; r++) {
+            if (renderers[r] === args.renderer) known = true;
+        }
+        if (!known) {
+            aemcpAbortArgs('unknown renderer: ' + args.renderer + ' (available: ' + renderers.join(', ') + ')');
+        }
+        comp.renderer = args.renderer;
+        changed += 1;
+    }
     if (changed === 0) {
         aemcpAbortArgs('no settings to change');
     }
@@ -1056,16 +1071,26 @@ AEMCP.register('layer.add_camera', function (args) {
 // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlighttype
 AEMCP.register('layer.add_light', function (args) {
     var comp = aemcpRequireComp(aemcpCompKey(args));
+    // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlighttype (ENVIRONMENT: AE 24.3+)
     var types = { parallel: LightType.PARALLEL, spot: LightType.SPOT, point: LightType.POINT, ambient: LightType.AMBIENT };
+    if (LightType.ENVIRONMENT !== undefined) types.environment = LightType.ENVIRONMENT;
     var lightType = args && args.lightType ? args.lightType : null;
     if (lightType !== null && !types.hasOwnProperty(lightType)) {
-        aemcpAbortArgs('unknown lightType: ' + lightType + ' (parallel, spot, point, ambient)');
+        aemcpAbortArgs('unknown lightType: ' + lightType + ' (parallel, spot, point, ambient, environment)');
     }
     var name = args && args.name ? args.name : 'Light';
     var center = args && args.centerPoint ? args.centerPoint : [comp.width / 2, comp.height / 2];
     var layer = comp.layers.addLight(name, center);
     if (lightType !== null) {
         layer.lightType = types[lightType];
+    }
+    // An environment light lights and reflects from a 2D layer of the same comp (AE 25.2+).
+    // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlightsource
+    if (args && args.lightSource !== undefined && args.lightSource !== null) {
+        if (lightType !== 'environment') {
+            aemcpAbortArgs('lightSource needs lightType environment');
+        }
+        layer.lightSource = aemcpRequireLayer(comp, { layer: args.lightSource });
     }
     var lightRef = aemcpLayerRef(layer);
     lightRef.lightType = lightType;

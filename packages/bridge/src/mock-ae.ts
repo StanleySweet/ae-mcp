@@ -263,6 +263,9 @@ export class MockCompItem extends MockItem {
 
   // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemmotiongraphicstemplatename
   motionGraphicsTemplateName = '';
+  // Ref: https://ae-scripting.docsforadobe.dev/item/compitem/#compitemrenderers (names are illustrative)
+  readonly renderers = ['Classic 3D', 'Advanced 3D'];
+  renderer = 'Classic 3D';
   // Essential graphics controls, by name, in panel order (added through Property.addToMotionGraphicsTemplateAs).
   readonly egpControls: string[] = [];
   // Each exportAsMotionGraphicsTemplate call, for tests (the mock writes no file).
@@ -972,6 +975,8 @@ export class MockCameraLayer extends MockLayer {}
 
 export class MockLightLayer extends MockLayer {
   lightType = 0;
+  // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlightsource
+  lightSource: MockLayer | null = null;
 }
 
 // Ref: https://ae-scripting.docsforadobe.dev/layer/lightlayer/#lightlayerlighttype
