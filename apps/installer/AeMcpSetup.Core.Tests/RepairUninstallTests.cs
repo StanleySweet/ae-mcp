@@ -66,6 +66,23 @@ public class RepairUninstallTests
     }
 
     [Fact]
+    public async Task UninstallRemovesThePanelAndTheLegacyPanelFile()
+    {
+        var root = TempDir.Create("ae-mcp-home-");
+        var (install, folder) = FakeInstall();
+        var panelDir = Path.Combine(folder, "Scripts", "ScriptUI Panels");
+        Directory.CreateDirectory(panelDir);
+        await File.WriteAllTextAsync(Path.Combine(panelDir, "Claude for After Effects.jsx"), "panel");
+        await File.WriteAllTextAsync(Path.Combine(panelDir, "ae-mcp-panel.jsx"), "old panel");
+
+        var result = await RepairUninstall.UninstallAsync(root, install);
+
+        Assert.Equal("ok", result.Status);
+        Assert.False(File.Exists(Path.Combine(panelDir, "Claude for After Effects.jsx")));
+        Assert.False(File.Exists(Path.Combine(panelDir, "ae-mcp-panel.jsx")));
+    }
+
+    [Fact]
     public async Task UninstallIsIdempotentWhenNothingIsInstalled()
     {
         var root = TempDir.Create("ae-mcp-home-");

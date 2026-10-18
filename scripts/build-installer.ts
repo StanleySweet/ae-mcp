@@ -27,7 +27,7 @@ const version: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf
 mkdirSync(resources, { recursive: true });
 cpSync(join(root, 'packages/bridge/dist/payload.jsx'), join(resources, 'payload.jsx'));
 cpSync(join(root, 'packages/bridge/dist/loader.jsx'), join(resources, 'loader.jsx'));
-cpSync(join(root, 'packages/bridge/dist/ae-mcp-panel.jsx'), join(resources, 'ae-mcp-panel.jsx'));
+cpSync(join(root, 'packages/bridge/dist/Claude for After Effects.jsx'), join(resources, 'Claude for After Effects.jsx'));
 cpSync(join(root, 'dist/ae-mcp.mcpb'), join(resources, 'ae-mcp.mcpb'));
 
 // 2. Publish a self-contained, trimmed macOS app.

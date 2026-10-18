@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import vm from 'node:vm';
 import { describe, it, expect } from 'vitest';
-import { build } from './build.js';
+import { build, PANEL_FILE } from './build.js';
 import { MockAE, MockCompItem, MockFile, MockLayer, runInMockAE } from './mock-ae.js';
 
 async function bridgeFiles(): Promise<{ home: string; panel: string; payload: string }> {
@@ -14,7 +14,7 @@ async function bridgeFiles(): Promise<{ home: string; panel: string; payload: st
   await build({ outDir });
   return {
     home,
-    panel: readFileSync(join(outDir, 'ae-mcp-panel.jsx'), 'utf8'),
+    panel: readFileSync(join(outDir, PANEL_FILE), 'utf8'),
     payload: readFileSync(join(outDir, 'payload.jsx'), 'utf8'),
   };
 }
@@ -27,7 +27,7 @@ function call(ctx: vm.Context, expression: string): unknown {
   return vm.runInContext(expression, ctx);
 }
 
-describe('ae-mcp-panel.jsx build', () => {
+describe('Claude for After Effects.jsx build', () => {
   it('is written next to the payload and loads without a payload', async () => {
     const { home, panel } = await bridgeFiles();
     const ae = new MockAE();
@@ -142,5 +142,80 @@ describe('aemcpPanelOpen', () => {
     expect(result[0]).toBeGreaterThan(0);
     expect(result[1]).toBe(true);
     expect(result[2]).toBe(0);
+  });
+});
+
+describe('settings helpers', () => {
+  it('parses a settings file and keeps unknown keys', async () => {
+    const { home, panel } = await bridgeFiles();
+    const ae = new MockAE();
+    ae.env.HOME = home;
+    const ctx = panelIn(ae, panel);
+    const parsed = call(ctx, 'aemcpPanelSettingsParse(\'{"backupMode":"off","futureKey":{"a":1}}\')') as Record<string, unknown>;
+    expect(parsed.backupMode).toBe('off');
+    expect(parsed.futureKey).toEqual({ a: 1 });
+    expect(call(ctx, 'aemcpPanelSettingsParse(null)')).toEqual({});
+    expect(call(ctx, 'aemcpPanelSettingsParse("  \\n")')).toEqual({});
+  });
+
+  it('rejects content that is not a JSON object and never runs it', async () => {
+    const { home, panel } = await bridgeFiles();
+    const ae = new MockAE();
+    ae.env.HOME = home;
+    const ctx = panelIn(ae, panel);
+    expect(call(ctx, 'aemcpPanelSettingsParse("[1,2]")')).toBeNull();
+    expect(call(ctx, 'aemcpPanelSettingsParse("{\\"backupMode\\": ")')).toBeNull();
+    expect(call(ctx, 'aemcpPanelSettingsParse("ae.fs.set(1)")')).toBeNull();
+    expect(call(ctx, 'aemcpPanelSettingsParse("{\\"a\\": 1} junk")')).toBeNull();
+  });
+
+  it('merges the four panel keys into the file and keeps every other key', async () => {
+    const { home, panel } = await bridgeFiles();
+    const ae = new MockAE();
+    ae.env.HOME = home;
+    const ctx = panelIn(ae, panel);
+    const merged = call(
+      ctx,
+      'aemcpPanelSettingsMerge({"backupMode":"single","other":"keep","incrementBeforeDestructive":true},' +
+        '{"backupMode":"increment","backupKeep":3,"readOnly":true,"evalEnabled":false})',
+    ) as Record<string, unknown>;
+    expect(merged).toEqual({
+      backupMode: 'increment',
+      backupKeep: 3,
+      readOnly: true,
+      evalEnabled: false,
+      other: 'keep',
+      incrementBeforeDestructive: true,
+    });
+  });
+
+  it('rejects an unknown backup mode or a keep count below 1', async () => {
+    const { home, panel } = await bridgeFiles();
+    const ae = new MockAE();
+    ae.env.HOME = home;
+    const ctx = panelIn(ae, panel);
+    expect(call(ctx, 'aemcpPanelSettingsError({backupMode: "full", backupKeep: 5, readOnly: false, evalEnabled: false})')).not.toBeNull();
+    expect(call(ctx, 'aemcpPanelSettingsError({backupMode: "single", backupKeep: 0, readOnly: false, evalEnabled: false})')).not.toBeNull();
+    expect(call(ctx, 'aemcpPanelSettingsError({backupMode: "single", backupKeep: NaN, readOnly: false, evalEnabled: false})')).not.toBeNull();
+    expect(call(ctx, 'aemcpPanelSettingsError({backupMode: "increment", backupKeep: 5, readOnly: false, evalEnabled: true})')).toBeNull();
+  });
+
+  it('saves to ~/.ae-mcp/settings.json, keeps unknown keys, and leaves an invalid file alone', async () => {
+    const { home, panel } = await bridgeFiles();
+    const ae = new MockAE();
+    ae.env.HOME = home;
+    const path = join(home, '.ae-mcp', 'settings.json');
+    ae.fs.set(path, '{"keepMe": "yes", "backupMode": "single"}');
+    const ctx = panelIn(ae, panel);
+
+    const error = call(ctx, 'aemcpPanelSettingsSave({backupMode: "off", backupKeep: 5, readOnly: true, evalEnabled: true})');
+    expect(error).toBeNull();
+    const saved = JSON.parse(ae.fs.get(path) as string) as Record<string, unknown>;
+    expect(saved).toEqual({ keepMe: 'yes', backupMode: 'off', backupKeep: 5, readOnly: true, evalEnabled: true });
+
+    ae.fs.set(path, '{"backupMode": ');
+    const refused = call(ctx, 'aemcpPanelSettingsSave({backupMode: "single", backupKeep: 5, readOnly: false, evalEnabled: false})') as string;
+    expect(refused).toContain('not valid JSON');
+    expect(ae.fs.get(path)).toBe('{"backupMode": ');
   });
 });

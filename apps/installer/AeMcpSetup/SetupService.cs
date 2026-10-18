@@ -32,7 +32,7 @@ public sealed class SetupService
     public string LoaderPath => Path.Combine(_baseDir, "loader.jsx");
 
     /// <summary>The bundled Claude panel, installed into Scripts/ScriptUI Panels.</summary>
-    public string PanelPath => Path.Combine(_baseDir, "ae-mcp-panel.jsx");
+    public string PanelPath => Path.Combine(_baseDir, InstallPanel.PanelFileName);
 
     public string McpbPath => Path.Combine(_baseDir, "ae-mcp.mcpb");
 

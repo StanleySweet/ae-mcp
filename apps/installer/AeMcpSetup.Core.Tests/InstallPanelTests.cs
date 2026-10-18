@@ -32,9 +32,25 @@ public class InstallPanelTests
         Assert.Equal("bridge_panel", result.Check);
         Assert.Equal("ok", result.Status);
         Assert.True(result.Changed);
-        var expected = Path.Combine(folder, "Scripts", "ScriptUI Panels", "ae-mcp-panel.jsx");
+        var expected = Path.Combine(folder, "Scripts", "ScriptUI Panels", "Claude for After Effects.jsx");
         Assert.Equal(expected, result.Path);
         Assert.Equal(Panel, await File.ReadAllTextAsync(expected));
+    }
+
+    [Fact]
+    public async Task RemovesTheLegacyPanelFileOnInstall()
+    {
+        var (install, folder) = FakeInstall();
+        var panelDir = Path.Combine(folder, "Scripts", "ScriptUI Panels");
+        Directory.CreateDirectory(panelDir);
+        var legacy = Path.Combine(panelDir, "ae-mcp-panel.jsx");
+        await File.WriteAllTextAsync(legacy, "old panel");
+
+        var result = await InstallPanel.InstallAsync(install, Panel);
+
+        Assert.Equal("ok", result.Status);
+        Assert.False(File.Exists(legacy));
+        Assert.True(File.Exists(Path.Combine(panelDir, "Claude for After Effects.jsx")));
     }
 
     [Fact]
@@ -60,7 +76,7 @@ public class InstallPanelTests
 
         Assert.Equal("fail", result.Status);
         Assert.Contains("the Claude panel", result.Fix);
-        Assert.Contains("ae-mcp-panel.jsx", result.Manual);
+        Assert.Contains("Claude for After Effects.jsx", result.Manual);
         Assert.DoesNotContain("loader", result.Manual);
     }
 

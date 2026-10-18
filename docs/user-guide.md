@@ -279,18 +279,28 @@ Save writes. Checkpoints are stored in `~/.ae-mcp/checkpoints.json`.
 
 ## Claude panel in After Effects
 
-Setup installs `ae-mcp-panel.jsx` into `Scripts/ScriptUI Panels` next to the startup loader.
-Open it from the Window menu in After Effects (quit and reopen After Effects after the first
-install). Opened from the Window menu it is a dockable panel, like After Effects' own panels;
-run any other way (File > Scripts > Run Script File) it opens as a floating palette.
+Setup installs `Claude for After Effects.jsx` into `Scripts/ScriptUI Panels` next to the startup loader.
+Open it from the Window menu in After Effects, where it is listed as "Claude for After Effects"
+(quit and reopen After Effects after the first install). Opened from the Window menu it is a dockable
+panel, like After Effects' own panels; run any other way (File > Scripts > Run Script File) it opens
+as a floating palette. Setup removes the older `ae-mcp-panel.jsx` when it installs, so only one entry remains.
 
 - **Steps**: the last 20 operations Claude ran, newest first, read from `~/.ae-mcp/history.jsonl`.
   Press Refresh to read the log again.
 - **Copy for Claude**: copies the project name, the active comp (name, size, duration, fps) and
   the selected layers (index, name, type) to the clipboard, and shows the same text in the box.
   No API key is needed; paste it into any Claude chat.
+- **Settings**: changes `~/.ae-mcp/settings.json` (Save writes it; other keys in the file are kept).
+  - *Backup mode*: `single` (default) saves the open project in place and keeps one copy in
+    `~/.ae-mcp/backups/<project name>/`; `increment` keeps a timestamped copy each time and the newest
+    *Backups kept* (default 5; editable only in increment mode); `off` makes no backup.
+  - *Read-only*: Claude may read the project but cannot change it.
+  - *Allow eval.run*: lets Claude run ExtendScript through `eval.run` (off by default).
+  - The backup folder is `~/.ae-mcp/backups`. Changes apply to the next Claude operation.
+  - If `settings.json` is not valid JSON, the panel shows a message and Save does not overwrite it.
+    Fix or delete the file, then save again.
 
-Manual install, if Setup could not write the file: copy `ae-mcp-panel.jsx` from the Setup app
+Manual install, if Setup could not write the file: copy `Claude for After Effects.jsx` from the Setup app
 bundle (`Resources/`) into the `Scripts/ScriptUI Panels` folder of the After Effects app, then
 reopen After Effects.
 

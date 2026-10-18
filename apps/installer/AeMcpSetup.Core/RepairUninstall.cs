@@ -54,6 +54,7 @@ public static class RepairUninstall
         {
             Path.Combine(InstallLoader.LoaderStartupDir(install), fileName ?? InstallLoader.LoaderFileName),
             InstallPanel.PanelPath(install),
+            InstallPanel.PanelPath(install, InstallPanel.LegacyPanelFileName),
             Path.Combine(root, "bridge"),
         };
 

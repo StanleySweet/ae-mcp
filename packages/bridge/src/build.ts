@@ -10,6 +10,8 @@ const SHARED_SOURCES = ['es3-polyfills.js', 'es3-json2.js', 'bridge-fs.js'];
 const PAYLOAD_SOURCES = [...SHARED_SOURCES, 'job-runner.js', 'serializers.js', 'handlers.js', 'handlers-relink.js', 'handlers-project.js', 'handlers-eval.js', 'handlers-layers.js', 'handlers-housekeeping.js', 'handlers-verify.js', 'handlers-templates.js', 'handlers-lint.js', 'handlers-errors.js', 'handlers-versions.js', 'handlers-mogrt.js', 'handlers-audio.js', 'handlers-localize.js', 'handlers-animate.js', 'handlers-keytimes.js', 'handlers-render-templates.js', 'handlers-layer-move.js', 'handlers-blend.js', 'handlers-render-queue.js', 'handlers-timing.js'];
 const LOADER_SOURCES = [...SHARED_SOURCES, 'loader.js'];
 const PANEL_SOURCES = [...SHARED_SOURCES, 'panel.js'];
+/** File name of the panel in dist/; After Effects' Window menu shows it (ADR-0012). */
+export const PANEL_FILE = 'Claude for After Effects.jsx';
 
 /** Short git revision, suffixed `-dirty` when the tree has uncommitted changes. Null outside a repo. */
 function gitRevision(): string | null {
@@ -71,7 +73,7 @@ export async function build(
   await mkdir(outDir, { recursive: true });
   await writeFile(join(outDir, 'loader.jsx'), loader);
   await writeFile(join(outDir, 'payload.jsx'), payload);
-  await writeFile(join(outDir, 'ae-mcp-panel.jsx'), panel);
+  await writeFile(join(outDir, PANEL_FILE), panel);
   return { loader, payload, panel };
 }
 
