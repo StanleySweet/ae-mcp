@@ -59,3 +59,43 @@ register one of its tools through that server instead of doing the work itself?
 3. Build the single-tool prototype under `.tmp/` (not in the repo) and run it once.
 4. Record the outcome and close the go/no-go decision in the ADR draft
    `docs/decisions/0010-ae-builtin-mcp-uxp.md`.
+
+## Update 2026-10-18: what the AE Beta 27.1 binaries and a live launch show
+
+Status: the built-in server exists and runs in the beta. Read from `strings` on
+`MCP Server.plugin` and `dvamcp.framework` in `Adobe After Effects (Beta).app` (27.1.0,
+`com.adobe.AfterEffectsBeta.application`), plus one launch of the beta. Not yet called
+with a valid token.
+
+**Rule.** The built-in server speaks MCP over streamable HTTP on loopback and needs a
+bearer token that changes at every launch. A client cannot reach it without first reading
+the token from inside After Effects (UXP `getAssistantPreferences`).
+
+- Two servers. The "AI Assistant" server on path `aftereffects/assistant/mcp` prefers port
+  4111 and falls back to an OS port; the general server on `aftereffects/mcp` uses the
+  preferences port. On launch the beta listened on `127.0.0.1:4111` and `[::1]:4111`.
+- Unauthenticated `initialize` on both paths returns `401 Unauthorized`
+  ("Bearer token authentication required for MCP connections").
+- Gate: the log string "MCP servers disabled by BetaFeature gate". AE 26.5 ships the same
+  plug-in but stays gated; the beta runs it.
+- Preferences object: `{enabled, authenticationMode, port, server, path, accessToken}`,
+  read with `getPreferences` / `getAssistantPreferences`, written with `setPreferences`.
+- UXP extension API (scripting objects `MCPScriptingExtensibilityAPIObject`, `MCPEvent`):
+  an extension receives `MCPEvent.MCPMethodCalled` for `tools/list`, `tools/call`,
+  `resources/*`, `prompts/*`, and answers with `MCP.postMCPResponse(contextGuid,
+  responseJSON)` or `postMCPError`. "Signals that the UXP extension has (re)loaded and
+  tools should be re-queried" and `EVENT_TOOLS_ADDED` cover tool registration.
+  `listNativeTools` and `setNativeToolEnabled` toggle the native tools.
+- Native tools: `RenderFrameTool`, `AnnotationTool` (strokes classified as dot, arrow,
+  closed-region, with `centroid` and `tip` to pick a layer), `InspectMediaTool`,
+  `VectorizeImageTool`, plus "agentic skills" resources (bundled and personal skills
+  directory) and an assistant workflow that asks before saving a new project.
+- Undo: `beginInitiatorTagging` / `endInitiatorTagging` claim undo grouping ids per agent
+  tool call, so agent edits show up as named undo groups.
+
+### Next steps
+
+1. Find where the beta shows the token or a client config (Preferences, AI Assistant panel).
+2. With the token, list the native tools and their schemas; record them here.
+3. Prototype: a UXP extension that answers `tools/list` and `tools/call` for one ae-mcp
+   operation through `postMCPResponse`. Then write the go/no-go ADR.
