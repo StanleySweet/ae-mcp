@@ -332,3 +332,18 @@ chunk of work; don't rewrite old entries — supersede them.
 - Open: **E11-7 / #126** is a `[HUMAN]` clean-Mac install test — instructions live
   in `docs/test-runs/clean-mac-install.md`; it needs a run on a clean Mac and its
   results committed, which an agent cannot do.
+
+## 2026-10-18 — AE crash from an environment light, #278 #279 #282 merged
+
+- AE 26.5 crashed at 10:50 rendering "GF Glass Pellet": an environment light with a
+  `lightSource` layer sent the render hash into an endless light ↔ source recursion.
+  Rule in `docs/findings/2026-10-18-environment-light-recursion-crash.md`;
+  `layer.add_light` now refuses `lightSource` (#282, 8033b527).
+- Merged agent branches: #278 (`ae_render_frame` `timeoutSeconds` and `draft`) and #279
+  (`batch.run` batch id, `batch.status`). `npm run check` green, pushed.
+- Recovered the Latent project from AE's auto-save into `~/Documents/Latent_v004.aep`.
+  The auto-save holds "GF Glass Pellet" with no layers, so the crashing setup is gone.
+- Open: #280/#281 agent still running. Live checks not done: `draft` may render at full
+  resolution if `saveFrameToPng` writes after the bridge restores `resolutionFactor`
+  (#278); the `batch.status` drive steps have not run against AE (#279). Next: test drive,
+  then release.
