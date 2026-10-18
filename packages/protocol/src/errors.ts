@@ -17,6 +17,7 @@ export const errorCodes = [
   'PLAN_EXPIRED',
   'PLAN_CHANGED',
   'DIALOG_OPEN',
+  'BATCH_ALREADY_APPLIED',
 ] as const;
 
 export type ErrorCode = (typeof errorCodes)[number];
@@ -43,6 +44,7 @@ export const errorHints: Record<ErrorCode, string> = {
   PLAN_EXPIRED: 'Plans expire after 10 minutes; call ae_plan again.',
   PLAN_CHANGED: 'The project changed since the plan; call ae_plan again.',
   DIALOG_OPEN: 'Dismiss the dialog with ae_dialogs, then retry.',
+  BATCH_ALREADY_APPLIED: 'Read the earlier result in details; retry only with a new batchId.',
 };
 
 /**
@@ -68,6 +70,8 @@ export const errorHintDetails: Record<ErrorCode, string> = {
   PLAN_CHANGED: 'The project changed since the plan was made; call ae_plan again to re-preview.',
   DIALOG_OPEN:
     'A dialog is open in After Effects; read it with ae_dialogs and dismiss it, or close it by hand, then retry.',
+  BATCH_ALREADY_APPLIED:
+    'A batch.run with this batchId already applied, so it was not run again. details.earlier holds its result; use a new batchId for a new batch.',
 };
 
 export const ERROR_HINTS_URI = 'ae-mcp://error-hints';

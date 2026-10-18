@@ -1,6 +1,7 @@
 import type { ErrorDetails, OperationCategory, OperationDefinition } from '@ae-mcp/protocol';
 import { registerAnimateOperations } from './operations-animate.js';
 import { registerAudioOperations } from './operations-audio.js';
+import { registerBatchOperations } from './operations-batch.js';
 import { registerBlendOperations } from './operations-blend.js';
 import { registerEvalOperations } from './operations-eval.js';
 import { registerHousekeepingOperations } from './operations-housekeeping.js';
@@ -789,7 +790,12 @@ export function defaultOperationRegistry(): OperationRegistry {
   register(
     operation('batch.run', 'batch', 'Run many operations as one undo group. It stops at the first failing step; earlier steps stay applied, and one Cmd+Z in After Effects reverts the whole batch (never undone by script, ADR-0009). A step argument string "$<n>.<field>" (e.g. "$0.index", "$2.layers[1]") takes that field from earlier step n\'s result. project.save, project.open, project.new and project.increment_save cannot run inside a batch; call them on their own.', {
       required: ['ops'],
-      schema: { ops: { type: 'array', items: { type: 'object' } }, atomic: { type: 'boolean' } },
+      schema: {
+        ops: { type: 'array', items: { type: 'object' } },
+        atomic: { type: 'boolean' },
+        // Optional id (1-64 of letters, digits, _ or -); the server generates one when absent (#279).
+        batchId: { type: 'string' },
+      },
     }),
   );
 
@@ -810,6 +816,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerLayerMoveOperations(register);
   registerBlendOperations(register);
   registerRenderOperations(register);
+  registerBatchOperations(register);
 
   return registry;
 }

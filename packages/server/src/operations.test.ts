@@ -119,6 +119,7 @@ const BRIDGE_OPS = [
   'project.reduce',
   'project.consolidate_footage',
   'batch.run',
+  'batch.status',
   'eval.run',
   'layer.move',
   'render.queue_remove',

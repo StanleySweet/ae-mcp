@@ -334,6 +334,9 @@ AEMCP.register('batch.run', function (args) {
         resolved = aemcpResolveRefs(sub.args, results, i, sub.op);
         outcome = resolved.ok ? aemcpRunHandler(sub.op, resolved.value) : { ok: false, issue: resolved.issue };
         if (!outcome.ok) {
+            // The failing step index, so the server can record it for batch.status (#279).
+            outcome.issue.details = outcome.issue.details || {};
+            outcome.issue.details.step = i;
             if (args.atomic !== false && changed) {
                 outcome.issue.message = 'batch stopped at ops[' + i + '] (' + sub.op + '): ' + outcome.issue.message;
                 outcome.issue.rollback = true;

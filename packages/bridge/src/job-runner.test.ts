@@ -225,6 +225,7 @@ describe('bridge batch.run', () => {
           code: 'SCRIPT_ERROR',
           message: 'batch stopped at ops[1] (a.boom): Error: kaboom',
           rollback: true,
+          details: { step: 1 },
         },
       });
       expect(ae.executedCommands).toEqual([]);

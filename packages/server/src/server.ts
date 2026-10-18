@@ -25,6 +25,7 @@ import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sd
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
 import { beginVerify, finishVerify } from './ae-do-verify.js';
+import { BatchLog, batchStatus, claimBatch, recordFromResult } from './batch-log.js';
 import { bridgeVersionWarning } from './bridge-version.js';
 import { isValidCheckpointName, readCheckpoints, saveCheckpoint } from './checkpoints.js';
 import { buildAeContext } from './context.js';
@@ -376,6 +377,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
   const userSnippets = loadUserSnippets(root, operations);
   registerUserSnippets(operations, userSnippets);
   const history = new HistoryLog(root);
+  // batch.run ids and batch.status (#279).
+  const batchLog = new BatchLog(root);
 
   /** Logs one bridge call so history_list and history_undo can name its undo group (#236). */
   const recordHistory = async (
@@ -1665,6 +1668,15 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (blocked) {
         return text(makeError(blocked.code, blocked.message, blocked.details), true);
       }
+      if (definition.name === 'batch.status') {
+        const answer = await batchStatus(batchLog, validation.args.batchId);
+        return answer.ok ? text(answer.body) : text(answer.error, true);
+      }
+      // An applied batchId is refused before anything runs; a failed one may run again (#279).
+      const batch = definition.name === 'batch.run' ? await claimBatch(batchLog, validation.args.batchId) : null;
+      if (batch && !batch.ok) {
+        return text(batch.error, true);
+      }
       // project.new with force on a saved, clean project discards nothing, so it skips the guard (E16-6).
       const discardsNothing = await projectNewDiscardsNothing(definition.name, validation.args, () => callRaw('project.info'));
       const needsIncrement =
@@ -1696,6 +1708,17 @@ export function createServer(options: ServerOptions = {}): McpServer {
           : null;
       const result = await callRaw(definition.name, bridgeArgs);
       await recordHistory(definition.name, validation.args, result);
+      if (batch?.ok) {
+        // The server records the outcome after the bridge answers (#279). A failed write only
+        // leaves batch.status unknown; the batch already ran, so it does not fail the call.
+        const record = recordFromResult(batch.batchId, result, new Date());
+        if (record !== null) {
+          await batchLog.record(record).catch(() => undefined);
+        }
+        if (!result.ok) {
+          result.error.details = { ...result.error.details, batchId: batch.batchId };
+        }
+      }
       if (definition.name === 'project.lint' && validation.args.fix === true && result.ok) {
         // fix: true applies only the findings marked safe, through the plan store (#244).
         return text({ result: result.result, fixes: await applyLintFixes(result.result) });
@@ -1717,6 +1740,12 @@ export function createServer(options: ServerOptions = {}): McpServer {
       };
       if (incrementInfo) {
         payload.increment = incrementInfo;
+      }
+      if (batch?.ok) {
+        payload.batchId = batch.batchId;
+        if (batch.previous?.outcome === 'failed') {
+          payload.retryOf = { outcome: 'failed', step: batch.previous.step, message: batch.previous.message };
+        }
       }
       const versionWarning = await bridgeVersionWarning(root, SERVER_VERSION);
       if (versionWarning !== undefined) {

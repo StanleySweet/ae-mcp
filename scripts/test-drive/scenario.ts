@@ -1042,6 +1042,20 @@ export const scenario: Step[] = [
       { op: 'property.get', args: { comp: s.comp, index: 1, name: OPACITY } },
     ],
   })),
+  // #279: the batch id from the good batch answers applied; a read-only check, no AE call.
+  op('batch.run.id', 'batch.run', (s) => ({
+    batchId: `drive-${s.prefix.replace(/[^A-Za-z0-9]/g, '')}`.slice(0, 64),
+    ops: [{ op: 'marker.add', args: { comp: s.comp, time: 4.5, comment: 'batch id' } }],
+  }), {
+    after: (result, state) => {
+      state.vars.batchId = payload(result).batchId;
+    },
+  }),
+  op('batch.status', 'batch.status', (s) => ({ batchId: s.vars.batchId }), {
+    after: (result) => {
+      if (!result.text.includes('"applied"')) throw new Error(`batch.status did not report applied: ${result.text.slice(0, 200)}`);
+    },
+  }),
   op(
     'batch.run.rollback',
     'batch.run',
