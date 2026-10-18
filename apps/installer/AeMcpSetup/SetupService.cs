@@ -65,6 +65,18 @@ public sealed class SetupService
             return new RepairResult(false, core.Checks, chosen.Notice);
         }
 
+        // The beta has its own Scripts/Startup: install the loader there too (#284).
+        var betaChecks = new List<InstallerCheck>();
+        foreach (var beta in environment.AfterEffects.Where(install => install.Beta && install.Path != resolved.Path))
+        {
+            var betaLoader = await InstallLoader.InstallAsync(beta, loader);
+            betaChecks.Add(betaLoader);
+            if (!betaLoader.IsOk)
+            {
+                return new RepairResult(false, [.. core.Checks, .. betaChecks], chosen.Notice);
+            }
+        }
+
         // A step can report success yet leave a missing or stale file, so re-read
         // both targets and compare them with the bundled content before going on.
         var verified = new[]
@@ -91,7 +103,7 @@ public sealed class SetupService
         }
 
         var extension = await InstallMcpb.HandToClaudeAsync(mcpbPath, environment.ClaudeDesktop);
-        var checks = new List<InstallerCheck>(core.Checks) { scriptingPref, extension };
+        var checks = new List<InstallerCheck>(core.Checks.Concat(betaChecks)) { scriptingPref, extension };
 
         // The bridge is installed, so prove it works even if the pref or extension
         // step reported a problem. The test needs a fresh heartbeat (the loader).

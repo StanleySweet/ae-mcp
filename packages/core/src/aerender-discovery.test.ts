@@ -25,6 +25,7 @@ describe('discoverAerenders', () => {
         appName: 'Adobe After Effects 2026',
         year: 2026,
         path: join(folder, 'Adobe After Effects 2026.app'),
+        beta: false,
         aerender: join(folder, 'aerender'),
       },
     ]);

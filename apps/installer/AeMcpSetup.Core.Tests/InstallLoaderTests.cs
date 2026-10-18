@@ -28,6 +28,21 @@ public class InstallLoaderTests
     }
 
     [Fact]
+    public async Task InstallsTheLoaderIntoTheBetaScriptsStartupToo()
+    {
+        var folder = TempDir.Create("ae-mcp-beta-");
+        var appPath = Path.Combine(folder, "Adobe After Effects (Beta).app");
+        Directory.CreateDirectory(appPath);
+        var beta = new AeInstall("Adobe After Effects (Beta)", 2027, appPath, Beta: true);
+
+        var result = await InstallLoader.InstallAsync(beta, Loader);
+
+        Assert.True(result.IsOk);
+        Assert.Equal(Path.Combine(folder, "Scripts", "Startup", InstallLoader.LoaderFileName), result.Path);
+        Assert.Equal(Loader, await File.ReadAllTextAsync(result.Path));
+    }
+
+    [Fact]
     public void ElevatedCopyCommandQuotesAndCreatesTheFolder()
     {
         Assert.Equal(

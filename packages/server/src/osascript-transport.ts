@@ -14,10 +14,12 @@ import {
   type JobMessage,
   type ResultMessage,
 } from '@ae-mcp/protocol';
+import { runningAeApp } from './ae-process.js';
 import { FileQueueTransport } from './file-queue-transport.js';
 import type { Transport } from './transport.js';
 
 const execFileAsync = promisify(execFile);
+const BETA_APP_NAME = 'Adobe After Effects (Beta)';
 
 export interface RunResult {
   stdout: string;
@@ -38,12 +40,16 @@ export function aeAppName(): string {
 
 /** The After Effects to script: `AE_APP_NAME`, else the newest install under
 `applicationsDir`, else the default name. A fixed default left AE 2026 users on
-the file-queue fallback (#179). */
-export async function resolveAeAppName(applicationsDir?: string): Promise<string> {
+the file-queue fallback (#179). Only the beta running (no stable) picks the beta (#284). */
+export async function resolveAeAppName(applicationsDir?: string, runner: Runner = defaultRunner): Promise<string> {
   if (process.env.AE_APP_NAME) {
     return process.env.AE_APP_NAME;
   }
-  const [newest] = await discoverAEVersions(applicationsDir);
+  const installs = await discoverAEVersions(applicationsDir);
+  if ((await runningAeApp(runner)) === 'beta') {
+    return installs.find((install) => install.beta)?.appName ?? BETA_APP_NAME;
+  }
+  const [newest] = installs.filter((install) => !install.beta);
   return newest?.appName ?? aeAppName();
 }
 

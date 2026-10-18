@@ -5,6 +5,11 @@ Claude can read and edit it. macOS only, After Effects 2025 and later. The
 versions that have been run against are listed in
 [`tested-versions.md`](tested-versions.md).
 
+The After Effects (Beta) app is supported too. Setup installs the loader in its
+`Scripts/Startup` as well, and when only the beta is running, ae-mcp works with
+it. If the stable app and the beta both run, ae-mcp uses the stable app; set
+`AE_APP_NAME` to `Adobe After Effects (Beta)` to force the beta.
+
 ## Install
 
 ### 1. Open the Setup app past Gatekeeper

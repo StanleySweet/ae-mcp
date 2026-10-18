@@ -186,6 +186,18 @@ describe('resolveAeAppName', () => {
     return dir;
   }
 
+  // pgrep fake: answers only for the names in `running`; a missing name exits 1 like pgrep.
+  function pgrepFake(running: Record<string, string>): Runner {
+    return async (_command, args) => {
+      const pid = running[args[1] ?? ''];
+      if (pid === undefined) {
+        throw Object.assign(new Error('exit 1'), { code: 1 });
+      }
+      return { stdout: `${pid}\n` };
+    };
+  }
+  const nothingRunning = pgrepFake({});
+
   async function withoutEnv<T>(run: () => Promise<T>): Promise<T> {
     const saved = process.env.AE_APP_NAME;
     delete process.env.AE_APP_NAME;
@@ -198,7 +210,25 @@ describe('resolveAeAppName', () => {
 
   it('targets the newest installed After Effects', async () => {
     const dir = await applications('Adobe After Effects 2025', 'Adobe After Effects 2026');
-    expect(await withoutEnv(() => resolveAeAppName(dir))).toBe('Adobe After Effects 2026');
+    expect(await withoutEnv(() => resolveAeAppName(dir, nothingRunning))).toBe('Adobe After Effects 2026');
+  });
+
+  it('targets the beta when only the beta process runs', async () => {
+    const dir = await applications('Adobe After Effects 2026', 'Adobe After Effects (Beta)');
+    const betaOnly = pgrepFake({ 'After Effects (Beta)': '777' });
+    expect(await withoutEnv(() => resolveAeAppName(dir, betaOnly))).toBe('Adobe After Effects (Beta)');
+  });
+
+  it('keeps the newest stable when both run', async () => {
+    const dir = await applications('Adobe After Effects 2026', 'Adobe After Effects (Beta)');
+    const both = pgrepFake({ 'After Effects': '1', 'After Effects (Beta)': '777' });
+    expect(await withoutEnv(() => resolveAeAppName(dir, both))).toBe('Adobe After Effects 2026');
+  });
+
+  it('keeps the newest stable when only stable runs, beta installed or not', async () => {
+    const dir = await applications('Adobe After Effects 2025', 'Adobe After Effects (Beta)');
+    const stableOnly = pgrepFake({ 'After Effects': '1' });
+    expect(await withoutEnv(() => resolveAeAppName(dir, stableOnly))).toBe('Adobe After Effects 2025');
   });
 
   it('lets AE_APP_NAME override the discovered install', async () => {
@@ -213,6 +243,6 @@ describe('resolveAeAppName', () => {
 
   it('falls back to the default name when nothing is installed', async () => {
     const dir = await applications();
-    expect(await withoutEnv(() => resolveAeAppName(dir))).toBe(aeAppName());
+    expect(await withoutEnv(() => resolveAeAppName(dir, nothingRunning))).toBe(aeAppName());
   });
 });
