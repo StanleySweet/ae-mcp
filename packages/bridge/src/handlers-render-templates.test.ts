@@ -48,10 +48,19 @@ describe('render.templates', () => {
   it('removes the temporary render queue item and never renders', async () => {
     const { ctx, ae } = await payloadContext();
     seedComp(ae, 'Main');
+    const added: { removed: boolean; rendered: boolean }[] = [];
+    const add = ae.project.renderQueue.items.add;
+    ae.project.renderQueue.items.add = (comp) => {
+      const item = add(comp);
+      added.push(item);
+      return item;
+    };
     invoke(ctx, 'render.templates', {});
-    expect(ae.project.renderQueue.numItems).toBe(1);
-    expect(ae.project.renderQueue.item(1)?.removed).toBe(true);
-    expect(ae.project.renderQueue.item(1)?.rendered).toBe(false);
+    // RenderQueueItem.remove takes the item out of the queue, so the queue is empty again.
+    expect(ae.project.renderQueue.numItems).toBe(0);
+    expect(added).toHaveLength(1);
+    expect(added[0]!.removed).toBe(true);
+    expect(added[0]!.rendered).toBe(false);
     expect(ae.project.renderQueue.rendering).toBe(false);
   });
 
@@ -59,8 +68,14 @@ describe('render.templates', () => {
     const { ctx, ae } = await payloadContext();
     seedComp(ae, 'Main');
     const other = seedComp(ae, 'Other');
+    const comps: unknown[] = [];
+    const add = ae.project.renderQueue.items.add;
+    ae.project.renderQueue.items.add = (comp) => {
+      comps.push(comp);
+      return add(comp);
+    };
     expect(invoke(ctx, 'render.templates', { comp: 'Other' }).ok).toBe(true);
-    expect(ae.project.renderQueue.item(1)?.comp).toBe(other);
+    expect(comps).toEqual([other]);
     const missing = invoke(ctx, 'render.templates', { comp: 'Nope' });
     expect(missing.ok).toBe(false);
     expect(missing.issue?.code).toBe('INVALID_ARGS');
