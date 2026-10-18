@@ -157,11 +157,12 @@ The mode is set by `backupMode` in `~/.ae-mcp/settings.json`:
 Environment overrides: `AE_MCP_BACKUP_MODE` and `AE_MCP_BACKUP_KEEP`. The older
 `incrementBeforeDestructive` setting still works: `false` means `off`, `true` means `increment`,
 and `backupMode` wins when both are set. The effective values are listed by `check_setup`
-(row `settings`). Claude has no tool to change them; use the settings file or the environment.
+(row `settings`). Claude has no tool to change them; use the Settings section of the Claude for
+After Effects panel, the settings file or the environment.
 
 A destructive operation returns the copy it made as `increment.backupFile` (for `ae_do` and
-`ae_apply`) or `backupFile` (for `checkpoint_revert`). The field `incrementedFile` is no longer
-returned, because no numbered copy is made any more.
+`ae_apply`) or `backupFile` (for `checkpoint_revert`). `incrementedFile` is still returned with
+the same path for older callers; read `backupFile` in new code.
 
 A project that was never saved and has content is refused with `UNSAVED_PROJECT`: save it once
 first. An empty untitled project proceeds without a backup.
