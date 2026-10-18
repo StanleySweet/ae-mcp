@@ -3,6 +3,14 @@
 Append-only progress log. Newest entry first. One entry per session or per landed
 chunk of work; don't rewrite old entries — supersede them.
 
+## 2026-10-18 (night)
+
+- **`chore(release): v1.9.1`**: ships #264.
+  - The Claude panel docks when opened from the Window menu (the panel is the script's `this`); run another way it opens as a palette.
+  - Closed #238 after a live replay check, #249 (UXP) as not wanted, epic E15. No open issues left.
+  - Test drive: 213 passed, 0 failed, 8 skipped.
+  - Open: a human check that the panel docks in AE after a restart.
+
 ## 2026-10-18 (evening)
 
 - **`chore(release): v1.9.0`**: ships #283, #284, #285, #286, #287.
