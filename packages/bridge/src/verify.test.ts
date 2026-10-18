@@ -166,6 +166,32 @@ describe('property.sample', () => {
     ]);
   });
 
+  it('addresses the layer by name or {id}, not only by index', async () => {
+    const { ctx, comp } = await sceneContext();
+    const opacity = transformProp(comp, 2, 'ADBE Opacity');
+    opacity.key(0, 0);
+    opacity.key(1, 100);
+    const layerId = (comp.layer(2) as unknown as { id: number }).id;
+
+    const byName = invoke<{ samples: { time: number; value: unknown }[] }>(ctx, 'property.sample', {
+      comp: 'Main',
+      layer: 'Title',
+      property: 'ADBE Opacity',
+      times: [1],
+    });
+    const byId = invoke<{ samples: { time: number; value: unknown }[] }>(ctx, 'property.sample', {
+      comp: 'Main',
+      layer: { id: layerId },
+      property: 'ADBE Opacity',
+      times: [1],
+    });
+
+    expect(byName.ok).toBe(true);
+    expect(byName.value?.samples).toEqual([{ time: 1, value: 100 }]);
+    expect(byId.ok).toBe(true);
+    expect(byId.value?.samples).toEqual([{ time: 1, value: 100 }]);
+  });
+
   it('aborts with INVALID_ARGS when times is empty', async () => {
     const { ctx } = await sceneContext();
 

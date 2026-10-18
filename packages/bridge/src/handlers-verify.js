@@ -194,13 +194,9 @@ AEMCP.register('comp.diff', function (args) {
 
 AEMCP.register('property.sample', function (args) {
     var comp = aemcpRequireComp(args && args.comp);
-    var index = args ? args.index : null;
     var times = args ? args.times : null;
     var i, layer, prop, value, samples = [];
-    if (typeof index !== 'number' || index !== Math.floor(index) || index < 1 || index > comp.numLayers) {
-        aemcpAbortArgs('layer not found: ' + index);
-    }
-    layer = comp.layer(index);
+    layer = aemcpRequireLayer(comp, args);
     if (!args || typeof args.property !== 'string' || args.property === '') {
         aemcpAbortArgs('property is required');
     }
