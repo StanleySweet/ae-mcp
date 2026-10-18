@@ -25,6 +25,7 @@ import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sd
 import { z } from 'zod';
 import { createAEClient, type AEClient } from './ae-client.js';
 import { beginVerify, finishVerify } from './ae-do-verify.js';
+import { copyToBackups } from './backup.js';
 import { BatchLog, batchStatus, claimBatch, recordFromResult } from './batch-log.js';
 import { bridgeVersionWarning } from './bridge-version.js';
 import { isValidCheckpointName, readCheckpoints, saveCheckpoint } from './checkpoints.js';
@@ -428,42 +429,62 @@ export function createServer(options: ServerOptions = {}): McpServer {
     return client.call(tool, args);
   };
 
-  // The E13 guard: Increment and Save before a destructive operation. The bridge
-  // raises UNSAVED_PROJECT for a never-saved project (#181); any other failure is
-  // surfaced with its real message (#161).
-  const incrementBeforeDestructive = async (
+  // The E13 guard (ADR-0012): before a destructive operation, save the project in place
+  // (project.save, the open file name is kept) and copy it to the backup folder. A
+  // never-saved project is refused (#181); an empty untitled one proceeds (#204); any
+  // other failure is surfaced with its real message (#161).
+  const backupBeforeDestructive = async (
     op: string,
+    settings: Settings,
   ): Promise<
     { ok: true; info: Record<string, unknown> | null } | { ok: false; result: ToolResult }
   > => {
-    const increment = await callRaw('project.increment_save');
-    if (!increment.ok) {
-      if (increment.error.code === 'UNSAVED_PROJECT') {
-        return {
-          ok: false,
-          result: text(
-            makeError('UNSAVED_PROJECT', `operation '${op}' is destructive and the project has never been saved`),
-            true,
-          ),
-        };
+    if (settings.backupMode === 'off') {
+      return { ok: true, info: null };
+    }
+    const refuseUnsaved = {
+      ok: false as const,
+      result: text(
+        makeError('UNSAVED_PROJECT', `operation '${op}' is destructive and the project has never been saved`),
+        true,
+      ),
+    };
+    const saved = await callRaw('project.save');
+    if (!saved.ok) {
+      if (saved.error.code === 'UNSAVED_PROJECT') {
+        return refuseUnsaved;
+      }
+      if (saved.error.code === 'INVALID_ARGS' && /never been saved/.test(saved.error.message)) {
+        const info = await callRaw('project.info');
+        const numItems = info.ok ? (info.result as { numItems?: unknown } | null)?.numItems : undefined;
+        return numItems === 0 ? { ok: true, info: null } : refuseUnsaved;
       }
       return {
         ok: false,
         result: text(
-          makeError(
-            'SCRIPT_ERROR',
-            `operation '${op}' is destructive and the pre-increment save failed: ${increment.error.message}`,
-          ),
+          makeError('SCRIPT_ERROR', `operation '${op}' is destructive and the pre-operation save failed: ${saved.error.message}`),
           true,
         ),
       };
     }
-    const saved = increment.result as { file?: unknown } | null;
-    if (typeof saved?.file !== 'string') {
+    const file = (saved.result as { file?: unknown } | null)?.file;
+    if (typeof file !== 'string') {
       return { ok: true, info: null };
     }
-    await persistSavedVersionPath(root, saved.file);
-    return { ok: true, info: { incrementedFile: saved.file } };
+    let backupFile: string | null;
+    try {
+      backupFile = await copyToBackups(root, file, settings.backupMode, settings.backupKeep);
+    } catch (error) {
+      return {
+        ok: false,
+        result: text(
+          makeError('SCRIPT_ERROR', `operation '${op}' is destructive and the backup copy failed: ${(error as Error).message}`),
+          true,
+        ),
+      };
+    }
+    await persistSavedVersionPath(root, file);
+    return { ok: true, info: backupFile === null ? null : { backupFile } };
   };
 
   const jobStore = options.jobStore ?? new JobStore();
@@ -580,6 +601,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
         // template.user is answered by the server, not the bridge.
         expectedOperations: operations.names().filter((name) => name !== TEMPLATE_OP),
         snippetProblems: loadUserSnippets(root, operations).problems,
+        settings: await getSettings(),
         expectedBridgeVersion: SERVER_VERSION,
         serverVersion: SERVER_VERSION,
         updateCheck: options.updateCheck,
@@ -782,7 +804,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       if (!checkpoint) {
         return text(makeError('INVALID_ARGS', `unknown checkpoint: ${args.name}`), true);
       }
-      const guard = await incrementBeforeDestructive('checkpoint_revert');
+      const guard = await backupBeforeDestructive('checkpoint_revert', settings);
       if (!guard.ok) {
         return guard.result;
       }
@@ -793,7 +815,7 @@ export function createServer(options: ServerOptions = {}): McpServer {
       return text({
         name: checkpoint.name,
         file: checkpoint.file,
-        incrementedFile: guard.info?.incrementedFile ?? null,
+        backupFile: guard.info?.backupFile ?? null,
         opened: opened.result,
       });
     },
@@ -1700,13 +1722,13 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const needsIncrement =
         (definition.destructive && !discardsNothing) ||
         (definition.name === 'batch.run' && batchHasDestructive(operations, validation.args.ops));
-      let incrementInfo: Record<string, unknown> | null = null;
-      if (needsIncrement && settings.incrementBeforeDestructive) {
-        const increment = await incrementBeforeDestructive(toolArgs.op);
-        if (!increment.ok) {
-          return increment.result;
+      let backupInfo: Record<string, unknown> | null = null;
+      if (needsIncrement) {
+        const backup = await backupBeforeDestructive(toolArgs.op, settings);
+        if (!backup.ok) {
+          return backup.result;
         }
-        incrementInfo = increment.info;
+        backupInfo = backup.info;
       }
       // The bridge undoes only after a step that changes the project, so the
       // flags come from the registry, never from the client.
@@ -1756,8 +1778,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
       const payload: Record<string, unknown> = {
         result: readsValues && toolArgs.full !== true ? truncateLongStrings(result.result) : result.result,
       };
-      if (incrementInfo) {
-        payload.increment = incrementInfo;
+      if (backupInfo) {
+        payload.increment = backupInfo;
       }
       if (batch?.ok) {
         payload.batchId = batch.batchId;
@@ -1848,14 +1870,14 @@ export function createServer(options: ServerOptions = {}): McpServer {
 
     const stepDefinition = operations.get(step.op);
     const settings = await getSettings();
-    const needsIncrement = stepDefinition?.destructive === true && settings.incrementBeforeDestructive;
-    let incrementInfo: Record<string, unknown> | null = null;
-    if (needsIncrement) {
-      const increment = await incrementBeforeDestructive(step.op);
-      if (!increment.ok) {
-        return { ok: false, result: increment.result };
+    const needsBackup = stepDefinition?.destructive === true;
+    let backupInfo: Record<string, unknown> | null = null;
+    if (needsBackup) {
+      const backup = await backupBeforeDestructive(step.op, settings);
+      if (!backup.ok) {
+        return { ok: false, result: backup.result };
       }
-      incrementInfo = increment.info;
+      backupInfo = backup.info;
     }
 
     const result = await callRaw(step.op, { ...step.args, dryRun: false });
@@ -1864,8 +1886,8 @@ export function createServer(options: ServerOptions = {}): McpServer {
       return { ok: false, result: toResult(result) };
     }
     const payload: Record<string, unknown> = { planId, op: step.op, result: result.result };
-    if (incrementInfo) {
-      payload.increment = incrementInfo;
+    if (backupInfo) {
+      payload.increment = backupInfo;
     }
     return { ok: true, value: payload };
   };

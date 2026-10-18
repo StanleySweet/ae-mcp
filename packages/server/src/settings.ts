@@ -3,11 +3,18 @@ import { join } from 'node:path';
 import { queueRoot } from '@ae-mcp/protocol';
 import { z } from 'zod';
 
+/** What a destructive operation saves first: one backup file, a timestamped copy per call, or nothing (ADR-0012). */
+export const BACKUP_MODES = ['single', 'increment', 'off'] as const;
+export type BackupMode = (typeof BACKUP_MODES)[number];
+
 export const settingsSchema = z
   .object({
     readOnly: z.boolean().optional(),
     allowedCategories: z.array(z.string()).nullable().optional(),
     evalEnabled: z.boolean().optional(),
+    backupMode: z.enum(BACKUP_MODES).optional(),
+    backupKeep: z.number().int().positive().optional(),
+    /** Legacy switch (before ADR-0012): false maps to "off", true to "increment". */
     incrementBeforeDestructive: z.boolean().optional(),
   })
   .strict();
@@ -16,14 +23,16 @@ export interface Settings {
   readOnly: boolean;
   allowedCategories: string[] | null;
   evalEnabled: boolean;
-  incrementBeforeDestructive: boolean;
+  backupMode: BackupMode;
+  backupKeep: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   readOnly: false,
   allowedCategories: null,
   evalEnabled: false,
-  incrementBeforeDestructive: true,
+  backupMode: 'single',
+  backupKeep: 5,
 };
 
 export function settingsPath(root: string): string {
@@ -35,6 +44,47 @@ function envBool(value: string | undefined, fallback: boolean): boolean {
     return fallback;
   }
   return value === '1' || value.toLowerCase() === 'true';
+}
+
+function legacyMode(enabled: boolean): BackupMode {
+  return enabled ? 'increment' : 'off';
+}
+
+function parseBackupMode(value: string, source: string): BackupMode {
+  if ((BACKUP_MODES as readonly string[]).includes(value)) {
+    return value as BackupMode;
+  }
+  throw new Error(`${source} must be one of ${BACKUP_MODES.join(', ')}, got "${value}"`);
+}
+
+function parseBackupKeep(value: string, source: string): number {
+  if (!/^[1-9]\d*$/.test(value)) {
+    throw new Error(`${source} must be a positive whole number, got "${value}"`);
+  }
+  return Number(value);
+}
+
+/**
+ * Precedence: AE_MCP_BACKUP_MODE, then the legacy AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE,
+ * then backupMode in settings.json, then the legacy incrementBeforeDestructive, then "single".
+ */
+function resolveBackupMode(
+  file: z.infer<typeof settingsSchema>,
+  env: Record<string, string | undefined>,
+): BackupMode {
+  if (env.AE_MCP_BACKUP_MODE) {
+    return parseBackupMode(env.AE_MCP_BACKUP_MODE, 'AE_MCP_BACKUP_MODE');
+  }
+  if (env.AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE) {
+    return legacyMode(envBool(env.AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE, true));
+  }
+  if (file.backupMode !== undefined) {
+    return file.backupMode;
+  }
+  if (file.incrementBeforeDestructive !== undefined) {
+    return legacyMode(file.incrementBeforeDestructive);
+  }
+  return DEFAULT_SETTINGS.backupMode;
 }
 
 export async function loadSettings(
@@ -64,9 +114,9 @@ export async function loadSettings(
           ? null
           : categories.split(','),
     evalEnabled: envBool(env.AE_MCP_EVAL_ENABLED, fromFile.evalEnabled ?? DEFAULT_SETTINGS.evalEnabled),
-    incrementBeforeDestructive: envBool(
-      env.AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE,
-      fromFile.incrementBeforeDestructive ?? DEFAULT_SETTINGS.incrementBeforeDestructive,
-    ),
+    backupMode: resolveBackupMode(fromFile, env),
+    backupKeep: env.AE_MCP_BACKUP_KEEP
+      ? parseBackupKeep(env.AE_MCP_BACKUP_KEEP, 'AE_MCP_BACKUP_KEEP')
+      : (fromFile.backupKeep ?? DEFAULT_SETTINGS.backupKeep),
   };
 }

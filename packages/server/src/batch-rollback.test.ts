@@ -19,7 +19,7 @@ async function connect(batchError: Record<string, unknown>): Promise<{ client: C
   };
   const server = createServer({
     client: aeClient,
-    settings: { ...DEFAULT_SETTINGS, incrementBeforeDestructive: false },
+    settings: { ...DEFAULT_SETTINGS, backupMode: 'off' },
   });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);

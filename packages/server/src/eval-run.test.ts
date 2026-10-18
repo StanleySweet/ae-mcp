@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,9 +29,11 @@ async function connectServer(calls: string[], settings: Settings): Promise<Harne
   project.addComp('Main', 1920, 1080);
   const handlers = {
     ...observeHandlers(project),
-    'project.increment_save': () => {
-      calls.push('project.increment_save');
-      return { success: true, file: '/projects/P_v008.aep' };
+    'project.save': () => {
+      calls.push('project.save');
+      const file = join(root, 'P.aep');
+      writeFileSync(file, 'aep');
+      return { file };
     },
     'eval.run': (args: unknown) => {
       calls.push('eval.run');
@@ -109,6 +112,6 @@ describe('eval.run policy gate with the default registry', () => {
 
     const result = await callDo(client, 'eval.run', { code: '1+1' });
     expect(result.isError).toBe(false);
-    expect(calls).toEqual(['project.increment_save', 'eval.run']);
+    expect(calls).toEqual(['project.save', 'eval.run']);
   });
 });

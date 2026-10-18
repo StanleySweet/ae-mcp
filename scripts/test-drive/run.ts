@@ -96,7 +96,7 @@ __out.close();`,
 
   const server = createServer({
     root: queueRoot(),
-    settings: { ...DEFAULT_SETTINGS, incrementBeforeDestructive: false, evalEnabled: false },
+    settings: { ...DEFAULT_SETTINGS, backupMode: 'off', evalEnabled: false },
     instructions: '',
   });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();

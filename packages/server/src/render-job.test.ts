@@ -388,7 +388,8 @@ describe('ae_render / job_status', () => {
         readOnly: true,
         allowedCategories: null,
         evalEnabled: false,
-        incrementBeforeDestructive: true,
+        backupMode: 'single',
+        backupKeep: 5,
       },
     });
     const result = (await harness.client.callTool({

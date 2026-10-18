@@ -33,7 +33,7 @@ async function connect(root: string, replies: Reply[] = []): Promise<Harness> {
   const server = createServer({
     root,
     client: aeClient,
-    settings: { ...DEFAULT_SETTINGS, incrementBeforeDestructive: false },
+    settings: { ...DEFAULT_SETTINGS, backupMode: 'off' },
   });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   await server.connect(serverTransport);

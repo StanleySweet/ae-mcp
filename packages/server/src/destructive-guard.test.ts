@@ -1,3 +1,4 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -49,7 +50,8 @@ function settings(overrides: Partial<Settings> = {}): Settings {
     readOnly: false,
     allowedCategories: null,
     evalEnabled: false,
-    incrementBeforeDestructive: true,
+    backupMode: 'single',
+    backupKeep: 5,
     ...overrides,
   };
 }
@@ -73,13 +75,20 @@ async function connectServer(
 
   const handlers: Record<string, (args?: unknown) => unknown> = {
     ...observeHandlers(project),
-    'project.increment_save': () => {
-      calls.push('project.increment_save');
+    'project.save': () => {
+      calls.push('project.save');
       // The bridge raises UNSAVED_PROJECT / other errors instead of returning them (#181).
       if (options.incrementResult instanceof Error) {
         throw options.incrementResult;
       }
-      return options.incrementResult ?? { success: true, file: '/projects/P_v008.aep' };
+      if (options.incrementResult !== undefined) {
+        return options.incrementResult;
+      }
+      // project.save saves in place: the guard copies this real file into the backup folder.
+      const file = join(home, 'projects', 'P.aep');
+      mkdirSync(join(home, 'projects'), { recursive: true });
+      writeFileSync(file, 'aep');
+      return { file };
     },
     'layer.rename': (args: unknown) => {
       calls.push('layer.rename');
@@ -154,7 +163,7 @@ describe('E13-3 destructive guard', () => {
 
     const result = await call(client, 'layer.delete', { index: 1 });
     expect(result.isError).toBe(false);
-    expect(calls).toEqual(['project.increment_save', 'layer.delete']);
+    expect(calls).toEqual(['project.save', 'layer.delete']);
   });
 
   it('does not increment before a non-destructive operation', async () => {
@@ -178,7 +187,7 @@ describe('E13-3 destructive guard', () => {
     expect(result.isError).toBe(true);
     const error = errorSchema.parse(JSON.parse(result.text));
     expect(error.code).toBe('UNSAVED_PROJECT');
-    expect(calls).toEqual(['project.increment_save']);
+    expect(calls).toEqual(['project.save']);
   });
 
   it('surfaces the real increment error instead of blaming an unsaved project', async () => {
@@ -193,13 +202,13 @@ describe('E13-3 destructive guard', () => {
     const error = errorSchema.parse(JSON.parse(result.text));
     expect(error.code).toBe('SCRIPT_ERROR');
     expect(error.message).toContain('the installed bridge payload is stale');
-    expect(calls).toEqual(['project.increment_save']);
+    expect(calls).toEqual(['project.save']);
   });
 
-  it('skips the increment when incrementBeforeDestructive is off', async () => {
+  it('skips the backup when backupMode is off', async () => {
     const calls: string[] = [];
     const { client, close } = await connectServer(project(), calls, {
-      settings: settings({ incrementBeforeDestructive: false }),
+      settings: settings({ backupMode: 'off' }),
     });
     closes.push(close);
 
@@ -220,7 +229,7 @@ describe('E13-3 destructive guard', () => {
       ],
     });
     expect(result.isError).toBe(false);
-    expect(calls).toEqual(['project.increment_save', 'batch.run']);
+    expect(calls).toEqual(['project.save', 'batch.run']);
   });
 
   it('sends server-computed mutating flags with batch.run', async () => {
@@ -270,7 +279,7 @@ describe('E13-3 destructive guard', () => {
       ],
     });
     expect(result.isError).toBe(false);
-    expect(calls).toEqual(['project.increment_save', 'batch.run']);
+    expect(calls).toEqual(['project.save', 'batch.run']);
   });
 
   it('does not increment for a batch.run without destructive sub-operations', async () => {
@@ -298,10 +307,10 @@ describe('E13-3 destructive guard', () => {
     expect(result.isError).toBe(true);
     const error = errorSchema.parse(JSON.parse(result.text));
     expect(error.code).toBe('UNSAVED_PROJECT');
-    expect(calls).toEqual(['project.increment_save']);
+    expect(calls).toEqual(['project.save']);
   });
 
-  it('increments before applying a destructive bulk plan', async () => {
+  it('backs up before applying a destructive bulk plan', async () => {
     const calls: string[] = [];
     const registryWithBulk = registry();
     registryWithBulk.register({
@@ -319,9 +328,12 @@ describe('E13-3 destructive guard', () => {
 
     const handlers = {
       ...observeHandlers(project()),
-      'project.increment_save': () => {
-        calls.push('project.increment_save');
-        return { success: true, file: '/projects/P_v008.aep' };
+      'project.save': () => {
+        calls.push('project.save');
+        const file = join(home, 'projects', 'P.aep');
+        mkdirSync(join(home, 'projects'), { recursive: true });
+        writeFileSync(file, 'aep');
+        return { file };
       },
       'bulk.remove_unused': (args: unknown) => {
         calls.push('bulk.remove_unused');
@@ -359,10 +371,10 @@ describe('E13-3 destructive guard', () => {
     expect(calls).toEqual([
       'bulk.remove_unused',
       'bulk.remove_unused',
-      'project.increment_save',
+      'project.save',
       'bulk.remove_unused',
     ]);
-    expect(appliedPayload.increment).toEqual({ incrementedFile: '/projects/P_v008.aep' });
+    expect(appliedPayload.increment).toEqual({ backupFile: join(home, '.ae-mcp', 'backups', 'P', 'P.backup.aep') });
 
     await client.close();
     await server.close();
@@ -387,8 +399,8 @@ describe('E13-3 destructive guard', () => {
 
     const handlers = {
       ...observeHandlers(project()),
-      'project.increment_save': () => {
-        calls.push('project.increment_save');
+      'project.save': () => {
+        calls.push('project.save');
         throw new HandlerError('UNSAVED_PROJECT', 'project has never been saved');
       },
       'bulk.remove_unused': (args: unknown) => {
@@ -423,7 +435,7 @@ describe('E13-3 destructive guard', () => {
     expect(applied.isError).toBe(true);
     const error = errorSchema.parse(JSON.parse((applied.content as Array<{ type: string; text: string }>)[0]!.text));
     expect(error.code).toBe('UNSAVED_PROJECT');
-    expect(calls).toEqual(['bulk.remove_unused', 'bulk.remove_unused', 'project.increment_save']);
+    expect(calls).toEqual(['bulk.remove_unused', 'bulk.remove_unused', 'project.save']);
 
     await client.close();
     await server.close();
@@ -449,8 +461,8 @@ describe('E13-3 destructive guard', () => {
 
     const handlers: Record<string, (args?: unknown) => unknown> = {
       ...observeHandlers(proj),
-      'project.increment_save': () => {
-        calls.push('project.increment_save');
+      'project.save': () => {
+        calls.push('project.save');
         throw new HandlerError('UNSAVED_PROJECT', 'project has never been saved');
       },
       'layer.rename': (args: unknown) => {
@@ -494,7 +506,7 @@ describe('E13-3 destructive guard', () => {
     expect(result.isError).toBe(true);
     const error = errorSchema.parse(JSON.parse(result.text));
     expect(error.code).toBe('UNSAVED_PROJECT');
-    expect(calls).toEqual(['project.increment_save']);
+    expect(calls).toEqual(['project.save']);
   });
 });
 
@@ -507,7 +519,7 @@ describe('E13-5 saved version path reporting', () => {
     }
   });
 
-  it('ae_do includes increment.incrementedFile and persists the path for check_setup', async () => {
+  it('ae_do includes increment.backupFile and persists the saved project path for check_setup', async () => {
     const calls: string[] = [];
     const { client, close, home } = await connectServer(project(), calls);
     closes.push(close);
@@ -515,10 +527,10 @@ describe('E13-5 saved version path reporting', () => {
     const result = await call(client, 'layer.delete', { index: 1 });
     expect(result.isError).toBe(false);
     const parsed = JSON.parse(result.text);
-    expect(parsed.increment).toEqual({ incrementedFile: '/projects/P_v008.aep' });
+    expect(parsed.increment).toEqual({ backupFile: join(home, '.ae-mcp', 'backups', 'P', 'P.backup.aep') });
 
     const savedVersion = await readFile(join(home, '.ae-mcp', 'bridge', 'last-saved-version'), 'utf8');
-    expect(savedVersion.trim()).toBe('/projects/P_v008.aep');
+    expect(savedVersion.trim()).toBe(join(home, 'projects', 'P.aep'));
   });
 
   // An empty untitled project is skipped by the bridge with file: null (#204): the
@@ -533,7 +545,7 @@ describe('E13-5 saved version path reporting', () => {
     const result = await call(client, 'layer.delete', { index: 1 });
     expect(result.isError).toBe(false);
     expect(JSON.parse(result.text).increment).toBeUndefined();
-    expect(calls).toEqual(['project.increment_save', 'layer.delete']);
+    expect(calls).toEqual(['project.save', 'layer.delete']);
   });
 });
 
@@ -593,7 +605,7 @@ describe('E16-6 project.new with force', () => {
 
     const result = await call(client, 'project.new', { force: true });
     expect(result.isError).toBe(false);
-    expect(calls).toEqual(['project.increment_save']);
+    expect(calls).toEqual(['project.save']);
   });
 
   it('keeps refusing when a never-saved project has content', async () => {
@@ -608,7 +620,7 @@ describe('E16-6 project.new with force', () => {
     const result = await call(client, 'project.new', { force: true });
     expect(result.isError).toBe(true);
     expect(errorSchema.parse(JSON.parse(result.text)).code).toBe('UNSAVED_PROJECT');
-    expect(calls).toEqual(['project.increment_save']);
+    expect(calls).toEqual(['project.save']);
   });
 
   it('keeps the guard without force', async () => {
@@ -620,7 +632,7 @@ describe('E16-6 project.new with force', () => {
     closes.push(close);
 
     await call(client, 'project.new', {});
-    expect(calls).toEqual(['project.increment_save']);
+    expect(calls).toEqual(['project.save']);
   });
 });
 
@@ -666,8 +678,8 @@ describe('E13-6 guard cannot be bypassed', () => {
 
     const result = await call(client, 'eval.run', { code: '1+1' });
     expect(result.isError).toBe(false);
-    expect(calls).toEqual(['project.increment_save', 'eval.run']);
-    expect(JSON.parse(result.text).increment).toEqual({ incrementedFile: '/projects/P_v008.aep' });
+    expect(calls).toEqual(['project.save', 'eval.run']);
+    expect(JSON.parse(result.text).increment).toEqual({ backupFile: expect.stringMatching(/P\.backup\.aep$/) });
   });
 
   it('cannot smuggle a destructive eval.run through batch.run', async () => {
@@ -683,7 +695,7 @@ describe('E13-6 guard cannot be bypassed', () => {
       ops: [{ op: 'eval.run', args: { code: '1+1' } }],
     });
     expect(result.isError).toBe(false);
-    expect(calls).toEqual(['project.increment_save', 'batch.run']);
+    expect(calls).toEqual(['project.save', 'batch.run']);
   });
 
   it('cannot smuggle a destructive eval.run through batch.run when the project is unsaved', async () => {
@@ -702,6 +714,36 @@ describe('E13-6 guard cannot be bypassed', () => {
     expect(result.isError).toBe(true);
     const error = errorSchema.parse(JSON.parse(result.text));
     expect(error.code).toBe('UNSAVED_PROJECT');
-    expect(calls).toEqual(['project.increment_save']);
+    expect(calls).toEqual(['project.save']);
+  });
+
+  // The bridge's project.save refuses a never-saved project with INVALID_ARGS (no path given).
+  // The guard asks project.info: items mean UNSAVED_PROJECT, an empty untitled project proceeds (#204).
+  it('refuses a destructive op on a never-saved project with items when project.save says so', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      incrementResult: new HandlerError('INVALID_ARGS', 'project has never been saved: pass path'),
+      extraHandlers: { 'project.info': () => ({ numItems: 1 }) },
+    });
+    closes.push(close);
+
+    const result = await call(client, 'layer.delete', { index: 1 });
+    expect(result.isError).toBe(true);
+    expect(errorSchema.parse(JSON.parse(result.text)).code).toBe('UNSAVED_PROJECT');
+    expect(calls).toEqual(['project.save']);
+  });
+
+  it('runs a destructive op on an empty untitled project when project.save says it was never saved', async () => {
+    const calls: string[] = [];
+    const { client, close } = await connectServer(project(), calls, {
+      incrementResult: new HandlerError('INVALID_ARGS', 'project has never been saved: pass path'),
+      extraHandlers: { 'project.info': () => ({ numItems: 0 }) },
+    });
+    closes.push(close);
+
+    const result = await call(client, 'layer.delete', { index: 1 });
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.text).increment).toBeUndefined();
+    expect(calls).toEqual(['project.save', 'layer.delete']);
   });
 });

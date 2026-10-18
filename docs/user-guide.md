@@ -143,16 +143,31 @@ installs and the paths ae-mcp uses, which is what to attach to a bug report.
 ## Destructive operations
 
 Some operations delete, replace or overwrite project data, or make a change that a single
-undo cannot reverse. Before any of them runs, ae-mcp saves a checkpoint with File > Increment
-and Save, so the file on disk keeps the state from just before the change
-(`MyProject_v007.aep` becomes `MyProject_v008.aep`).
+undo cannot reverse. Before any of them runs, ae-mcp saves the open project in place (the same
+as Cmd+S, so its file name does not change) and copies the saved file to a backup folder:
+`~/.ae-mcp/backups/<project name>/`. Backups never sit next to the project.
 
-The guard is on when `incrementBeforeDestructive` is enabled, which is the default. The
-setting is owned by the Setup app and Claude cannot change it; the environment variable
-`AE_MCP_INCREMENT_BEFORE_DESTRUCTIVE` overrides it.
+The mode is set by `backupMode` in `~/.ae-mcp/settings.json`:
+
+- `single` (default): one copy, `<name>.backup.aep`, overwritten on each destructive operation.
+- `increment`: a timestamped copy per operation, `<name>-YYYYMMDD-HHMMSS.aep`. The newest
+  `backupKeep` (default 5) are kept; older ones are deleted.
+- `off`: no backup, no save.
+
+Environment overrides: `AE_MCP_BACKUP_MODE` and `AE_MCP_BACKUP_KEEP`. The older
+`incrementBeforeDestructive` setting still works: `false` means `off`, `true` means `increment`,
+and `backupMode` wins when both are set. The effective values are listed by `check_setup`
+(row `settings`). Claude has no tool to change them; use the settings file or the environment.
+
+A destructive operation returns the copy it made as `increment.backupFile` (for `ae_do` and
+`ae_apply`) or `backupFile` (for `checkpoint_revert`). The field `incrementedFile` is no longer
+returned, because no numbered copy is made any more.
+
+A project that was never saved and has content is refused with `UNSAVED_PROJECT`: save it once
+first. An empty untitled project proceeds without a backup.
 
 `project.new` with `force: true` is the exception: when the open project has a file on disk and
-no unsaved changes, there is nothing to lose, so no increment save is made. With unsaved changes,
+no unsaved changes, there is nothing to lose, so no backup is made. With unsaved changes,
 or a project that was never saved and has content, the guard runs as usual.
 
 Render queue cleanup: `render.queue_remove {index}` removes one queue item, `{all: true}` empties
@@ -168,10 +183,10 @@ Operations flagged destructive:
 - `bulk.remove_unused` — a bulk plan that removes or replaces items
 - `eval.run` — arbitrary ExtendScript, always destructive and off unless explicitly enabled
 
-The guard makes one incremental save per call, per `batch.run`, and per bulk plan — never
-once per operation inside a batch. When an increment happens, the result carries
-`increment.incrementedFile`, the path of the new versioned project file. The next
-`check_setup` also names it through the `project_saved_version` check. If the project has
+The guard makes one backup per call, per `batch.run`, and per bulk plan — never
+once per operation inside a batch. When a backup happens, the result carries
+`increment.backupFile`, the path of the copy (see Destructive operations). The next
+`check_setup` also names the saved project through the `project_saved_version` check. If the project has
 never been saved, the operation is refused with the error code `UNSAVED_PROJECT` and a hint
 to save once first.
 
@@ -244,8 +259,8 @@ Save writes. Checkpoints are stored in `~/.ae-mcp/checkpoints.json`.
   Reusing a name replaces the old entry; the old file stays on disk. The project must have
   been saved once already (`UNSAVED_PROJECT` otherwise).
 - `checkpoint_list` returns the checkpoints, newest first.
-- `checkpoint_revert {name}` is destructive. It first runs Increment and Save so the current
-  state is kept as a version, then reopens the checkpoint's file (with `force`). It is
+- `checkpoint_revert {name}` is destructive. It first saves and backs up the current state
+  (see Destructive operations; nothing is backed up when `backupMode` is `off`), then reopens the checkpoint's file (with `force`). It is
   refused in read-only mode, and so is `checkpoint_create`, because both save the project.
 
 ## History, replay and user snippets

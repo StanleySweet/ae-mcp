@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { discoverAEVersions, discoverAeExtensions } from '@ae-mcp/core';
 import { bridgeVersionDiffers } from './bridge-version.js';
 import { readHeartbeat } from './heartbeat.js';
+import type { Settings } from './settings.js';
 import { checkForUpdate, type UpdateCheckOptions } from './update-check.js';
 
 export type CheckStatus = 'ok' | 'fail';
@@ -31,6 +32,20 @@ export interface SetupDeps {
   updateCheck?: Pick<UpdateCheckOptions, 'env' | 'fetchLatest' | 'now' | 'timeoutMs'>;
   /** Invalid files found in `<root>/snippets` (#246), each with its reason. */
   snippetProblems?: Array<{ file: string; reason: string }>;
+  /** The effective settings (after env overrides), listed read-only (ADR-0012). */
+  settings?: Settings;
+}
+
+/** One read-only row that names the effective settings and the backup folder. */
+function settingsRow(root: string, settings: Settings): SetupCheck {
+  const categories = settings.allowedCategories === null ? 'all' : settings.allowedCategories.join(',');
+  return {
+    check: 'settings',
+    status: 'ok',
+    detail:
+      `readOnly=${settings.readOnly}, evalEnabled=${settings.evalEnabled}, allowedCategories=${categories}, ` +
+      `backupMode=${settings.backupMode}, backupKeep=${settings.backupKeep}, backupFolder=${join(root, 'backups')}`,
+  };
 }
 
 async function updateCheckRow(deps: SetupDeps): Promise<SetupCheck | null> {
@@ -218,6 +233,9 @@ export async function runSetupChecks(deps: SetupDeps): Promise<SetupCheck[]> {
     await extensionsCheck(deps.homeDir),
     snippetsCheck(deps.snippetProblems),
   ];
+  if (deps.settings) {
+    checks.push(settingsRow(deps.root, deps.settings));
+  }
   const update = await updateCheckRow(deps);
   if (update !== null) {
     checks.push(update);

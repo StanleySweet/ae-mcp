@@ -107,6 +107,7 @@ describe('mcp server skeleton', () => {
       'project_saved_version',
       'third_party_extensions',
       'user_snippets',
+      'settings',
     ]);
     expect(checks.every((row) => row.status === 'ok' || row.status === 'fail')).toBe(true);
 

@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -89,9 +90,11 @@ async function connectServer(
       calls.push('eval.run');
       return { success: true };
     },
-    'project.increment_save': () => {
-      calls.push('project.increment_save');
-      return { success: true, file: '/projects/P_v008.aep' };
+    'project.save': () => {
+      calls.push('project.save');
+      const file = join(root, 'P.aep');
+      writeFileSync(file, 'aep');
+      return { file };
     },
   };
   const consumer = createQueueConsumer(root, handlers);
@@ -347,6 +350,6 @@ describe('E7-3 eval.run gate', () => {
 
     const result = await call(client, 'ae_do', { op: 'eval.run', args: { code: '1 + 1' } });
     expect(result.isError).toBe(false);
-    expect(calls).toEqual(['project.increment_save', 'eval.run']);
+    expect(calls).toEqual(['project.save', 'eval.run']);
   });
 });

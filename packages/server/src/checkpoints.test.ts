@@ -1,3 +1,4 @@
+import { writeFileSync } from 'node:fs';
 import { chmod, mkdir, mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -44,6 +45,13 @@ async function connect(
       nextVersion += 1;
       return { success: true, file };
     },
+    // checkpoint_revert's guard saves in place and copies the saved file (ADR-0012).
+    'project.save': () => {
+      calls.push({ op: 'project.save', args: null });
+      const file = join(home, 'P.aep');
+      writeFileSync(file, 'aep');
+      return { success: true, file };
+    },
     'project.open': (args: unknown) => {
       calls.push({ op: 'project.open', args });
       return { success: true };
@@ -60,7 +68,8 @@ async function connect(
       readOnly: false,
       allowedCategories: null,
       evalEnabled: false,
-      incrementBeforeDestructive: true,
+      backupMode: 'single',
+      backupKeep: 5,
       ...options.settings,
     },
   });
@@ -179,7 +188,7 @@ describe('named checkpoints', () => {
     expect(listed.json).toEqual({ checkpoints: [] });
   });
 
-  it('checkpoint_revert increments first, then reopens the named file with force', async () => {
+  it('checkpoint_revert saves and backs up first, then reopens the named file with force', async () => {
     const { client, calls } = await start({
       increment: () => ({ success: true, file: '/projects/P_v010.aep' }),
     });
@@ -190,9 +199,19 @@ describe('named checkpoints', () => {
     expect(result.isError).toBe(false);
     expect(result.json).toMatchObject({ name: 'drive-a', file: '/projects/P_v010.aep' });
     expect(calls).toEqual([
-      { op: 'project.increment_save', args: null },
+      { op: 'project.save', args: null },
       { op: 'project.open', args: { path: '/projects/P_v010.aep', force: true } },
     ]);
+  });
+
+  it('checkpoint_revert skips the backup when backupMode is off', async () => {
+    const { client, calls } = await start({ settings: { backupMode: 'off' } });
+    await call(client, 'checkpoint_create', { name: 'drive-b' });
+    calls.length = 0;
+
+    const result = await call(client, 'checkpoint_revert', { name: 'drive-b' });
+    expect(result.isError).toBe(false);
+    expect(calls.map((c) => c.op)).toEqual(['project.open']);
   });
 
   it('checkpoint_revert refuses an unknown name without touching the project', async () => {
