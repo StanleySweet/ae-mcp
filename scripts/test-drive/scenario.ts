@@ -226,6 +226,10 @@ const SQUARE = [
 // ---------------------------------------------------------------- scenario
 
 export const scenario: Step[] = [
+  // Earlier drives' frames pile up in <root>/render, and project.import_folder imports that
+  // folder, so remove them first (only files named like a drive comp).
+  tool('render_clean.drive', 'render_clean', () => ({ pattern: 'ae-mcp_test_drive_*', dryRun: false })),
+
   // --- read-only orientation -------------------------------------------------
   tool('check_setup', 'check_setup', () => ({})),
   tool('ae_version_info', 'ae_version_info', () => ({})),
