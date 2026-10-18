@@ -162,7 +162,7 @@ wildcard (`*`, `?`). It never follows symlinks and never leaves that folder.
 
 Operations flagged destructive:
 
-- `layer.delete`, `keyframe.remove`, `effect.remove` — deletes and removals
+- `layer.delete`, `keyframe.remove`, `keyframe.clear`, `effect.remove` — deletes and removals
 - `project.open` — replaces the open project; refuses unless `force: true` when the open project has unsaved changes (or that cannot be told)
 - `command.execute` — runs an arbitrary menu command
 - `bulk.remove_unused` — a bulk plan that removes or replaces items
@@ -414,6 +414,12 @@ in After Effects inside one undo group, so Edit > Undo reverts it. The result is
 
 Empty `code` returns `INVALID_ARGS`. An exception thrown by the code returns
 `SCRIPT_ERROR` with its message.
+
+## Timing and keyframe clearing (#286)
+
+- `keyframe.clear {comp, layer, property, from?, to?}` removes every key of a property, or only the keys with time in `[from, to]` (seconds). Keys go from last to first. It returns `removed` and `remaining`. When all keys go, the property keeps its value at the comp time. Destructive.
+- `layer.set_timing {comp, layer, startTime?, inPoint?, outPoint?}` sets the layer's start time and in/out points in seconds of comp time. Pass at least one. `outPoint` must stay after `inPoint`. Returns the three values as read back.
+- `layer.replace_source {comp, layer, item, fixExpressions?}` swaps the source of an AV layer for a footage or comp item, given by name or id. `fixExpressions` (default `false`) adjusts expressions for the new source and can be slow. Non-AV layers are refused.
 
 ## Tool details
 

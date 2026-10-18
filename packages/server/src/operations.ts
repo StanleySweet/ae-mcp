@@ -16,6 +16,7 @@ import { registerRenderTemplateOperations } from './operations-render-templates.
 import { registerRenderOperations } from './operations-render.js';
 
 import { registerTemplateOperations } from './operations-templates.js';
+import { registerTimingOperations } from './operations-timing.js';
 import { registerVerifyOperations } from './operations-verify.js';
 import { registerVersionOperations } from './operations-versions.js';
 
@@ -817,6 +818,7 @@ export function defaultOperationRegistry(): OperationRegistry {
   registerBlendOperations(register);
   registerRenderOperations(register);
   registerBatchOperations(register);
+  registerTimingOperations(register);
 
   return registry;
 }

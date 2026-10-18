@@ -584,6 +584,14 @@ export const scenario: Step[] = [
     time: 4,
   })),
 
+  op('keyframe.clear', 'keyframe.clear', (s) => ({
+    comp: s.comp,
+    layer: layerIndex(s, 'Shapes'),
+    property: POS,
+    from: 3.5,
+    to: 4.5,
+  })),
+
   op('property.sample', 'property.sample', (s) => ({
     comp: s.comp,
     index: layerIndex(s, 'Shapes'),
@@ -1238,6 +1246,8 @@ export const scenario: Step[] = [
   // --- explicit skips --------------------------------------------------------
   skipOp('project.new', 'run.ts starts the drive with it (fresh scratch project); a mid-drive call would wipe the scratch comp'),
   skipOp('command.execute', 'runs arbitrary menu commands; unsafe in an unattended drive'),
+  skipOp('layer.set_timing', 'moves the timing of a scratch layer the later steps read; covered by handlers-timing.test.ts'),
+  skipOp('layer.replace_source', 'swaps the source of a drive layer that later steps depend on; covered by handlers-timing.test.ts'),
 ];
 
 /** Names this scenario covers: steps (run or skipped) plus the tools they imply. */

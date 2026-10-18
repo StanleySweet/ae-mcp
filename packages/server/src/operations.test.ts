@@ -83,6 +83,9 @@ const BRIDGE_OPS = [
   'mask.read',
   'shape.add',
   'layer.set_blend_mode',
+  'keyframe.clear',
+  'layer.set_timing',
+  'layer.replace_source',
   'shape.set',
   'shape.read',
   'text.add',
@@ -152,7 +155,7 @@ describe('server operation registry', () => {
 
   it('flags the delete/remove and command.execute operations destructive', () => {
     const registry = defaultOperationRegistry();
-    const destructive = ['layer.delete', 'keyframe.remove', 'effect.remove', 'command.execute'];
+    const destructive = ['layer.delete', 'keyframe.remove', 'keyframe.clear', 'effect.remove', 'command.execute'];
     for (const name of destructive) {
       expect(registry.get(name)!.destructive).toBe(true);
     }
