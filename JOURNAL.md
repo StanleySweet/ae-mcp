@@ -3,6 +3,19 @@
 Append-only progress log. Newest entry first. One entry per session or per landed
 chunk of work; don't rewrite old entries — supersede them.
 
+## 2026-10-18 (evening)
+
+- **`chore(release): v1.9.0`**: ships #283, #284, #285, #286, #287.
+  - A job lost in an AE crash no longer blocks later calls with DIALOG_OPEN: jobs remember the AE process id (#283).
+  - After Effects (Beta) installs are found, scripted when only the beta runs, and get the loader (#284).
+  - Every index-based operation also takes `layer` as an index, name or `{id}` (#285).
+  - New ops `keyframe.clear`, `layer.set_timing`, `layer.replace_source` (#286).
+  - `project.export_json` takes `items` to stay under the result limit (#287).
+  - The built-in MCP server in the AE Beta is documented in the #249 spike notes: HTTP on 4111, bearer token reachable from UXP only.
+  - AE crashed twice today in its own Advanced 3D renderer (10:50 environment light recursion, 19:08 Calder GPU thread).
+  - Test drive: 213 passed, 0 failed, 8 skipped.
+  - Open: `layer.set_timing` and `layer.replace_source` are skipped by the drive (not run on real AE); #249 needs a UXP prototype.
+
 ## 2026-10-18
 
 - **`chore(release): v1.8.0`**: ships #278, #279, #280, #282.
