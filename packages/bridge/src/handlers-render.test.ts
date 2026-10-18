@@ -70,15 +70,6 @@ describe('render.frame', () => {
     expect(ae.fs.get(file)).toBe('PNG:Main:1');
   });
 
-  // An effect-only change left the cached frame in place (#281): every render purges the image caches first.
-  it('purges the image caches before saving, so an effect change shows', async () => {
-    const { ctx, ae } = await payloadContext();
-    seedComp(ae, 1);
-    const outcome = invoke(ctx, 'render.frame', { comp: 'Main', time: 1 });
-    expect(outcome.ok).toBe(true);
-    expect(ae.purgeCalls).toEqual(['IMAGE_CACHES']);
-  });
-
   // E16-3: a second render of the same frame writes a new file, never the earlier one.
   it('gives each render of the same frame a fresh file name', async () => {
     const { ctx, ae } = await payloadContext();

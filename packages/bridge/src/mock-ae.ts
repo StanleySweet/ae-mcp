@@ -1193,16 +1193,6 @@ export class MockItemCollection {
   }
 }
 
-// Ref: https://ae-scripting.docsforadobe.dev/general/application/#apppurge
-// Names only: the guide gives no numeric values, so the mock uses the names as values.
-export const MockPurgeTarget = {
-  ALL_CACHES: 'ALL_CACHES',
-  ALL_MEMORY_CACHES: 'ALL_MEMORY_CACHES',
-  UNDO_CACHES: 'UNDO_CACHES',
-  SNAPSHOT_CACHES: 'SNAPSHOT_CACHES',
-  IMAGE_CACHES: 'IMAGE_CACHES',
-};
-
 // Render queue item status enum, mirroring AE's RQItemStatus global.
 // Ref: https://ae-scripting.docsforadobe.dev/renderqueue/renderqueueitem/#renderqueueitemstatus
 export const RQItemStatus = {
@@ -1488,8 +1478,6 @@ export class MockAE {
   // Ref: https://ae-scripting.docsforadobe.dev/text/fontsobject/#fontsobjectallfonts
   // Family groups: each entry is an array of the FontObjects of one family.
   readonly fontFamilies: MockFontObject[][] = [];
-  // app.purge() targets, in call order.
-  readonly purgeCalls: string[] = [];
 
   app = {
     exitCode: 0,
@@ -1498,10 +1486,6 @@ export class MockAE {
     effects: this.effects,
     // Ref: https://ae-scripting.docsforadobe.dev/text/fontsobject/
     fonts: { allFonts: this.fontFamilies },
-    // Ref: https://ae-scripting.docsforadobe.dev/general/application/#apppurge
-    purge: (target: string): void => {
-      this.purgeCalls.push(target);
-    },
     beginUndoGroup: (name?: string): void => {
       this.undoDepth += 1;
       this.undoGroups.push({ name, start: this.clock, end: -1 });
@@ -1659,7 +1643,6 @@ export function runInMockAE(code: string, ae: MockAE): vm.Context {
     ParagraphJustification: MockParagraphJustification,
     PropertyValueType,
     RQItemStatus,
-    PurgeTarget: MockPurgeTarget,
     File: function (path: string): MockFile {
       return new MockFile(ae, path);
     },

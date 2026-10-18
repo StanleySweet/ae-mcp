@@ -716,44 +716,6 @@ export const scenario: Step[] = [
     index: layerIndex(s, 'Solid'),
     effect: BLUR,
   })),
-  // #281: an effect-only change must show in the next render. The solid is scaled down first,
-  // so the blur has edges to soften; a full-frame flat solid would not change at all.
-  op('effect.blur_cache.scale', 'property.set', (s) => ({ comp: s.comp, index: layerIndex(s, 'Solid'), name: SCALE, value: [30, 30, 100] })),
-  op('effect.blur_cache.apply', 'effect.apply', (s) => ({ comp: s.comp, index: layerIndex(s, 'Solid'), effect: BLUR })),
-  op('effect.blur_cache.zero', 'effect.set_property', (s) => ({
-    comp: s.comp,
-    index: layerIndex(s, 'Solid'),
-    effect: BLUR,
-    property: BLUR_AMOUNT,
-    value: 0,
-  })),
-  tool('ae_render_frame.blur_cache.before', 'ae_render_frame', (s) => ({ comp: s.comp, time: 1 }), {
-    after: (result, state) => {
-      const meta = result.json as { file?: string } | null;
-      if (typeof meta?.file === 'string') {
-        state.vars.blurCacheBefore = meta.file;
-      }
-    },
-  }),
-  op('effect.blur_cache.set', 'effect.set_property', (s) => ({
-    comp: s.comp,
-    index: layerIndex(s, 'Solid'),
-    effect: BLUR,
-    property: BLUR_AMOUNT,
-    value: 50,
-  })),
-  tool('ae_render_frame.blur_cache.after', 'ae_render_frame', (s) => ({ comp: s.comp, time: 1, compareWith: s.vars.blurCacheBefore as string }), {
-    skipIf: (s) => (typeof s.vars.blurCacheBefore === 'string' ? undefined : 'no frame rendered before the blur change'),
-    after: (result) => {
-      const meta = result.json as { compare?: { changedPercent?: number } } | null;
-      const changed = meta?.compare?.changedPercent ?? 0;
-      if (!(changed > 0)) {
-        throw new Error('ae_render_frame showed the stale frame after a blur change (changedPercent ' + changed + ')');
-      }
-    },
-  }),
-  op('effect.blur_cache.remove', 'effect.remove', (s) => ({ comp: s.comp, index: layerIndex(s, 'Solid'), effect: BLUR })),
-  op('effect.blur_cache.unscale', 'property.set', (s) => ({ comp: s.comp, index: layerIndex(s, 'Solid'), name: SCALE, value: [100, 100, 100] })),
 
   // --- presets ---------------------------------------------------------------
   op('preset.list', 'preset.list', () => ({}), {

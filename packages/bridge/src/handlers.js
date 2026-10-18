@@ -644,11 +644,6 @@ AEMCP.register('render.frame', function (args) {
     var file = aemcpRenderPath(comp, time);
     var frame = Math.round(time * comp.frameRate);
     var method = typeof comp.saveFrameToPng === 'function' ? 'direct' : 'queue';
-    // An effect-only change (#281) can leave the frame in AE's image cache, so the render
-    // shows the old pixels. Purge only saved image data: the guide offers no per-comp purge,
-    // and ALL_CACHES would also drop the undo and snapshot caches.
-    // Ref: https://ae-scripting.docsforadobe.dev/general/application/#apppurge
-    app.purge(PurgeTarget.IMAGE_CACHES);
     var draft = args && args.draft === true;
     var savedFactor = null;
     if (draft) {
