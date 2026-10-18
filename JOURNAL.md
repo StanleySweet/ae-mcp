@@ -5,6 +5,16 @@ chunk of work; don't rewrite old entries — supersede them.
 
 ## 2026-10-18
 
+- **`chore(release): v1.8.0`**: ships #278, #279, #280, #282.
+  - `ae_render_frame` takes `timeoutSeconds` (up to 180) and `draft` (half resolution) for heavy 3D frames (#278).
+  - `batch.run` returns a `batchId`; `batch.status` reports whether a batch was applied, and an applied id is refused on retry (#279).
+  - `property.sample` addresses the layer by name or `{id}` (#280).
+  - `layer.add_light` refuses `lightSource`: an environment light with a source layer crashed AE 26.5 (#282).
+  - `comp.set_settings` names the renderer match names: `ADBE Calder` is Advanced 3D, `ADBE Advanced 3d` is Classic 3D.
+  - #281 closed as not a bug; the cache purge was reverted.
+  - Test drive: 212 passed, 0 failed, 6 skipped.
+  - Not verified live: whether `draft` renders at half resolution when `saveFrameToPng` writes after the bridge restores `resolutionFactor`.
+
 - **`chore(release): v1.7.0`**: epic E16 (renders you can trust, and a tidy machine), from a Claude Desktop session that could not render a finished 12-second comp ("LATENT").
   - **`ae_render`:**
     - fails a render that shows no progress or output growth for 120 s;

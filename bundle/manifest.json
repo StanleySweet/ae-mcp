@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "ae-mcp",
   "display_name": "After Effects for Claude",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Let Claude Desktop see and edit the After Effects project you have open.",
   "long_description": "An MCP server that reads and edits the project open in Adobe After Effects on macOS. Install once with the Setup app; Claude then inspects comps and layers, runs operations as single undo steps, and previews bulk edits before applying them.",
   "author": {
