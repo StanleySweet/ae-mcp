@@ -67,3 +67,24 @@ describe('shape.add rect roundness', () => {
     expect(roundness).toBe(60);
   });
 });
+
+// layer.set_parent wrote layer.parentIndex, which AE ignores; the parent must be Layer.parent.
+describe('layer.set_parent', () => {
+  it('parents by index or name and reports the parent index', async () => {
+    const { ctx, ae } = await payloadContext();
+    invoke(ctx, 'comp.create', { name: 'Main', width: 800, height: 600, fps: 24, duration: 5 });
+    invoke(ctx, 'layer.add_null', { comp: 'Main', name: 'Child' });
+    invoke(ctx, 'layer.add_null', { comp: 'Main', name: 'Rig' });
+
+    const out = invoke(ctx, 'layer.set_parent', { comp: 'Main', layer: 'Child', parent: 'Rig' });
+
+    expect(out.ok).toBe(true);
+    const comp = ae.project.item(1) as MockCompItem;
+    const child = comp.layer(out.value.index) as unknown as { parent: { name: string; index: number } | null };
+    expect(child.parent?.name).toBe('Rig');
+    expect(out.value.parentIndex).toBe(child.parent?.index);
+
+    expect(invoke(ctx, 'layer.set_parent', { comp: 'Main', layer: 'Child', parent: 0 }).value).toMatchObject({ parentIndex: null });
+    expect(child.parent).toBeNull();
+  });
+});

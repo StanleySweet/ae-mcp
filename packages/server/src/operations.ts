@@ -220,8 +220,8 @@ export function defaultOperationRegistry(): OperationRegistry {
       opacity: { type: 'number' },
     },
   }));
-  register(operation('layer.set_parent', 'layer', 'Parent a layer to another layer.', {
-    schema: { comp, index: layerIndex, parent: layerIndex },
+  register(operation('layer.set_parent', 'layer', 'Parent a layer to another layer: parent is an index, a name or {id}; 0 or null removes the parent.', {
+    schema: { comp, index: layerIndex, parent: {} },
   }));
   register(operation('layer.delete', 'layer', 'Delete a layer.', {
     destructive: true,

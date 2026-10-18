@@ -1188,14 +1188,24 @@ AEMCP.register('layer.set_transform', function (args) {
     return { index: layer.index, set: set };
 });
 
+// `parent` is a layer index, name or {id}; 0, null or absent removes the parent. It used to
+// write layer.parentIndex, which is not a Layer attribute: AE ignored it and reported success.
+// Ref: https://ae-scripting.docsforadobe.dev/layer/layer/#layerparent
 AEMCP.register('layer.set_parent', function (args) {
     var compName = args && args.comp ? args.comp : null;
-    var parentIndex = args && args.parent ? args.parent : 0;
     var comp = aemcpRequireComp(compName);
     var layer = aemcpRequireLayer(comp, args, 1);
-    if (!layer) return { success: false, error: 'Layer not found' };
-    layer.parentIndex = parentIndex;
-    return { success: true };
+    var target = args ? args.parent : undefined;
+    if (target === undefined || target === null || target === 0) {
+        layer.parent = null;
+        return { success: true, index: layer.index, parentIndex: null };
+    }
+    var parent = aemcpRequireLayer(comp, { layer: target });
+    if (parent.index === layer.index) {
+        aemcpAbortArgs('a layer cannot be its own parent');
+    }
+    layer.parent = parent;
+    return { success: true, index: layer.index, parentIndex: layer.parent ? layer.parent.index : null };
 });
 
 AEMCP.register('layer.delete', function (args) {
