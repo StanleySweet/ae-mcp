@@ -99,3 +99,6 @@ the token from inside After Effects (UXP `getAssistantPreferences`).
 2. With the token, list the native tools and their schemas; record them here.
 3. Prototype: a UXP extension that answers `tools/list` and `tools/call` for one ae-mcp
    operation through `postMCPResponse`. Then write the go/no-go ADR.
+- 2026-10-18: the beta's Preferences have no "Agents" section, and ExtendScript has no
+  `MCP` object (`app.reflect.properties` lists none). The token is only reachable from
+  UXP (`getAssistantPreferences`), so the prototype must start as a UXP plugin.
